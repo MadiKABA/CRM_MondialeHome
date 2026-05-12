@@ -1,0 +1,251 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Fonts are loaded via next/font/google in layout.tsx */
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================
+   THEME TOKENS — Tailwind v4 CSS-first config
+   ============================================================ */
+@theme inline {
+  /* Colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Charts */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Sidebar */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Brand colors (extra — pour usage direct dans le code) */
+  --color-brand-terracotta: #c4622d;
+  --color-brand-sand: #d4a853;
+  --color-brand-moss: #4a6741;
+  --color-brand-cream: #fdfaf6;
+  --color-brand-bark: #8b7355;
+
+  /* Radius */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Typography — variables injectées par next/font via layout.tsx */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-plus-jakarta-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+/* ============================================================
+   PALETTE MONDIAL HOME — Light Mode
+   Inspiration : ameublement africain contemporain
+   Terracotta chaud + Sable doré + Vert mousse
+   ============================================================ */
+:root {
+  /* Base */
+  --background: oklch(0.99 0.005 80); /* Crème ivoire très clair */
+  --foreground: oklch(0.2 0.02 50); /* Brun foncé, pas noir pur */
+
+  /* Cards & Popovers */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.02 50);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.02 50);
+
+  /* Primary — Terracotta #C4622D */
+  --primary: oklch(0.556 0.151 42.5);
+  --primary-foreground: oklch(0.98 0.005 80);
+
+  /* Secondary — Sable doré #D4A853 */
+  --secondary: oklch(0.76 0.098 72);
+  --secondary-foreground: oklch(0.2 0.02 50);
+
+  /* Muted */
+  --muted: oklch(0.96 0.008 60);
+  --muted-foreground: oklch(0.52 0.03 55);
+
+  /* Accent — Vert mousse #4A6741 */
+  --accent: oklch(0.48 0.08 145);
+  --accent-foreground: oklch(0.98 0.005 80);
+
+  /* Destructive */
+  --destructive: oklch(0.577 0.245 27.325);
+
+  /* Borders & Inputs */
+  --border: oklch(0.9 0.01 60);
+  --input: oklch(0.9 0.01 60);
+  --ring: oklch(0.556 0.151 42.5);
+
+  /* Charts — palette cohérente */
+  --chart-1: oklch(0.556 0.151 42.5); /* Terracotta */
+  --chart-2: oklch(0.76 0.098 72); /* Sable */
+  --chart-3: oklch(0.48 0.08 145); /* Mousse */
+  --chart-4: oklch(0.65 0.12 28); /* Brique */
+  --chart-5: oklch(0.85 0.07 85); /* Champagne */
+
+  /* Radius */
+  --radius: 0.5rem;
+
+  /* Sidebar */
+  --sidebar: oklch(0.2 0.025 42); /* Brun profond */
+  --sidebar-foreground: oklch(0.93 0.01 60);
+  --sidebar-primary: oklch(0.556 0.151 42.5);
+  --sidebar-primary-foreground: oklch(0.98 0.005 80);
+  --sidebar-accent: oklch(0.28 0.025 42);
+  --sidebar-accent-foreground: oklch(0.93 0.01 60);
+  --sidebar-border: oklch(0.28 0.025 42);
+  --sidebar-ring: oklch(0.556 0.151 42.5);
+}
+
+/* ============================================================
+   PALETTE MONDIAL HOME — Dark Mode
+   ============================================================ */
+.dark {
+  --background: oklch(0.16 0.015 40);
+  --foreground: oklch(0.93 0.01 60);
+
+  --card: oklch(0.2 0.02 40);
+  --card-foreground: oklch(0.93 0.01 60);
+  --popover: oklch(0.2 0.02 40);
+  --popover-foreground: oklch(0.93 0.01 60);
+
+  /* Primary reste terracotta, légèrement plus vif */
+  --primary: oklch(0.62 0.16 42.5);
+  --primary-foreground: oklch(0.1 0.01 40);
+
+  --secondary: oklch(0.3 0.02 40);
+  --secondary-foreground: oklch(0.93 0.01 60);
+
+  --muted: oklch(0.25 0.015 40);
+  --muted-foreground: oklch(0.65 0.03 55);
+
+  --accent: oklch(0.38 0.07 145);
+  --accent-foreground: oklch(0.93 0.01 60);
+
+  --destructive: oklch(0.704 0.191 22.216);
+
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.62 0.16 42.5);
+
+  --chart-1: oklch(0.62 0.16 42.5);
+  --chart-2: oklch(0.76 0.098 72);
+  --chart-3: oklch(0.55 0.1 145);
+  --chart-4: oklch(0.7 0.13 28);
+  --chart-5: oklch(0.85 0.07 85);
+
+  --sidebar: oklch(0.13 0.015 40);
+  --sidebar-foreground: oklch(0.93 0.01 60);
+  --sidebar-primary: oklch(0.62 0.16 42.5);
+  --sidebar-primary-foreground: oklch(0.1 0.01 40);
+  --sidebar-accent: oklch(0.2 0.02 40);
+  --sidebar-accent-foreground: oklch(0.93 0.01 60);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.62 0.16 42.5);
+}
+
+/* ============================================================
+   BASE STYLES
+   ============================================================ */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading;
+  }
+
+  /* Scrollbar subtile */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
+  }
+}
+
+/* ============================================================
+   ANIMATIONS PERSONNALISÉES
+   ============================================================ */
+@layer utilities {
+  .animate-in-up {
+    animation: slideInUp 0.2s ease-out;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.15s ease-out;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
