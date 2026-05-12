@@ -1,59 +1,100 @@
-// ============================================================
-// PRISMA SCHEMA — CRM Mondial Home
-// ============================================================
-// IMPORTANT: Ce fichier est un placeholder.
-// Le schéma complet sera fourni par le client.
-// Lancer `pnpm db:push` après avoir reçu le schéma.
-// ============================================================
+// ============================================================================
+// SCHEMA PRISMA — CRM MONDIAL HOME
+// Version: 2.0
+// Base de données: PostgreSQL 16
+// Authentification: Better Auth
+// ============================================================================
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-// ============================================================
-// BETTER AUTH — Tables requises (seront étendues)
-// ============================================================
+// ============================================================================
+// SECTION 1 — AUTHENTIFICATION (Better Auth)
+// ============================================================================
 
 model User {
-  id            String    @id @default(cuid())
-  name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  email           String    @unique
+  emailVerified   Boolean   @default(false)
+  emailVerifiedAt DateTime?
+  name            String
+  firstName       String?
+  lastName        String?
+  image           String?
+  phone           String?
+
+  // Better Auth
+  password         String?
+  twoFactorEnabled Boolean @default(false)
+  twoFactorSecret  String?
+
+  // Métadonnées utilisateur
+  jobTitle   String?
+  department String?
+  language   String  @default("fr")
+  timezone   String  @default("Africa/Dakar")
+
+  // Statut
+  isActive    Boolean   @default(true)
+  isSuperAdmin Boolean  @default(false)
+  lastLoginAt DateTime?
+  lastLoginIp String?
+  loginCount  Int       @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relations Better Auth
   sessions      Session[]
   accounts      Account[]
+  verifications Verification[]
 
+  // Relations métier
+  roles              UserRole[]
+  permissions        UserPermission[]
+  salesAsSeller      Sale[]     @relation("Seller")
+  createdCampaigns   Campaign[] @relation("CampaignCreator")
+  validatedCampaigns Campaign[] @relation("CampaignValidator")
+  auditLogs          AuditLog[]
+  notifications      Notification[]
+  assignedClients    Client[]   @relation("AssignedTo")
+  createdClients     Client[]   @relation("CreatedBy")
+  invitationsSent    Invitation[] @relation("InvitedBy")
+
+  @@index([email])
   @@map("users")
 }
 
 model Session {
   id        String   @id @default(cuid())
-  expiresAt DateTime
-  token     String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  ipAddress String?
-  userAgent String?
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([token])
   @@map("sessions")
 }
 
 model Account {
   id                    String    @id @default(cuid())
-  accountId             String
-  providerId            String
   userId                String
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerId            String
+  accountId             String
   accessToken           String?
   refreshToken          String?
   idToken               String?
@@ -61,19 +102,1209 @@ model Account {
   refreshTokenExpiresAt DateTime?
   scope                 String?
   password              String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([providerId, accountId])
+  @@index([userId])
   @@map("accounts")
 }
 
 model Verification {
-  id         String    @id @default(cuid())
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   identifier String
   value      String
   expiresAt  DateTime
-  createdAt  DateTime? @default(now())
-  updatedAt  DateTime? @updatedAt
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([identifier])
   @@map("verifications")
+}
+
+model Invitation {
+  id          String           @id @default(cuid())
+  email       String
+  invitedById String
+  invitedBy   User             @relation("InvitedBy", fields: [invitedById], references: [id])
+  roleId      String?
+  role        Role?            @relation(fields: [roleId], references: [id])
+  token       String           @unique
+  status      InvitationStatus @default(PENDING)
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([token])
+  @@map("invitations")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+// ============================================================================
+// SECTION 2 — RBAC (Rôles et Permissions)
+// ============================================================================
+
+model Role {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String?
+  isSystem    Boolean @default(false)
+  priority    Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  permissions RolePermission[]
+  users       UserRole[]
+  invitations Invitation[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(cuid())
+  code        String  @unique
+  module      String
+  action      String
+  scope       String  @default("all")
+  description String?
+  category    String?
+
+  createdAt DateTime @default(now())
+
+  roles RolePermission[]
+  users UserPermission[]
+
+  @@index([module, action])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  granted   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  assignedAt DateTime @default(now())
+  assignedBy String?
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@map("user_roles")
+}
+
+model UserPermission {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  granted   Boolean   @default(true)
+  reason    String?
+  expiresAt DateTime?
+  grantedBy String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, permissionId])
+  @@index([userId])
+  @@map("user_permissions")
+}
+
+// ============================================================================
+// SECTION 3 — GESTION DES CLIENTS
+// ============================================================================
+
+model Client {
+  id        String  @id @default(cuid())
+  reference String? @unique
+
+  // Informations personnelles
+  firstName String
+  lastName  String?
+  fullName  String
+  gender    Gender?
+  birthDate DateTime?
+
+  // Coordonnées
+  phone          String?
+  phoneSecondary String?
+  whatsapp       String?
+  email          String?
+
+  // Adresse
+  address    String?
+  city       String?
+  district   String?
+  region     String?
+  country    String  @default("SN")
+  postalCode String?
+  latitude   Float?
+  longitude  Float?
+
+  // Préférences
+  language         String  @default("fr")
+  preferredChannel String?
+
+  // Acquisition
+  source          String?
+  sourceDetails   String?
+  acquisitionDate DateTime @default(now())
+
+  // Statut
+  status ClientStatus @default(ACTIVE)
+  isVip  Boolean      @default(false)
+
+  // Consentements
+  smsConsent      Boolean @default(true)
+  whatsappConsent Boolean @default(true)
+  emailConsent    Boolean @default(true)
+
+  // Données enrichies (calculées via triggers ou jobs)
+  totalSpent      Decimal   @default(0) @db.Decimal(15, 2)
+  totalOrders     Int       @default(0)
+  averageBasket   Decimal   @default(0) @db.Decimal(15, 2)
+  firstPurchaseAt DateTime?
+  lastPurchaseAt  DateTime?
+  rfmScore        String?
+
+  // Notes et métadonnées
+  notes        String?
+  tags         String[]
+  customFields Json     @default("{}")
+
+  // Relations utilisateurs
+  assignedToId String?
+  assignedTo   User?   @relation("AssignedTo", fields: [assignedToId], references: [id])
+  createdById  String?
+  createdBy    User?   @relation("CreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  sales                Sale[]
+  messages             Message[]
+  segmentMembers       SegmentMember[]
+  groupMembers         ClientGroupMember[]
+  consentLogs          ConsentLog[]
+  automationExecutions AutomationExecution[]
+  categoryPreferences  ClientCategoryPreference[]
+
+  @@unique([phone])
+  @@index([email])
+  @@index([fullName])
+  @@index([status])
+  @@index([city])
+  @@index([isVip])
+  @@map("clients")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  UNSUBSCRIBED
+  BLACKLISTED
+  DELETED
+}
+
+model ClientGroup {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  color       String?
+  icon        String?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members ClientGroupMember[]
+
+  @@map("client_groups")
+}
+
+model ClientGroupMember {
+  id       String      @id @default(cuid())
+  clientId String
+  client   Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  groupId  String
+  group    ClientGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  addedAt DateTime @default(now())
+  addedBy String?
+
+  @@unique([clientId, groupId])
+  @@index([clientId])
+  @@index([groupId])
+  @@map("client_group_members")
+}
+
+model ConsentLog {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  channel   String
+  consent   Boolean
+  source    String?
+  ipAddress String?
+  userAgent String?
+  reason    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([clientId])
+  @@index([createdAt])
+  @@map("consent_logs")
+}
+
+model ClientCategoryPreference {
+  id         String   @id @default(cuid())
+  clientId   String
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  score             Float     @default(0)
+  lastInteractionAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clientId, categoryId])
+  @@index([clientId])
+  @@map("client_category_preferences")
+}
+
+// ============================================================================
+// SECTION 4 — SEGMENTATION
+// ============================================================================
+
+model Segment {
+  id          String      @id @default(cuid())
+  name        String
+  slug        String      @unique
+  description String?
+  color       String?
+  icon        String?
+  type        SegmentType @default(DYNAMIC)
+  rules       Json        @default("[]")
+  isSystem    Boolean     @default(false)
+  isActive    Boolean     @default(true)
+
+  memberCount    Int       @default(0)
+  lastComputedAt DateTime?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members   SegmentMember[]
+  campaigns Campaign[]
+
+  @@map("segments")
+}
+
+enum SegmentType {
+  DYNAMIC
+  STATIC
+}
+
+model SegmentMember {
+  id        String  @id @default(cuid())
+  segmentId String
+  segment   Segment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  clientId  String
+  client    Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  addedAt DateTime @default(now())
+
+  @@unique([segmentId, clientId])
+  @@index([segmentId])
+  @@index([clientId])
+  @@map("segment_members")
+}
+
+// ============================================================================
+// SECTION 5 — CATALOGUE PRODUITS
+// ============================================================================
+
+model Category {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String?
+  image       String?
+  icon        String?
+
+  parentId String?
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  articles          Article[]
+  clientPreferences ClientCategoryPreference[]
+
+  @@index([parentId])
+  @@map("categories")
+}
+
+model Article {
+  id        String  @id @default(cuid())
+  reference String  @unique
+  barcode   String? @unique
+
+  // Informations
+  name             String
+  shortDescription String?
+  description      String?
+
+  // Catégorisation
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+  brand      String?
+  supplier   String?
+
+  // Attributs flexibles
+  color      String?
+  material   String?
+  dimensions String?
+  weight     Float?
+  attributes Json    @default("{}")
+
+  // Prix
+  price          Decimal   @db.Decimal(15, 2)
+  promoPrice     Decimal?  @db.Decimal(15, 2)
+  promoStartDate DateTime?
+  promoEndDate   DateTime?
+  costPrice      Decimal?  @db.Decimal(15, 2)
+  currency       String    @default("XOF")
+
+  // Stock
+  stock      Int @default(0)
+  stockAlert Int @default(5)
+
+  // Statut
+  status      ArticleStatus @default(AVAILABLE)
+  isNew       Boolean       @default(false)
+  arrivalDate DateTime?
+
+  // Médias
+  mainImage String?
+  images    String[]
+  videoUrl  String?
+
+  // SEO et métadonnées
+  tags     String[]
+  metadata Json     @default("{}")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  saleItems SaleItem[]
+
+  @@index([reference])
+  @@index([categoryId])
+  @@index([status])
+  @@index([isNew])
+  @@map("articles")
+}
+
+enum ArticleStatus {
+  AVAILABLE
+  OUT_OF_STOCK
+  COMING_SOON
+  ARCHIVED
+  DISCONTINUED
+}
+
+// ============================================================================
+// SECTION 6 — VENTES
+// ============================================================================
+
+model Sale {
+  id            String @id @default(cuid())
+  invoiceNumber String @unique
+
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
+  sellerId String?
+  seller   User?  @relation("Seller", fields: [sellerId], references: [id])
+
+  // Montants
+  subtotal     Decimal @db.Decimal(15, 2)
+  discount     Decimal @default(0) @db.Decimal(15, 2)
+  discountType String?
+  tax          Decimal @default(0) @db.Decimal(15, 2)
+  total        Decimal @db.Decimal(15, 2)
+  amountPaid   Decimal @default(0) @db.Decimal(15, 2)
+  amountDue    Decimal @default(0) @db.Decimal(15, 2)
+  currency     String  @default("XOF")
+
+  // Paiement
+  paymentMethod  PaymentMethod?
+  paymentStatus  PaymentStatus @default(PAID)
+  paymentDetails Json          @default("{}")
+
+  // Statut
+  status SaleStatus @default(COMPLETED)
+
+  // Lieu et source
+  location   String?
+  source     String?
+  campaignId String?
+  campaign   Campaign? @relation(fields: [campaignId], references: [id])
+
+  // Livraison
+  deliveryRequired Boolean  @default(false)
+  deliveryAddress  String?
+  deliveryDate     DateTime?
+  deliveryStatus   String?
+
+  // Métadonnées
+  notes    String?
+  metadata Json    @default("{}")
+
+  saleDate    DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  cancelledAt DateTime?
+  refundedAt  DateTime?
+
+  items SaleItem[]
+
+  @@index([clientId])
+  @@index([sellerId])
+  @@index([campaignId])
+  @@index([saleDate])
+  @@index([status])
+  @@map("sales")
+}
+
+enum PaymentMethod {
+  CASH
+  WAVE
+  ORANGE_MONEY
+  FREE_MONEY
+  CARD
+  CHECK
+  CREDIT
+  BANK_TRANSFER
+  OTHER
+}
+
+enum PaymentStatus {
+  PAID
+  PARTIAL
+  PENDING
+  OVERDUE
+  REFUNDED
+}
+
+enum SaleStatus {
+  DRAFT
+  COMPLETED
+  CANCELLED
+  REFUNDED
+  RETURNED
+}
+
+model SaleItem {
+  id        String  @id @default(cuid())
+  saleId    String
+  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  articleId String
+  article   Article @relation(fields: [articleId], references: [id])
+
+  quantity  Int
+  unitPrice Decimal @db.Decimal(15, 2)
+  discount  Decimal @default(0) @db.Decimal(15, 2)
+  subtotal  Decimal @db.Decimal(15, 2)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+
+  @@index([saleId])
+  @@index([articleId])
+  @@map("sale_items")
+}
+
+// ============================================================================
+// SECTION 7 — CAMPAGNES
+// ============================================================================
+
+model Campaign {
+  id          String             @id @default(cuid())
+  name        String
+  description String?
+  objective   CampaignObjective?
+  category    String?
+
+  // Type et statut
+  type   CampaignType   @default(MANUAL)
+  status CampaignStatus @default(DRAFT)
+
+  // Audience
+  audienceType    AudienceType @default(ALL)
+  segmentId       String?
+  segment         Segment?     @relation(fields: [segmentId], references: [id])
+  audienceFilters Json         @default("{}")
+  audienceCount   Int          @default(0)
+  excludeFilters  Json         @default("{}")
+
+  // Canaux
+  channels        String[]
+  fallbackEnabled Boolean  @default(false)
+  fallbackDelay   Int?
+
+  // Planification
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  completedAt DateTime?
+
+  // Récurrence
+  isRecurring    Boolean @default(false)
+  recurrenceRule String?
+
+  // A/B Testing
+  abTestEnabled   Boolean @default(false)
+  abTestConfig    Json    @default("{}")
+  winnerVariantId String?
+
+  // Coûts et budget
+  estimatedCost Decimal  @default(0) @db.Decimal(15, 2)
+  actualCost    Decimal  @default(0) @db.Decimal(15, 2)
+  budget        Decimal? @db.Decimal(15, 2)
+
+  // Statistiques
+  totalRecipients   Int @default(0)
+  totalSent         Int @default(0)
+  totalDelivered    Int @default(0)
+  totalOpened       Int @default(0)
+  totalClicked      Int @default(0)
+  totalFailed       Int @default(0)
+  totalUnsubscribed Int @default(0)
+
+  // ROI
+  attributedRevenue Decimal @default(0) @db.Decimal(15, 2)
+  attributedSales   Int     @default(0)
+  attributionWindow Int     @default(30)
+
+  // Création et validation
+  createdById        String
+  createdBy          User     @relation("CampaignCreator", fields: [createdById], references: [id])
+  validatedById      String?
+  validatedBy        User?    @relation("CampaignValidator", fields: [validatedById], references: [id])
+  validatedAt        DateTime?
+  requiresValidation Boolean  @default(false)
+
+  notes String?
+  tags  String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  variants CampaignVariant[]
+  messages Message[]
+  sales    Sale[]
+
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([createdById])
+  @@map("campaigns")
+}
+
+enum CampaignType {
+  MANUAL
+  AUTOMATED
+  TRANSACTIONAL
+  RECURRING
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  PAUSED
+  CANCELLED
+  FAILED
+  COMPLETED
+}
+
+enum CampaignObjective {
+  PROMOTION
+  NEW_ARRIVAL
+  EVENT
+  REACTIVATION
+  LOYALTY
+  ANNOUNCEMENT
+  SURVEY
+  OTHER
+}
+
+enum AudienceType {
+  ALL
+  SEGMENT
+  GROUP
+  CUSTOM
+  SINGLE
+}
+
+model CampaignVariant {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  name    String
+  channel String
+
+  // Contenu
+  subject     String?
+  preheader   String?
+  content     String
+  contentHtml String?
+  templateId  String?
+  template    Template? @relation(fields: [templateId], references: [id])
+
+  // WhatsApp
+  whatsappTemplateId String?
+  mediaUrl           String?
+  mediaType          String?
+  buttons            Json    @default("[]")
+
+  // Email
+  fromName  String?
+  fromEmail String?
+  replyTo   String?
+
+  // SMS
+  senderId String?
+
+  // Variables
+  variables Json @default("{}")
+
+  // A/B Testing
+  trafficPercent Int @default(100)
+
+  // Stats
+  sent      Int @default(0)
+  delivered Int @default(0)
+  opened    Int @default(0)
+  clicked   Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages Message[]
+
+  @@index([campaignId])
+  @@map("campaign_variants")
+}
+
+// ============================================================================
+// SECTION 8 — MESSAGES
+// ============================================================================
+
+model Message {
+  id String @id @default(cuid())
+
+  campaignId String?
+  campaign   Campaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  variantId  String?
+  variant    CampaignVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Envoi
+  channel   String
+  recipient String
+  senderId  String?
+
+  // Contenu
+  subject String?
+  content String
+
+  // Statut
+  status MessageStatus @default(PENDING)
+
+  // Provider
+  externalId       String?
+  providerName     String?
+  providerResponse Json    @default("{}")
+
+  // Timestamps
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  openedAt    DateTime?
+  clickedAt   DateTime?
+  failedAt    DateTime?
+
+  // Erreur
+  errorCode    String?
+  errorMessage String?
+  retryCount   Int    @default(0)
+
+  // Coût
+  cost     Decimal @default(0) @db.Decimal(10, 4)
+  segments Int     @default(1)
+
+  metadata Json @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events MessageEvent[]
+
+  @@index([clientId])
+  @@index([campaignId])
+  @@index([status])
+  @@index([channel])
+  @@index([externalId])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+enum MessageStatus {
+  PENDING
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  FAILED
+  BOUNCED
+  REJECTED
+  UNSUBSCRIBED
+  EXPIRED
+}
+
+model MessageEvent {
+  id        String  @id @default(cuid())
+  messageId String
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  eventType String
+  eventData Json   @default("{}")
+
+  ipAddress String?
+  userAgent String?
+  linkUrl   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([messageId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("message_events")
+}
+
+// ============================================================================
+// SECTION 9 — TEMPLATES
+// ============================================================================
+
+model Template {
+  id          String           @id @default(cuid())
+  name        String
+  slug        String           @unique
+  description String?
+  channel     String
+  category    TemplateCategory
+
+  // Contenu
+  subject     String?
+  content     String
+  contentHtml String?
+  preheader   String?
+
+  // WhatsApp Meta
+  whatsappTemplateName String?
+  whatsappStatus       String?
+  whatsappCategory     String?
+  whatsappLanguage     String? @default("fr")
+
+  // Email
+  fromName  String?
+  fromEmail String?
+
+  variables String[]
+
+  isActive Boolean @default(true)
+  isSystem Boolean @default(false)
+
+  usageCount Int       @default(0)
+  lastUsedAt DateTime?
+
+  version  Int       @default(1)
+  parentId String?
+  parent   Template?  @relation("TemplateVersions", fields: [parentId], references: [id])
+  versions Template[] @relation("TemplateVersions")
+
+  tags String[]
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  variants CampaignVariant[]
+
+  @@index([channel])
+  @@index([category])
+  @@map("templates")
+}
+
+enum TemplateCategory {
+  PROMOTION
+  NEW_ARRIVAL
+  EVENT
+  BIRTHDAY
+  WELCOME
+  REMINDER
+  THANK_YOU
+  REACTIVATION
+  POST_PURCHASE
+  ANNOUNCEMENT
+  OTHER
+}
+
+// ============================================================================
+// SECTION 10 — AUTOMATISATIONS
+// ============================================================================
+
+model Automation {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  triggerType TriggerType
+  triggerConfig Json      @default("{}")
+  steps       Json        @default("[]")
+  isActive    Boolean     @default(false)
+
+  maxExecutions Int?
+  cooldownHours Int?
+
+  totalEntered    Int   @default(0)
+  totalCompleted  Int   @default(0)
+  totalExited     Int   @default(0)
+  conversionRate  Float @default(0)
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  executions AutomationExecution[]
+
+  @@map("automations")
+}
+
+enum TriggerType {
+  CLIENT_CREATED
+  BIRTHDAY
+  PURCHASE_ANNIVERSARY
+  POST_PURCHASE
+  INACTIVITY
+  SEGMENT_ENTRY
+  SEGMENT_EXIT
+  DATE_BASED
+  MANUAL
+  ARTICLE_CATEGORY_INTEREST
+}
+
+model AutomationExecution {
+  id           String     @id @default(cuid())
+  automationId String
+  automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  clientId     String
+  client       Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  status      ExecutionStatus @default(RUNNING)
+  currentStep Int             @default(0)
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  executionLog Json @default("[]")
+
+  nextStepAt DateTime?
+
+  @@index([automationId])
+  @@index([clientId])
+  @@index([status])
+  @@index([nextStepAt])
+  @@map("automation_executions")
+}
+
+enum ExecutionStatus {
+  RUNNING
+  WAITING
+  COMPLETED
+  FAILED
+  CANCELLED
+  EXITED
+}
+
+// ============================================================================
+// SECTION 11 — CONFIGURATION DES CANAUX
+// ============================================================================
+
+model ChannelConfig {
+  id       String @id @default(cuid())
+  channel  String @unique
+  provider String
+
+  isActive  Boolean @default(false)
+  isDefault Boolean @default(false)
+
+  credentials Json @default("{}")
+  settings    Json @default("{}")
+
+  balance      Decimal? @db.Decimal(15, 2)
+  monthlyLimit Int?
+  monthlyUsed  Int      @default(0)
+
+  lowBalanceThreshold Decimal? @db.Decimal(15, 2)
+
+  lastSyncAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("channel_configs")
+}
+
+// ============================================================================
+// SECTION 12 — SUIVI & AUDIT
+// ============================================================================
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action   String
+  entity   String
+  entityId String?
+
+  oldValue Json?
+  newValue Json?
+
+  ipAddress String?
+  userAgent String?
+
+  status       String  @default("success")
+  errorMessage String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id     String           @id @default(cuid())
+  userId String
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type   NotificationType
+  title  String
+  message String
+  data   Json             @default("{}")
+  link   String?
+
+  isRead Boolean   @default(false)
+  readAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  CAMPAIGN
+  SALE
+  SYSTEM
+  ALERT
+}
+
+// ============================================================================
+// SECTION 13 — IMPORTS / EXPORTS
+// ============================================================================
+
+model ImportJob {
+  id       String     @id @default(cuid())
+  type     ImportType
+  fileName String
+  fileUrl  String?
+  fileSize Int?
+  status   JobStatus  @default(PENDING)
+
+  totalRows     Int @default(0)
+  processedRows Int @default(0)
+  successRows   Int @default(0)
+  errorRows     Int @default(0)
+
+  mapping Json @default("{}")
+  options Json @default("{}")
+  errors  Json @default("[]")
+
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([status])
+  @@index([type])
+  @@map("import_jobs")
+}
+
+model ExportJob {
+  id      String    @id @default(cuid())
+  type    String
+  format  String
+  filters Json      @default("{}")
+  status  JobStatus @default(PENDING)
+
+  fileUrl     String?
+  fileName    String?
+  fileSize    Int?
+  recordCount Int     @default(0)
+
+  startedAt   DateTime?
+  completedAt DateTime?
+  expiresAt   DateTime?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([status])
+  @@map("export_jobs")
+}
+
+enum ImportType {
+  CLIENTS
+  ARTICLES
+  SALES
+  CATEGORIES
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// ============================================================================
+// SECTION 14 — CONFIGURATION SYSTÈME
+// ============================================================================
+
+model Setting {
+  id          String  @id @default(cuid())
+  key         String  @unique
+  value       Json
+  category    String?
+  description String?
+  isPublic    Boolean @default(false)
+
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@map("settings")
+}
+
+model ApiKey {
+  id     String @id @default(cuid())
+  name   String
+  key    String @unique
+  prefix String
+
+  scopes String[]
+
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  isActive   Boolean   @default(true)
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+
+  @@index([key])
+  @@map("api_keys")
+}
+
+model Webhook {
+  id     String   @id @default(cuid())
+  name   String
+  url    String
+  events String[]
+  secret String?
+
+  isActive Boolean @default(true)
+
+  lastTriggeredAt DateTime?
+  failureCount    Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("webhooks")
 }
