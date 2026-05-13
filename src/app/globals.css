@@ -119,14 +119,14 @@
   /* Radius */
   --radius: 0.5rem;
 
-  /* Sidebar */
-  --sidebar: oklch(0.2 0.025 42); /* Brun profond */
-  --sidebar-foreground: oklch(0.93 0.01 60);
-  --sidebar-primary: oklch(0.556 0.151 42.5);
+  /* Sidebar — fond blanc pour light mode */
+  --sidebar: oklch(1 0 0); /* Blanc pur */
+  --sidebar-foreground: oklch(0.2 0.02 50); /* Brun foncé */
+  --sidebar-primary: oklch(0.556 0.151 42.5); /* Terracotta */
   --sidebar-primary-foreground: oklch(0.98 0.005 80);
-  --sidebar-accent: oklch(0.28 0.025 42);
-  --sidebar-accent-foreground: oklch(0.93 0.01 60);
-  --sidebar-border: oklch(0.28 0.025 42);
+  --sidebar-accent: oklch(0.94 0.012 50); /* Crème légère pour hover/actif */
+  --sidebar-accent-foreground: oklch(0.2 0.02 50);
+  --sidebar-border: oklch(0.9 0.01 60); /* Border subtile */
   --sidebar-ring: oklch(0.556 0.151 42.5);
 }
 
@@ -227,6 +227,46 @@
 
   .animate-fade-in {
     animation: fadeIn 0.15s ease-out;
+  }
+
+  .animate-shake {
+    animation: shake 0.5s ease-in-out;
+  }
+
+  /* Indicateur barre verticale pour item actif de la sidebar */
+  [data-sidebar="menu-button"][data-active="true"]::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 60%;
+    background-color: var(--sidebar-primary);
+    border-radius: 0 2px 2px 0;
+  }
+
+  [data-sidebar="menu-item"] {
+    position: relative;
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(4px);
   }
 }
 

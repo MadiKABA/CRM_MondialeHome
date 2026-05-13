@@ -1,15 +1,11 @@
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "better-auth/crypto";
 
 const db = new PrismaClient();
 
 // ============================================================================
 // HELPERS
 // ============================================================================
-
-async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 12);
-}
 
 // ============================================================================
 // PERMISSIONS
@@ -1019,11 +1015,19 @@ async function main() {
   // 3. Super Admin
   console.log("Création du Super Administrateur...");
   const superAdminPassword = process.env["SUPER_ADMIN_PASSWORD"] ?? "Mondial@2024!";
-  const hashedPassword = await hashPassword(superAdminPassword);
+
+  // ⭐ Utiliser le context Better Auth pour hasher correctement
+  const hash = await hashPassword(superAdminPassword);
 
   const superAdmin = await db.user.upsert({
     where: { email: "admin@mondialhome.sn" },
-    update: {},
+    update: {
+      // Au cas où on relance le seed, on remet à jour les flags
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+      isSuperAdmin: true,
+      isActive: true,
+    },
     create: {
       email: "admin@mondialhome.sn",
       name: "Super Admin",
@@ -1036,24 +1040,27 @@ async function main() {
       language: "fr",
       timezone: "Africa/Dakar",
       jobTitle: "Administrateur Système",
-      accounts: {
-        create: {
-          providerId: "credential",
-          accountId: "admin@mondialhome.sn",
-          password: hashedPassword,
-        },
-      },
     },
   });
 
-  const superAdminRole = await db.role.findUnique({ where: { slug: "super_admin" } });
-  if (superAdminRole) {
-    await db.userRole.upsert({
-      where: { userId_roleId: { userId: superAdmin.id, roleId: superAdminRole.id } },
-      update: {},
-      create: { userId: superAdmin.id, roleId: superAdminRole.id },
-    });
-  }
+  // ⭐ Étape B : Créer/Mettre à jour le compte avec accountId = userId
+  await db.account.upsert({
+    where: {
+      providerId_accountId: {
+        providerId: "credential",
+        accountId: superAdmin.id, // ⭐ ID utilisateur, PAS l'email
+      },
+    },
+    update: {
+      password: hash, // ⭐ Met à jour le mot de passe à chaque seed
+    },
+    create: {
+      userId: superAdmin.id,
+      providerId: "credential",
+      accountId: superAdmin.id, // ⭐ ID utilisateur, PAS l'email
+      password: hash,
+    },
+  });
 
   console.log(`  OK: admin@mondialhome.sn`);
   console.log(`  MOT DE PASSE TEMPORAIRE: ${superAdminPassword}`);

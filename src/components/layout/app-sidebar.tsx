@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -23,11 +24,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { NAV_BOTTOM_ITEMS, NAV_ITEMS } from "@/constants/navigation";
+import { NAV_GROUPS, NAV_BOTTOM_ITEMS } from "@/constants/navigation";
 import { cn } from "@/lib/utils";
 import { ChevronUp, LogOut, User } from "lucide-react";
 import { signOut, useSession } from "@/lib/auth/client";
-import { useRouter } from "next/navigation";
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -47,83 +47,123 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader>
+    <Sidebar collapsible="icon" className="shadow-md">
+      {/* Header sidebar */}
+      <SidebarHeader className="border-sidebar-border border-b">
         <div
           className={cn(
-            "flex items-center gap-3 px-2 py-4",
+            "flex items-center gap-3 px-3 py-3",
             isCollapsed && "justify-center"
           )}
         >
-          <div className="bg-primary text-primary-foreground font-heading flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold">
+          <div className="bg-primary text-primary-foreground font-heading flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold">
             MH
           </div>
           {!isCollapsed && (
             <div className="flex flex-col">
-              <span className="font-heading text-sidebar-foreground text-sm font-semibold">
+              <span className="font-heading text-sidebar-foreground text-sm leading-tight font-semibold">
                 Mondial Home
               </span>
-              <span className="text-sidebar-foreground/60 text-xs">CRM</span>
+              <span className="text-sidebar-foreground/50 text-xs">CRM Platform</span>
             </div>
           )}
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {NAV_ITEMS.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    isActive={isActive(item.href)}
-                    tooltip={item.title}
-                    render={<Link href={item.href} />}
-                  >
-                    <item.icon className="size-4 shrink-0" />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+      {/* Navigation principale par groupes */}
+      <SidebarContent className="gap-0">
+        {NAV_GROUPS.map((group) => (
+          <SidebarGroup key={group.label} className="py-2">
+            <SidebarGroupLabel className="text-sidebar-foreground/40 px-3 text-[10px] font-semibold tracking-widest uppercase">
+              {group.label}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      isActive={isActive(item.href)}
+                      tooltip={item.title}
+                      size="lg"
+                      render={<Link href={item.href} />}
+                      className={cn(
+                        "gap-3 transition-all duration-200",
+                        isActive(item.href) && "text-primary font-semibold"
+                      )}
+                    >
+                      <item.icon
+                        className={cn(
+                          "size-5 shrink-0",
+                          isActive(item.href)
+                            ? "text-primary"
+                            : "text-sidebar-foreground/60"
+                        )}
+                      />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
-      <SidebarFooter>
+      {/* Footer : paramètres + admin + user */}
+      <SidebarFooter className="border-sidebar-border border-t pt-2">
         <SidebarMenu>
           {NAV_BOTTOM_ITEMS.map((item) => (
             <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton tooltip={item.title} render={<Link href={item.href} />}>
-                <item.icon className="size-4 shrink-0" />
+              <SidebarMenuButton
+                isActive={isActive(item.href)}
+                tooltip={item.title}
+                size="lg"
+                render={<Link href={item.href} />}
+                className={cn(
+                  "gap-3 transition-all duration-200",
+                  isActive(item.href) && "text-primary font-semibold"
+                )}
+              >
+                <item.icon
+                  className={cn(
+                    "size-5 shrink-0",
+                    isActive(item.href) ? "text-primary" : "text-sidebar-foreground/60"
+                  )}
+                />
                 <span>{item.title}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
 
+          {/* User card */}
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
-                  <SidebarMenuButton size="lg" tooltip={session?.user.name ?? "Compte"} />
+                  <SidebarMenuButton
+                    size="lg"
+                    tooltip={session?.user.name ?? "Mon compte"}
+                    className="gap-3 transition-all duration-200"
+                  />
                 }
               >
-                <Avatar className="size-7 rounded-lg">
+                <Avatar className="size-8 rounded-lg">
                   <AvatarImage src={session?.user.image ?? undefined} />
-                  <AvatarFallback className="bg-primary text-primary-foreground rounded-lg text-xs">
+                  <AvatarFallback className="bg-primary text-primary-foreground rounded-lg text-xs font-semibold">
                     {session?.user.name?.slice(0, 2).toUpperCase() ?? "??"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col text-left text-sm leading-tight">
                   <span className="text-sidebar-foreground truncate font-medium">
-                    {session?.user.name}
+                    {session?.user.name ?? "Utilisateur"}
                   </span>
-                  <span className="text-sidebar-foreground/60 truncate text-xs">
+                  <span className="text-sidebar-foreground/50 truncate text-xs">
                     {session?.user.email}
                   </span>
                 </div>
-                <ChevronUp className="text-sidebar-foreground/60 ml-auto size-4" />
+                <ChevronUp className="text-sidebar-foreground/40 ml-auto size-4" />
               </DropdownMenuTrigger>
+
               <DropdownMenuContent side="top" className="w-56 min-w-56" align="start">
                 <DropdownMenuItem render={<Link href="/settings/profile" />}>
                   <User className="size-4" />
