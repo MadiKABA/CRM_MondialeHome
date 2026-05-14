@@ -8,13 +8,13 @@ const db = new PrismaClient();
 // ============================================================================
 
 // ============================================================================
-// PERMISSIONS
+// PERMISSIONS — 59 permissions sur 9 modules
 // ============================================================================
 
 const PERMISSION_DEFS = [
-  // Clients
+  // ── CLIENTS (8) ────────────────────────────────────────────────────────────
   {
-    code: "clients.read",
+    code: "clients.read.own",
     module: "clients",
     action: "read",
     scope: "own",
@@ -30,23 +30,31 @@ const PERMISSION_DEFS = [
     category: "Clients",
   },
   {
-    code: "clients.create",
+    code: "clients.create.all",
     module: "clients",
     action: "create",
     scope: "all",
-    description: "Créer des clients",
+    description: "Ajouter des clients",
     category: "Clients",
   },
   {
-    code: "clients.update",
+    code: "clients.update.own",
+    module: "clients",
+    action: "update",
+    scope: "own",
+    description: "Modifier ses propres clients",
+    category: "Clients",
+  },
+  {
+    code: "clients.update.all",
     module: "clients",
     action: "update",
     scope: "all",
-    description: "Modifier des clients",
+    description: "Modifier tous les clients",
     category: "Clients",
   },
   {
-    code: "clients.delete",
+    code: "clients.delete.all",
     module: "clients",
     action: "delete",
     scope: "all",
@@ -54,24 +62,25 @@ const PERMISSION_DEFS = [
     category: "Clients",
   },
   {
-    code: "clients.export",
+    code: "clients.export.all",
     module: "clients",
     action: "export",
     scope: "all",
-    description: "Exporter les clients",
+    description: "Exporter la liste clients",
     category: "Clients",
   },
   {
-    code: "clients.import",
+    code: "clients.import.all",
     module: "clients",
     action: "import",
     scope: "all",
     description: "Importer des clients",
     category: "Clients",
   },
-  // Articles
+
+  // ── ARTICLES (6) ───────────────────────────────────────────────────────────
   {
-    code: "articles.read",
+    code: "articles.read.all",
     module: "articles",
     action: "read",
     scope: "all",
@@ -79,7 +88,7 @@ const PERMISSION_DEFS = [
     category: "Articles",
   },
   {
-    code: "articles.create",
+    code: "articles.create.all",
     module: "articles",
     action: "create",
     scope: "all",
@@ -87,7 +96,7 @@ const PERMISSION_DEFS = [
     category: "Articles",
   },
   {
-    code: "articles.update",
+    code: "articles.update.all",
     module: "articles",
     action: "update",
     scope: "all",
@@ -95,16 +104,33 @@ const PERMISSION_DEFS = [
     category: "Articles",
   },
   {
-    code: "articles.delete",
+    code: "articles.delete.all",
     module: "articles",
     action: "delete",
     scope: "all",
     description: "Supprimer des articles",
     category: "Articles",
   },
-  // Ventes
   {
-    code: "sales.read",
+    code: "articles.export.all",
+    module: "articles",
+    action: "export",
+    scope: "all",
+    description: "Exporter le catalogue",
+    category: "Articles",
+  },
+  {
+    code: "articles.import.all",
+    module: "articles",
+    action: "import",
+    scope: "all",
+    description: "Importer des articles",
+    category: "Articles",
+  },
+
+  // ── VENTES (8) ─────────────────────────────────────────────────────────────
+  {
+    code: "sales.read.own",
     module: "sales",
     action: "read",
     scope: "own",
@@ -120,40 +146,57 @@ const PERMISSION_DEFS = [
     category: "Ventes",
   },
   {
-    code: "sales.create",
+    code: "sales.create.all",
     module: "sales",
     action: "create",
     scope: "all",
-    description: "Créer des ventes",
+    description: "Enregistrer une vente",
     category: "Ventes",
   },
   {
-    code: "sales.update",
+    code: "sales.update.all",
     module: "sales",
     action: "update",
     scope: "all",
-    description: "Modifier des ventes",
+    description: "Modifier une vente",
     category: "Ventes",
   },
   {
-    code: "sales.delete",
+    code: "sales.cancel.all",
     module: "sales",
-    action: "delete",
+    action: "cancel",
     scope: "all",
-    description: "Supprimer des ventes",
+    description: "Annuler une vente",
     category: "Ventes",
   },
   {
-    code: "sales.export",
+    code: "sales.refund.all",
+    module: "sales",
+    action: "refund",
+    scope: "all",
+    description: "Effectuer un remboursement",
+    category: "Ventes",
+  },
+  {
+    code: "sales.export.all",
     module: "sales",
     action: "export",
     scope: "all",
     description: "Exporter les ventes",
     category: "Ventes",
   },
-  // Campagnes
   {
-    code: "campaigns.read",
+    code: "sales.delete.all",
+    module: "sales",
+    action: "delete",
+    scope: "all",
+    description: "Supprimer des ventes",
+    category: "Ventes",
+  },
+
+  // ── CAMPAGNES (6) ──────────────────────────────────────────────────────────
+  {
+    code: "campaigns.read.all",
     module: "campaigns",
     action: "read",
     scope: "all",
@@ -161,7 +204,7 @@ const PERMISSION_DEFS = [
     category: "Campagnes",
   },
   {
-    code: "campaigns.create",
+    code: "campaigns.create.all",
     module: "campaigns",
     action: "create",
     scope: "all",
@@ -169,7 +212,7 @@ const PERMISSION_DEFS = [
     category: "Campagnes",
   },
   {
-    code: "campaigns.update",
+    code: "campaigns.update.all",
     module: "campaigns",
     action: "update",
     scope: "all",
@@ -177,7 +220,7 @@ const PERMISSION_DEFS = [
     category: "Campagnes",
   },
   {
-    code: "campaigns.delete",
+    code: "campaigns.delete.all",
     module: "campaigns",
     action: "delete",
     scope: "all",
@@ -185,7 +228,7 @@ const PERMISSION_DEFS = [
     category: "Campagnes",
   },
   {
-    code: "campaigns.send",
+    code: "campaigns.send.all",
     module: "campaigns",
     action: "send",
     scope: "all",
@@ -193,49 +236,59 @@ const PERMISSION_DEFS = [
     category: "Campagnes",
   },
   {
-    code: "campaigns.approve",
+    code: "campaigns.validate.all",
     module: "campaigns",
-    action: "approve",
+    action: "validate",
     scope: "all",
     description: "Valider des campagnes",
     category: "Campagnes",
   },
-  // Segments
+
+  // ── SEGMENTS (5) ───────────────────────────────────────────────────────────
   {
-    code: "segments.read",
+    code: "segments.read.all",
     module: "segments",
     action: "read",
     scope: "all",
     description: "Voir les segments",
-    category: "Segmentation",
+    category: "Segments",
   },
   {
-    code: "segments.create",
+    code: "segments.create.all",
     module: "segments",
     action: "create",
     scope: "all",
     description: "Créer des segments",
-    category: "Segmentation",
+    category: "Segments",
   },
   {
-    code: "segments.update",
+    code: "segments.update.all",
     module: "segments",
     action: "update",
     scope: "all",
     description: "Modifier des segments",
-    category: "Segmentation",
+    category: "Segments",
   },
   {
-    code: "segments.delete",
+    code: "segments.delete.all",
     module: "segments",
     action: "delete",
     scope: "all",
     description: "Supprimer des segments",
-    category: "Segmentation",
+    category: "Segments",
   },
-  // Automatisations
   {
-    code: "automations.read",
+    code: "segments.compute.all",
+    module: "segments",
+    action: "compute",
+    scope: "all",
+    description: "Recalculer des segments",
+    category: "Segments",
+  },
+
+  // ── AUTOMATISATIONS (5) ────────────────────────────────────────────────────
+  {
+    code: "automations.read.all",
     module: "automations",
     action: "read",
     scope: "all",
@@ -243,7 +296,7 @@ const PERMISSION_DEFS = [
     category: "Automatisations",
   },
   {
-    code: "automations.create",
+    code: "automations.create.all",
     module: "automations",
     action: "create",
     scope: "all",
@@ -251,7 +304,7 @@ const PERMISSION_DEFS = [
     category: "Automatisations",
   },
   {
-    code: "automations.update",
+    code: "automations.update.all",
     module: "automations",
     action: "update",
     scope: "all",
@@ -259,7 +312,7 @@ const PERMISSION_DEFS = [
     category: "Automatisations",
   },
   {
-    code: "automations.delete",
+    code: "automations.delete.all",
     module: "automations",
     action: "delete",
     scope: "all",
@@ -267,90 +320,109 @@ const PERMISSION_DEFS = [
     category: "Automatisations",
   },
   {
-    code: "automations.activate",
+    code: "automations.activate.all",
     module: "automations",
     action: "activate",
     scope: "all",
     description: "Activer des automatisations",
     category: "Automatisations",
   },
-  // Templates
+
+  // ── TEMPLATES (5) ──────────────────────────────────────────────────────────
   {
-    code: "templates.read",
+    code: "templates.read.all",
     module: "templates",
     action: "read",
     scope: "all",
-    description: "Voir les templates",
-    category: "Templates",
+    description: "Voir les modèles",
+    category: "Modèles",
   },
   {
-    code: "templates.create",
+    code: "templates.create.all",
     module: "templates",
     action: "create",
     scope: "all",
-    description: "Créer des templates",
-    category: "Templates",
+    description: "Créer des modèles",
+    category: "Modèles",
   },
   {
-    code: "templates.update",
+    code: "templates.update.all",
     module: "templates",
     action: "update",
     scope: "all",
-    description: "Modifier des templates",
-    category: "Templates",
+    description: "Modifier des modèles",
+    category: "Modèles",
   },
   {
-    code: "templates.delete",
+    code: "templates.delete.all",
     module: "templates",
     action: "delete",
     scope: "all",
-    description: "Supprimer des templates",
-    category: "Templates",
+    description: "Supprimer des modèles",
+    category: "Modèles",
   },
-  // Analytics
   {
-    code: "analytics.read",
-    module: "analytics",
-    action: "read",
+    code: "templates.duplicate.all",
+    module: "templates",
+    action: "duplicate",
     scope: "all",
-    description: "Voir les analytics",
-    category: "Analytics",
+    description: "Dupliquer des modèles",
+    category: "Modèles",
+  },
+
+  // ── ANALYTICS (3) ──────────────────────────────────────────────────────────
+  {
+    code: "analytics.view.basic",
+    module: "analytics",
+    action: "view",
+    scope: "basic",
+    description: "Voir les statistiques de base",
+    category: "Statistiques",
   },
   {
-    code: "analytics.export",
+    code: "analytics.view.advanced",
+    module: "analytics",
+    action: "view",
+    scope: "advanced",
+    description: "Voir les statistiques avancées",
+    category: "Statistiques",
+  },
+  {
+    code: "analytics.export.all",
     module: "analytics",
     action: "export",
     scope: "all",
-    description: "Exporter les analytics",
-    category: "Analytics",
+    description: "Exporter les rapports",
+    category: "Statistiques",
   },
-  // Admin
+
+  // ── ADMIN (13) ─────────────────────────────────────────────────────────────
   {
-    code: "admin.read",
+    code: "admin.view.all",
     module: "admin",
-    action: "read",
+    action: "view",
     scope: "all",
-    description: "Accès au panneau admin",
+    description: "Accéder au panneau d'administration",
     category: "Administration",
   },
   {
-    code: "admin.users.read",
+    code: "admin.users.read.all",
     module: "admin",
     action: "users.read",
     scope: "all",
-    description: "Voir les utilisateurs",
+    description: "Voir tous les utilisateurs",
     category: "Administration",
   },
   {
-    code: "admin.users.create",
+    code: "admin.users.create.all",
     module: "admin",
     action: "users.create",
     scope: "all",
-    description: "Créer des utilisateurs",
+    description: "Créer et inviter des utilisateurs",
     category: "Administration",
   },
   {
-    code: "admin.users.update",
+    code: "admin.users.update.all",
     module: "admin",
     action: "users.update",
     scope: "all",
@@ -358,7 +430,7 @@ const PERMISSION_DEFS = [
     category: "Administration",
   },
   {
-    code: "admin.users.delete",
+    code: "admin.users.delete.all",
     module: "admin",
     action: "users.delete",
     scope: "all",
@@ -366,171 +438,229 @@ const PERMISSION_DEFS = [
     category: "Administration",
   },
   {
-    code: "admin.roles.read",
+    code: "admin.users.deactivate.all",
+    module: "admin",
+    action: "users.deactivate",
+    scope: "all",
+    description: "Désactiver des comptes utilisateurs",
+    category: "Administration",
+  },
+  {
+    code: "admin.roles.read.all",
     module: "admin",
     action: "roles.read",
     scope: "all",
-    description: "Voir les rôles",
+    description: "Voir les profils d'accès",
     category: "Administration",
   },
   {
-    code: "admin.roles.manage",
+    code: "admin.roles.manage.all",
     module: "admin",
     action: "roles.manage",
     scope: "all",
-    description: "Gérer les rôles et permissions",
+    description: "Gérer les profils et leurs droits",
     category: "Administration",
   },
   {
-    code: "admin.audit.read",
+    code: "admin.permissions.manage.all",
+    module: "admin",
+    action: "permissions.manage",
+    scope: "all",
+    description: "Modifier les droits d'accès individuels",
+    category: "Administration",
+  },
+  {
+    code: "admin.audit.read.all",
     module: "admin",
     action: "audit.read",
     scope: "all",
-    description: "Voir les journaux d'audit",
+    description: "Consulter l'historique des actions",
     category: "Administration",
   },
   {
-    code: "admin.settings.read",
+    code: "admin.sessions.manage.all",
+    module: "admin",
+    action: "sessions.manage",
+    scope: "all",
+    description: "Gérer les connexions actives",
+    category: "Administration",
+  },
+  {
+    code: "admin.settings.read.all",
     module: "admin",
     action: "settings.read",
     scope: "all",
-    description: "Voir les paramètres",
+    description: "Voir les paramètres système",
     category: "Administration",
   },
   {
-    code: "admin.settings.update",
+    code: "admin.settings.update.all",
     module: "admin",
     action: "settings.update",
     scope: "all",
-    description: "Modifier les paramètres",
+    description: "Modifier les paramètres système",
     category: "Administration",
   },
 ];
 
 // ============================================================================
-// ROLES
+// ROLES — 8 profils système
 // ============================================================================
+
+const ALL_CODES = PERMISSION_DEFS.map((p) => p.code);
+
+// Permissions en lecture seule (toutes les *.read.* et *.view.*)
+const READ_ONLY_CODES = ALL_CODES.filter(
+  (c) => c.includes(".read.") || c.includes(".view.")
+);
+
+// Toutes sauf admin.permissions.manage.all (réservée Super Admin)
+const ADMIN_CODES = ALL_CODES.filter((c) => c !== "admin.permissions.manage.all");
 
 const ROLE_DEFS = [
   {
     name: "Super Administrateur",
     slug: "super_admin",
-    description: "Accès complet à toutes les fonctionnalités du CRM",
+    description:
+      "Accès illimité à toute l'application, y compris la gestion des droits d'accès",
     isSystem: true,
     priority: 100,
-    permissions: PERMISSION_DEFS.map((p) => p.code),
+    permissions: ALL_CODES,
   },
   {
     name: "Administrateur",
     slug: "admin",
-    description: "Administration complète sauf accès super admin",
+    description:
+      "Accès complet aux fonctions métier sans pouvoir modifier les droits d'accès",
     isSystem: true,
-    priority: 80,
+    priority: 90,
+    permissions: ADMIN_CODES,
+  },
+  {
+    name: "Responsable Marketing",
+    slug: "manager_marketing",
+    description: "Gère les campagnes, segments et analyse les performances marketing",
+    isSystem: true,
+    priority: 75,
     permissions: [
-      "clients.read",
       "clients.read.all",
-      "clients.create",
-      "clients.update",
-      "clients.delete",
-      "clients.export",
-      "clients.import",
-      "articles.read",
-      "articles.create",
-      "articles.update",
-      "articles.delete",
-      "sales.read",
-      "sales.read.all",
-      "sales.create",
-      "sales.update",
-      "sales.delete",
-      "sales.export",
-      "campaigns.read",
-      "campaigns.create",
-      "campaigns.update",
-      "campaigns.delete",
-      "campaigns.send",
-      "campaigns.approve",
-      "segments.read",
-      "segments.create",
-      "segments.update",
-      "segments.delete",
-      "automations.read",
-      "automations.create",
-      "automations.update",
-      "automations.delete",
-      "automations.activate",
-      "templates.read",
-      "templates.create",
-      "templates.update",
-      "templates.delete",
-      "analytics.read",
-      "analytics.export",
-      "admin.read",
-      "admin.users.read",
-      "admin.users.create",
-      "admin.audit.read",
-      "admin.settings.read",
+      "clients.export.all",
+      "campaigns.read.all",
+      "campaigns.create.all",
+      "campaigns.update.all",
+      "campaigns.delete.all",
+      "campaigns.send.all",
+      "campaigns.validate.all",
+      "segments.read.all",
+      "segments.create.all",
+      "segments.update.all",
+      "segments.delete.all",
+      "segments.compute.all",
+      "automations.read.all",
+      "automations.create.all",
+      "automations.update.all",
+      "automations.delete.all",
+      "automations.activate.all",
+      "templates.read.all",
+      "templates.create.all",
+      "templates.update.all",
+      "templates.delete.all",
+      "templates.duplicate.all",
+      "analytics.view.basic",
+      "analytics.view.advanced",
+      "analytics.export.all",
+      "admin.view.all",
     ],
   },
   {
-    name: "Manager",
-    slug: "manager",
-    description: "Gestion des clients, ventes et campagnes",
+    name: "Opérateur Marketing",
+    slug: "operator_marketing",
+    description: "Crée les campagnes — une validation est requise avant l'envoi",
+    isSystem: true,
+    priority: 50,
+    permissions: [
+      "clients.read.all",
+      "campaigns.read.all",
+      "campaigns.create.all",
+      "campaigns.update.all",
+      // Pas de campaigns.send ni campaigns.delete
+      "segments.read.all",
+      "segments.create.all",
+      "templates.read.all",
+      "templates.create.all",
+      "templates.duplicate.all",
+      "analytics.view.basic",
+      "admin.view.all",
+    ],
+  },
+  {
+    name: "Responsable Commercial",
+    slug: "manager_commercial",
+    description:
+      "Gère la relation client, les ventes et suit les performances commerciales",
+    isSystem: true,
+    priority: 70,
+    permissions: [
+      "clients.read.all",
+      "clients.create.all",
+      "clients.update.all",
+      "clients.delete.all",
+      "clients.export.all",
+      "clients.import.all",
+      "articles.read.all",
+      "sales.read.all",
+      "sales.create.all",
+      "sales.update.all",
+      "sales.cancel.all",
+      "sales.export.all",
+      // Pas de sales.refund ni sales.delete (sensible)
+      "analytics.view.basic",
+      "analytics.view.advanced",
+      "analytics.export.all",
+      "admin.view.all",
+    ],
+  },
+  {
+    name: "Vendeur",
+    slug: "seller",
+    description: "Enregistre les ventes et consulte les clients dont il s'occupe",
+    isSystem: true,
+    priority: 30,
+    permissions: [
+      "clients.read.own",
+      "clients.create.all",
+      "clients.update.own",
+      "articles.read.all",
+      "sales.read.own",
+      "sales.create.all",
+      "templates.read.all",
+    ],
+  },
+  {
+    name: "Comptable",
+    slug: "accountant",
+    description: "Consulte les ventes et exporte les rapports financiers",
     isSystem: true,
     priority: 60,
     permissions: [
-      "clients.read",
       "clients.read.all",
-      "clients.create",
-      "clients.update",
-      "clients.export",
-      "articles.read",
-      "sales.read",
+      "articles.read.all",
       "sales.read.all",
-      "sales.create",
-      "sales.export",
-      "campaigns.read",
-      "campaigns.create",
-      "campaigns.update",
-      "campaigns.send",
-      "segments.read",
-      "segments.create",
-      "automations.read",
-      "templates.read",
-      "templates.create",
-      "analytics.read",
+      "sales.export.all",
+      "analytics.view.basic",
+      "analytics.view.advanced",
+      "analytics.export.all",
+      "admin.view.all",
     ],
   },
   {
-    name: "Agent Commercial",
-    slug: "agent",
-    description: "Saisie des ventes et gestion basique des clients",
-    isSystem: true,
-    priority: 40,
-    permissions: [
-      "clients.read",
-      "clients.create",
-      "clients.update",
-      "articles.read",
-      "sales.read",
-      "sales.create",
-      "campaigns.read",
-      "templates.read",
-    ],
-  },
-  {
-    name: "Observateur",
+    name: "Consultation seule",
     slug: "viewer",
-    description: "Lecture seule sur les données principales",
+    description:
+      "Accès en lecture uniquement — ne peut rien créer, modifier ni supprimer",
     isSystem: true,
-    priority: 20,
-    permissions: [
-      "clients.read",
-      "articles.read",
-      "sales.read",
-      "campaigns.read",
-      "analytics.read",
-    ],
+    priority: 10,
+    permissions: READ_ONLY_CODES,
   },
 ];
 
@@ -949,6 +1079,20 @@ const TEMPLATE_DEFS: TemplateDef[] = [
 async function main() {
   console.log("Démarrage du seed CRM Mondial Home...\n");
 
+  // 0. Nettoyage RBAC (idempotence — repart de zéro sur les associations)
+  console.log("Nettoyage des associations RBAC...");
+  await db.rolePermission.deleteMany({});
+  await db.userRole.deleteMany({});
+  // Supprime les permissions obsolètes (codes absents du catalogue actuel)
+  const currentCodes = PERMISSION_DEFS.map((p) => p.code);
+  const deleted = await db.permission.deleteMany({
+    where: { code: { notIn: currentCodes } },
+  });
+  if (deleted.count > 0) {
+    console.log(`  Supprimé: ${deleted.count} permission(s) obsolète(s)`);
+  }
+  console.log("  OK\n");
+
   // 1. Permissions
   console.log("Création des permissions...");
   await db.$transaction(
@@ -984,6 +1128,7 @@ async function main() {
         name: roleDef.name,
         description: roleDef.description,
         priority: roleDef.priority,
+        isSystem: roleDef.isSystem,
       },
       create: {
         name: roleDef.name,
@@ -998,15 +1143,16 @@ async function main() {
       where: { code: { in: roleDef.permissions } },
     });
 
-    await db.$transaction(
-      permissions.map((perm) =>
-        db.rolePermission.upsert({
-          where: { roleId_permissionId: { roleId: role.id, permissionId: perm.id } },
-          update: { granted: true },
-          create: { roleId: role.id, permissionId: perm.id, granted: true },
-        })
-      )
-    );
+    if (permissions.length > 0) {
+      await db.rolePermission.createMany({
+        data: permissions.map((perm) => ({
+          roleId: role.id,
+          permissionId: perm.id,
+          granted: true,
+        })),
+        skipDuplicates: true,
+      });
+    }
 
     console.log(`  OK: ${role.name} (${permissions.length} permissions)`);
   }
@@ -1061,6 +1207,20 @@ async function main() {
       password: hash,
     },
   });
+
+  // Assigner le rôle super_admin au Super Admin
+  const superAdminRole = await db.role.findUnique({ where: { slug: "super_admin" } });
+  if (superAdminRole) {
+    await db.userRole.upsert({
+      where: { userId_roleId: { userId: superAdmin.id, roleId: superAdminRole.id } },
+      update: {},
+      create: {
+        userId: superAdmin.id,
+        roleId: superAdminRole.id,
+        assignedBy: superAdmin.id,
+      },
+    });
+  }
 
   console.log(`  OK: admin@mondialhome.sn`);
   console.log(`  MOT DE PASSE TEMPORAIRE: ${superAdminPassword}`);
