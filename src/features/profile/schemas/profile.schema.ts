@@ -14,15 +14,27 @@ export const updateProfileSchema = z.object({
   phone: z
     .string()
     .regex(/^\+221[0-9]{9}$/, "Format requis : +221XXXXXXXXX")
-    .optional()
-    .or(z.literal("")),
-  jobTitle: z.string().max(100, "Le titre est trop long").optional().or(z.literal("")),
-  department: z.string().max(100).optional().or(z.literal("")),
-  language: z.enum(["fr", "wo", "en"]).default("fr"),
-  timezone: z.string().default("Africa/Dakar"),
+    .or(z.literal(""))
+    .optional(),
+  jobTitle: z.string().max(100, "Le titre est trop long").or(z.literal("")).optional(),
+  department: z.string().max(100).or(z.literal("")).optional(),
+  language: z.enum(["fr", "wo", "en"]),
+  timezone: z.string().min(1),
 });
 
+// Input type matches what the form sends (language & timezone always provided)
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+// Form values type — all fields present (optional ones default to empty string)
+export type ProfileFormValues = {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  jobTitle: string;
+  department: string;
+  language: "fr" | "wo" | "en";
+  timezone: string;
+};
 
 export const changePasswordSchema = z
   .object({
