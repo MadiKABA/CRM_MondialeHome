@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import type {
   UserListItemDTO,
   UserDetailDTO,
+  RoleListItemDTO,
   AdminStats,
   PaginatedResult,
 } from "@/features/admin/types";
@@ -246,4 +247,32 @@ export async function getAdminStats(): Promise<AdminStats> {
     totalRoles,
     activeSessions,
   };
+}
+
+// ── Liste des rôles disponibles (pour formulaires) ────────────
+
+export async function getAvailableRoles(): Promise<RoleListItemDTO[]> {
+  const roles = await db.role.findMany({
+    orderBy: { priority: "desc" },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      description: true,
+      isSystem: true,
+      priority: true,
+      _count: { select: { permissions: true, users: true } },
+    },
+  });
+
+  return roles.map((r) => ({
+    id: r.id,
+    name: r.name,
+    slug: r.slug,
+    description: r.description,
+    isSystem: r.isSystem,
+    priority: r.priority,
+    permissionCount: r._count.permissions,
+    userCount: r._count.users,
+  }));
 }
