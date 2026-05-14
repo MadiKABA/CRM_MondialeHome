@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import type { PermissionCode } from "./constants";
 
 // ============================================================
-// Server-side helpers
+// Server-side session helpers
 // ============================================================
 
 export async function getServerSession() {
@@ -20,27 +20,28 @@ export async function requireAuth() {
 }
 
 /**
- * Vérifie une permission côté serveur — throw si non autorisé.
- * Délègue à getEffectivePermissions (implémenté en Phase 2).
- * Pour l'instant : toujours autorisé si authentifié + isSuperAdmin.
+ * Vérifie une permission côté serveur — throw FORBIDDEN si non autorisé.
  *
- * TODO(Phase 2): remplacer par appel à features/admin/lib/permissions.ts
+ * Utilise getEffectivePermissions de features/admin/lib/permissions.ts.
+ * Super Admin court-circuite la vérification via le flag isSuperAdmin en session.
  */
 export async function checkPermission(permission: PermissionCode): Promise<void> {
   const session = await getServerSession();
   if (!session) throw new Error("UNAUTHORIZED");
 
-  // Super Admin court-circuit — accès total
+  // Super Admin : accès total sans requête DB
   if ((session.user as { isSuperAdmin?: boolean }).isSuperAdmin) return;
 
-  // TODO(Phase 2): charger les permissions effectives depuis la DB
-  // const perms = await getEffectivePermissions(session.user.id);
-  // if (!perms.has(permission)) throw new Error("FORBIDDEN");
-  throw new Error(`FORBIDDEN: permission ${permission} requise`);
+  // Chargement des permissions effectives depuis la DB (memoïsé par request)
+  const { hasPermission: dbHasPermission } =
+    await import("@/features/admin/lib/permissions");
+  const allowed = await dbHasPermission(session.user.id, permission);
+  if (!allowed) throw new Error(`FORBIDDEN: permission "${permission}" requise`);
 }
 
 /**
  * Vérifie sans throw — retourne boolean.
+ * Utilisé par les hooks client via les permissions stockées dans la session.
  */
 export function hasPermission(
   userPermissions: string[],
