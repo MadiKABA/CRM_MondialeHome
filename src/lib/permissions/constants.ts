@@ -1,180 +1,195 @@
 // ============================================================
 // PERMISSIONS — CRM Mondial Home
-// Format : resource.action[.scope]
+// Format : module.action.scope
+// 59 permissions réparties sur 9 modules
 // ============================================================
 
 export const PERMISSIONS = {
-  // Clients
-  CLIENTS_READ: "clients.read",
+  // ── CLIENTS (8) ─────────────────────────────────────────
+  CLIENTS_READ_OWN: "clients.read.own",
   CLIENTS_READ_ALL: "clients.read.all",
-  CLIENTS_CREATE: "clients.create",
-  CLIENTS_UPDATE: "clients.update",
-  CLIENTS_DELETE: "clients.delete",
-  CLIENTS_EXPORT: "clients.export",
-  CLIENTS_IMPORT: "clients.import",
+  CLIENTS_CREATE_ALL: "clients.create.all",
+  CLIENTS_UPDATE_OWN: "clients.update.own",
+  CLIENTS_UPDATE_ALL: "clients.update.all",
+  CLIENTS_DELETE_ALL: "clients.delete.all",
+  CLIENTS_EXPORT_ALL: "clients.export.all",
+  CLIENTS_IMPORT_ALL: "clients.import.all",
 
-  // Articles
-  ARTICLES_READ: "articles.read",
-  ARTICLES_CREATE: "articles.create",
-  ARTICLES_UPDATE: "articles.update",
-  ARTICLES_DELETE: "articles.delete",
+  // ── ARTICLES (6) ────────────────────────────────────────
+  ARTICLES_READ_ALL: "articles.read.all",
+  ARTICLES_CREATE_ALL: "articles.create.all",
+  ARTICLES_UPDATE_ALL: "articles.update.all",
+  ARTICLES_DELETE_ALL: "articles.delete.all",
+  ARTICLES_EXPORT_ALL: "articles.export.all",
+  ARTICLES_IMPORT_ALL: "articles.import.all",
 
-  // Ventes
-  SALES_READ: "sales.read",
+  // ── VENTES (8) ──────────────────────────────────────────
+  SALES_READ_OWN: "sales.read.own",
   SALES_READ_ALL: "sales.read.all",
-  SALES_CREATE: "sales.create",
-  SALES_UPDATE: "sales.update",
-  SALES_DELETE: "sales.delete",
-  SALES_EXPORT: "sales.export",
+  SALES_CREATE_ALL: "sales.create.all",
+  SALES_UPDATE_ALL: "sales.update.all",
+  SALES_CANCEL_ALL: "sales.cancel.all",
+  SALES_REFUND_ALL: "sales.refund.all",
+  SALES_EXPORT_ALL: "sales.export.all",
+  SALES_DELETE_ALL: "sales.delete.all",
 
-  // Campagnes
-  CAMPAIGNS_READ: "campaigns.read",
-  CAMPAIGNS_CREATE: "campaigns.create",
-  CAMPAIGNS_UPDATE: "campaigns.update",
-  CAMPAIGNS_DELETE: "campaigns.delete",
-  CAMPAIGNS_SEND: "campaigns.send",
-  CAMPAIGNS_APPROVE: "campaigns.approve",
+  // ── CAMPAGNES (6) ───────────────────────────────────────
+  CAMPAIGNS_READ_ALL: "campaigns.read.all",
+  CAMPAIGNS_CREATE_ALL: "campaigns.create.all",
+  CAMPAIGNS_UPDATE_ALL: "campaigns.update.all",
+  CAMPAIGNS_DELETE_ALL: "campaigns.delete.all",
+  CAMPAIGNS_SEND_ALL: "campaigns.send.all",
+  CAMPAIGNS_VALIDATE_ALL: "campaigns.validate.all",
 
-  // Segments
-  SEGMENTS_READ: "segments.read",
-  SEGMENTS_CREATE: "segments.create",
-  SEGMENTS_UPDATE: "segments.update",
-  SEGMENTS_DELETE: "segments.delete",
+  // ── SEGMENTS (5) ────────────────────────────────────────
+  SEGMENTS_READ_ALL: "segments.read.all",
+  SEGMENTS_CREATE_ALL: "segments.create.all",
+  SEGMENTS_UPDATE_ALL: "segments.update.all",
+  SEGMENTS_DELETE_ALL: "segments.delete.all",
+  SEGMENTS_COMPUTE_ALL: "segments.compute.all",
 
-  // Automatisations
-  AUTOMATIONS_READ: "automations.read",
-  AUTOMATIONS_CREATE: "automations.create",
-  AUTOMATIONS_UPDATE: "automations.update",
-  AUTOMATIONS_DELETE: "automations.delete",
-  AUTOMATIONS_ACTIVATE: "automations.activate",
+  // ── AUTOMATISATIONS (5) ─────────────────────────────────
+  AUTOMATIONS_READ_ALL: "automations.read.all",
+  AUTOMATIONS_CREATE_ALL: "automations.create.all",
+  AUTOMATIONS_UPDATE_ALL: "automations.update.all",
+  AUTOMATIONS_DELETE_ALL: "automations.delete.all",
+  AUTOMATIONS_ACTIVATE_ALL: "automations.activate.all",
 
-  // Templates
-  TEMPLATES_READ: "templates.read",
-  TEMPLATES_CREATE: "templates.create",
-  TEMPLATES_UPDATE: "templates.update",
-  TEMPLATES_DELETE: "templates.delete",
+  // ── TEMPLATES (5) ───────────────────────────────────────
+  TEMPLATES_READ_ALL: "templates.read.all",
+  TEMPLATES_CREATE_ALL: "templates.create.all",
+  TEMPLATES_UPDATE_ALL: "templates.update.all",
+  TEMPLATES_DELETE_ALL: "templates.delete.all",
+  TEMPLATES_DUPLICATE_ALL: "templates.duplicate.all",
 
-  // Analytics
-  ANALYTICS_READ: "analytics.read",
-  ANALYTICS_EXPORT: "analytics.export",
+  // ── ANALYTICS (3) ───────────────────────────────────────
+  ANALYTICS_VIEW_BASIC: "analytics.view.basic",
+  ANALYTICS_VIEW_ADVANCED: "analytics.view.advanced",
+  ANALYTICS_EXPORT_ALL: "analytics.export.all",
 
-  // Admin
-  ADMIN_READ: "admin.read",
-  ADMIN_USERS_READ: "admin.users.read",
-  ADMIN_USERS_CREATE: "admin.users.create",
-  ADMIN_USERS_UPDATE: "admin.users.update",
-  ADMIN_USERS_DELETE: "admin.users.delete",
-  ADMIN_ROLES_READ: "admin.roles.read",
-  ADMIN_ROLES_MANAGE: "admin.roles.manage",
-  ADMIN_AUDIT_READ: "admin.audit.read",
-  ADMIN_SETTINGS_READ: "admin.settings.read",
-  ADMIN_SETTINGS_UPDATE: "admin.settings.update",
+  // ── ADMIN (13) ──────────────────────────────────────────
+  ADMIN_VIEW_ALL: "admin.view.all",
+  ADMIN_USERS_READ_ALL: "admin.users.read.all",
+  ADMIN_USERS_CREATE_ALL: "admin.users.create.all",
+  ADMIN_USERS_UPDATE_ALL: "admin.users.update.all",
+  ADMIN_USERS_DELETE_ALL: "admin.users.delete.all",
+  ADMIN_USERS_DEACTIVATE_ALL: "admin.users.deactivate.all",
+  ADMIN_ROLES_READ_ALL: "admin.roles.read.all",
+  ADMIN_ROLES_MANAGE_ALL: "admin.roles.manage.all",
+  ADMIN_PERMISSIONS_MANAGE_ALL: "admin.permissions.manage.all",
+  ADMIN_AUDIT_READ_ALL: "admin.audit.read.all",
+  ADMIN_SESSIONS_MANAGE_ALL: "admin.sessions.manage.all",
+  ADMIN_SETTINGS_READ_ALL: "admin.settings.read.all",
+  ADMIN_SETTINGS_UPDATE_ALL: "admin.settings.update.all",
 } as const;
 
-export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
-// ============================================================
-// RÔLES SYSTÈME avec permissions par défaut
-// ============================================================
+// Toutes les permissions en tableau (utile pour le Super Admin)
+export const ALL_PERMISSION_CODES = Object.values(PERMISSIONS) as PermissionCode[];
 
-export const ROLES = {
-  SUPER_ADMIN: "super_admin",
-  ADMIN: "admin",
-  MANAGER: "manager",
-  AGENT: "agent",
-  VIEWER: "viewer",
-} as const;
-
-export type Role = (typeof ROLES)[keyof typeof ROLES];
-
-export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
-  super_admin: Object.values(PERMISSIONS),
-
+// Permissions selon leur module (pour filtrer rapidement)
+export const PERMISSIONS_BY_MODULE: Record<string, PermissionCode[]> = {
+  clients: [
+    PERMISSIONS.CLIENTS_READ_OWN,
+    PERMISSIONS.CLIENTS_READ_ALL,
+    PERMISSIONS.CLIENTS_CREATE_ALL,
+    PERMISSIONS.CLIENTS_UPDATE_OWN,
+    PERMISSIONS.CLIENTS_UPDATE_ALL,
+    PERMISSIONS.CLIENTS_DELETE_ALL,
+    PERMISSIONS.CLIENTS_EXPORT_ALL,
+    PERMISSIONS.CLIENTS_IMPORT_ALL,
+  ],
+  articles: [
+    PERMISSIONS.ARTICLES_READ_ALL,
+    PERMISSIONS.ARTICLES_CREATE_ALL,
+    PERMISSIONS.ARTICLES_UPDATE_ALL,
+    PERMISSIONS.ARTICLES_DELETE_ALL,
+    PERMISSIONS.ARTICLES_EXPORT_ALL,
+    PERMISSIONS.ARTICLES_IMPORT_ALL,
+  ],
+  sales: [
+    PERMISSIONS.SALES_READ_OWN,
+    PERMISSIONS.SALES_READ_ALL,
+    PERMISSIONS.SALES_CREATE_ALL,
+    PERMISSIONS.SALES_UPDATE_ALL,
+    PERMISSIONS.SALES_CANCEL_ALL,
+    PERMISSIONS.SALES_REFUND_ALL,
+    PERMISSIONS.SALES_EXPORT_ALL,
+    PERMISSIONS.SALES_DELETE_ALL,
+  ],
+  campaigns: [
+    PERMISSIONS.CAMPAIGNS_READ_ALL,
+    PERMISSIONS.CAMPAIGNS_CREATE_ALL,
+    PERMISSIONS.CAMPAIGNS_UPDATE_ALL,
+    PERMISSIONS.CAMPAIGNS_DELETE_ALL,
+    PERMISSIONS.CAMPAIGNS_SEND_ALL,
+    PERMISSIONS.CAMPAIGNS_VALIDATE_ALL,
+  ],
+  segments: [
+    PERMISSIONS.SEGMENTS_READ_ALL,
+    PERMISSIONS.SEGMENTS_CREATE_ALL,
+    PERMISSIONS.SEGMENTS_UPDATE_ALL,
+    PERMISSIONS.SEGMENTS_DELETE_ALL,
+    PERMISSIONS.SEGMENTS_COMPUTE_ALL,
+  ],
+  automations: [
+    PERMISSIONS.AUTOMATIONS_READ_ALL,
+    PERMISSIONS.AUTOMATIONS_CREATE_ALL,
+    PERMISSIONS.AUTOMATIONS_UPDATE_ALL,
+    PERMISSIONS.AUTOMATIONS_DELETE_ALL,
+    PERMISSIONS.AUTOMATIONS_ACTIVATE_ALL,
+  ],
+  templates: [
+    PERMISSIONS.TEMPLATES_READ_ALL,
+    PERMISSIONS.TEMPLATES_CREATE_ALL,
+    PERMISSIONS.TEMPLATES_UPDATE_ALL,
+    PERMISSIONS.TEMPLATES_DELETE_ALL,
+    PERMISSIONS.TEMPLATES_DUPLICATE_ALL,
+  ],
+  analytics: [
+    PERMISSIONS.ANALYTICS_VIEW_BASIC,
+    PERMISSIONS.ANALYTICS_VIEW_ADVANCED,
+    PERMISSIONS.ANALYTICS_EXPORT_ALL,
+  ],
   admin: [
-    PERMISSIONS.CLIENTS_READ,
-    PERMISSIONS.CLIENTS_READ_ALL,
-    PERMISSIONS.CLIENTS_CREATE,
-    PERMISSIONS.CLIENTS_UPDATE,
-    PERMISSIONS.CLIENTS_DELETE,
-    PERMISSIONS.CLIENTS_EXPORT,
-    PERMISSIONS.CLIENTS_IMPORT,
-    PERMISSIONS.ARTICLES_READ,
-    PERMISSIONS.ARTICLES_CREATE,
-    PERMISSIONS.ARTICLES_UPDATE,
-    PERMISSIONS.ARTICLES_DELETE,
-    PERMISSIONS.SALES_READ,
-    PERMISSIONS.SALES_READ_ALL,
-    PERMISSIONS.SALES_CREATE,
-    PERMISSIONS.SALES_UPDATE,
-    PERMISSIONS.SALES_DELETE,
-    PERMISSIONS.SALES_EXPORT,
-    PERMISSIONS.CAMPAIGNS_READ,
-    PERMISSIONS.CAMPAIGNS_CREATE,
-    PERMISSIONS.CAMPAIGNS_UPDATE,
-    PERMISSIONS.CAMPAIGNS_DELETE,
-    PERMISSIONS.CAMPAIGNS_SEND,
-    PERMISSIONS.CAMPAIGNS_APPROVE,
-    PERMISSIONS.SEGMENTS_READ,
-    PERMISSIONS.SEGMENTS_CREATE,
-    PERMISSIONS.SEGMENTS_UPDATE,
-    PERMISSIONS.SEGMENTS_DELETE,
-    PERMISSIONS.AUTOMATIONS_READ,
-    PERMISSIONS.AUTOMATIONS_CREATE,
-    PERMISSIONS.AUTOMATIONS_UPDATE,
-    PERMISSIONS.AUTOMATIONS_DELETE,
-    PERMISSIONS.AUTOMATIONS_ACTIVATE,
-    PERMISSIONS.TEMPLATES_READ,
-    PERMISSIONS.TEMPLATES_CREATE,
-    PERMISSIONS.TEMPLATES_UPDATE,
-    PERMISSIONS.TEMPLATES_DELETE,
-    PERMISSIONS.ANALYTICS_READ,
-    PERMISSIONS.ANALYTICS_EXPORT,
-    PERMISSIONS.ADMIN_READ,
-    PERMISSIONS.ADMIN_USERS_READ,
-    PERMISSIONS.ADMIN_USERS_CREATE,
-    PERMISSIONS.ADMIN_AUDIT_READ,
-    PERMISSIONS.ADMIN_SETTINGS_READ,
-  ],
-
-  manager: [
-    PERMISSIONS.CLIENTS_READ,
-    PERMISSIONS.CLIENTS_READ_ALL,
-    PERMISSIONS.CLIENTS_CREATE,
-    PERMISSIONS.CLIENTS_UPDATE,
-    PERMISSIONS.CLIENTS_EXPORT,
-    PERMISSIONS.ARTICLES_READ,
-    PERMISSIONS.SALES_READ,
-    PERMISSIONS.SALES_READ_ALL,
-    PERMISSIONS.SALES_CREATE,
-    PERMISSIONS.SALES_EXPORT,
-    PERMISSIONS.CAMPAIGNS_READ,
-    PERMISSIONS.CAMPAIGNS_CREATE,
-    PERMISSIONS.CAMPAIGNS_UPDATE,
-    PERMISSIONS.CAMPAIGNS_SEND,
-    PERMISSIONS.SEGMENTS_READ,
-    PERMISSIONS.SEGMENTS_CREATE,
-    PERMISSIONS.AUTOMATIONS_READ,
-    PERMISSIONS.TEMPLATES_READ,
-    PERMISSIONS.TEMPLATES_CREATE,
-    PERMISSIONS.ANALYTICS_READ,
-  ],
-
-  agent: [
-    PERMISSIONS.CLIENTS_READ,
-    PERMISSIONS.CLIENTS_CREATE,
-    PERMISSIONS.CLIENTS_UPDATE,
-    PERMISSIONS.ARTICLES_READ,
-    PERMISSIONS.SALES_READ,
-    PERMISSIONS.SALES_CREATE,
-    PERMISSIONS.CAMPAIGNS_READ,
-    PERMISSIONS.TEMPLATES_READ,
-  ],
-
-  viewer: [
-    PERMISSIONS.CLIENTS_READ,
-    PERMISSIONS.ARTICLES_READ,
-    PERMISSIONS.SALES_READ,
-    PERMISSIONS.CAMPAIGNS_READ,
-    PERMISSIONS.ANALYTICS_READ,
+    PERMISSIONS.ADMIN_VIEW_ALL,
+    PERMISSIONS.ADMIN_USERS_READ_ALL,
+    PERMISSIONS.ADMIN_USERS_CREATE_ALL,
+    PERMISSIONS.ADMIN_USERS_UPDATE_ALL,
+    PERMISSIONS.ADMIN_USERS_DELETE_ALL,
+    PERMISSIONS.ADMIN_USERS_DEACTIVATE_ALL,
+    PERMISSIONS.ADMIN_ROLES_READ_ALL,
+    PERMISSIONS.ADMIN_ROLES_MANAGE_ALL,
+    PERMISSIONS.ADMIN_PERMISSIONS_MANAGE_ALL,
+    PERMISSIONS.ADMIN_AUDIT_READ_ALL,
+    PERMISSIONS.ADMIN_SESSIONS_MANAGE_ALL,
+    PERMISSIONS.ADMIN_SETTINGS_READ_ALL,
+    PERMISSIONS.ADMIN_SETTINGS_UPDATE_ALL,
   ],
 };
+
+// Permissions considérées comme sensibles (confirmation requise en UI)
+export const DANGEROUS_PERMISSIONS = new Set<PermissionCode>([
+  PERMISSIONS.CLIENTS_DELETE_ALL,
+  PERMISSIONS.ARTICLES_DELETE_ALL,
+  PERMISSIONS.SALES_CANCEL_ALL,
+  PERMISSIONS.SALES_REFUND_ALL,
+  PERMISSIONS.SALES_DELETE_ALL,
+  PERMISSIONS.CAMPAIGNS_DELETE_ALL,
+  PERMISSIONS.CAMPAIGNS_SEND_ALL,
+  PERMISSIONS.SEGMENTS_DELETE_ALL,
+  PERMISSIONS.AUTOMATIONS_DELETE_ALL,
+  PERMISSIONS.AUTOMATIONS_ACTIVATE_ALL,
+  PERMISSIONS.TEMPLATES_DELETE_ALL,
+  PERMISSIONS.ADMIN_USERS_DELETE_ALL,
+  PERMISSIONS.ADMIN_USERS_UPDATE_ALL,
+  PERMISSIONS.ADMIN_ROLES_MANAGE_ALL,
+  PERMISSIONS.ADMIN_PERMISSIONS_MANAGE_ALL,
+  PERMISSIONS.ADMIN_SETTINGS_UPDATE_ALL,
+]);
+
+// Permission réservée Super Admin uniquement
+export const SUPER_ADMIN_ONLY_PERMISSIONS = new Set<PermissionCode>([
+  PERMISSIONS.ADMIN_PERMISSIONS_MANAGE_ALL,
+]);

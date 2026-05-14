@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth/auth";
 import { headers } from "next/headers";
-import type { Permission } from "./constants";
+import type { PermissionCode } from "./constants";
 
 // ============================================================
 // Server-side helpers
@@ -11,38 +11,7 @@ export async function getServerSession() {
 }
 
 /**
- * Check if a user has a specific permission (no throw).
- * Uses the user's roles array stored in session.
- */
-export function hasPermission(
-  userPermissions: string[],
-  permission: Permission
-): boolean {
-  return userPermissions.includes(permission);
-}
-
-/**
- * Server-side permission check — throws if unauthorized.
- * Use inside Server Actions and Route Handlers.
- */
-export async function checkPermission(permission: Permission): Promise<void> {
-  const session = await getServerSession();
-
-  if (!session) {
-    throw new Error("UNAUTHORIZED");
-  }
-
-  const userPermissions: string[] =
-    // TODO: load from user's role in DB — replace this placeholder
-    (session.user as { permissions?: string[] }).permissions ?? [];
-
-  if (!hasPermission(userPermissions, permission)) {
-    throw new Error("FORBIDDEN");
-  }
-}
-
-/**
- * Returns the current session or throws UNAUTHORIZED.
+ * Retourne la session ou throw UNAUTHORIZED.
  */
 export async function requireAuth() {
   const session = await getServerSession();
@@ -50,8 +19,46 @@ export async function requireAuth() {
   return session;
 }
 
+/**
+ * Vérifie une permission côté serveur — throw si non autorisé.
+ * Délègue à getEffectivePermissions (implémenté en Phase 2).
+ * Pour l'instant : toujours autorisé si authentifié + isSuperAdmin.
+ *
+ * TODO(Phase 2): remplacer par appel à features/admin/lib/permissions.ts
+ */
+export async function checkPermission(permission: PermissionCode): Promise<void> {
+  const session = await getServerSession();
+  if (!session) throw new Error("UNAUTHORIZED");
+
+  // Super Admin court-circuit — accès total
+  if ((session.user as { isSuperAdmin?: boolean }).isSuperAdmin) return;
+
+  // TODO(Phase 2): charger les permissions effectives depuis la DB
+  // const perms = await getEffectivePermissions(session.user.id);
+  // if (!perms.has(permission)) throw new Error("FORBIDDEN");
+  throw new Error(`FORBIDDEN: permission ${permission} requise`);
+}
+
+/**
+ * Vérifie sans throw — retourne boolean.
+ */
+export function hasPermission(
+  userPermissions: string[],
+  permission: PermissionCode
+): boolean {
+  return userPermissions.includes(permission);
+}
+
 // ============================================================
 // Exports
 // ============================================================
-export { PERMISSIONS, ROLES, ROLE_PERMISSIONS } from "./constants";
-export type { Permission, Role } from "./constants";
+export {
+  PERMISSIONS,
+  ALL_PERMISSION_CODES,
+  PERMISSIONS_BY_MODULE,
+  DANGEROUS_PERMISSIONS,
+  SUPER_ADMIN_ONLY_PERMISSIONS,
+} from "./constants";
+export type { PermissionCode } from "./constants";
+export { MODULES, MODULE_ORDER } from "./modules";
+export type { ModuleCode, Module } from "./modules";

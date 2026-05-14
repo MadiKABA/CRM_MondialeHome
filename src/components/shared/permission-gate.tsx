@@ -1,9 +1,9 @@
 import { usePermission } from "@/hooks/use-permission";
-import type { Permission } from "@/lib/permissions";
+import type { PermissionCode } from "@/lib/permissions";
 import type { ReactNode } from "react";
 
 interface PermissionGateProps {
-  permission: Permission;
+  permission: PermissionCode;
   children: ReactNode;
   fallback?: ReactNode;
 }
