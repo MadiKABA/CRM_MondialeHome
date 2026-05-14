@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { CldUploadWidget } from "next-cloudinary";
-import type { CloudinaryUploadWidgetResults } from "next-cloudinary";
-import { Camera, Trash2 } from "lucide-react";
+import { Camera, Loader2, Trash2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,27 +13,76 @@ import {
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { updateAvatar, removeAvatar } from "../server/actions";
 
+const MAX_FILE_SIZE = 2_000_000;
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
 interface AvatarUploadProps {
   currentImage: string | null;
   userName: string;
 }
 
 export function AvatarUpload({ currentImage }: AvatarUploadProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
 
-  const handleUploadSuccess = async (results: CloudinaryUploadWidgetResults) => {
-    if (results.event !== "success" || typeof results.info !== "object" || !results.info)
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+
+    // Réinitialiser immédiatement pour permettre le ré-upload du même fichier
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    if (!file) return;
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast.error("Format non supporté. Utilisez JPG, PNG ou WebP.");
       return;
+    }
 
-    const info = results.info as { secure_url?: string };
-    if (!info.secure_url) return;
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("Fichier trop volumineux. Taille maximale : 2 Mo.");
+      return;
+    }
 
-    const result = await updateAvatar({ imageUrl: info.secure_url });
-    if (result.success) {
-      toast.success("Photo de profil mise à jour");
-    } else {
-      toast.error(result.error);
+    const cloudName = process.env["NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME"];
+    const uploadPreset = process.env["NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET"];
+
+    if (!cloudName || !uploadPreset) {
+      toast.error("Configuration Cloudinary manquante.");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", uploadPreset);
+      formData.append("folder", "mondial-home/avatars");
+
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+        { method: "POST", body: formData }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Upload échoué : ${response.status}`);
+      }
+
+      const data = (await response.json()) as Record<string, unknown>;
+      const secureUrl = typeof data.secure_url === "string" ? data.secure_url : undefined;
+      if (!secureUrl) throw new Error("URL manquante dans la réponse Cloudinary");
+
+      const result = await updateAvatar({ imageUrl: secureUrl });
+      if (result.success) {
+        toast.success("Photo de profil mise à jour");
+      } else {
+        toast.error(result.error);
+      }
+    } catch {
+      toast.error("Échec de l'upload. Veuillez réessayer.");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -55,47 +102,38 @@ export function AvatarUpload({ currentImage }: AvatarUploadProps) {
 
   return (
     <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="sr-only"
+        onChange={handleFileChange}
+        aria-hidden="true"
+        tabIndex={-1}
+      />
+
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
             <button
-              className="bg-primary text-primary-foreground hover:bg-primary/90 absolute -right-1 -bottom-1 flex size-8 items-center justify-center rounded-full shadow-md transition-colors"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 absolute -right-1 -bottom-1 flex size-8 items-center justify-center rounded-full shadow-md transition-colors disabled:cursor-not-allowed disabled:opacity-60"
               aria-label="Modifier la photo de profil"
+              disabled={isUploading}
             />
           }
         >
-          <Camera className="size-4" />
+          {isUploading ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Camera className="size-4" />
+          )}
         </DropdownMenuTrigger>
+
         <DropdownMenuContent align="end" className="w-52">
-          <CldUploadWidget
-            uploadPreset={
-              process.env["NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET"] ?? "ml_default"
-            }
-            options={{
-              folder: "mondial-home/avatars",
-              cropping: true,
-              croppingAspectRatio: 1,
-              maxImageWidth: 400,
-              maxImageHeight: 400,
-              clientAllowedFormats: ["jpg", "png", "webp"],
-              maxFileSize: 2_000_000,
-              multiple: false,
-              sources: ["local", "camera"],
-            }}
-            onSuccess={handleUploadSuccess}
-          >
-            {({ open }) => (
-              <DropdownMenuItem
-                onSelect={(e) => {
-                  e.preventDefault();
-                  open();
-                }}
-              >
-                <Camera className="size-4" />
-                Téléverser une photo
-              </DropdownMenuItem>
-            )}
-          </CldUploadWidget>
+          <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
+            <Camera className="size-4" />
+            Téléverser une photo
+          </DropdownMenuItem>
 
           {currentImage && (
             <>
