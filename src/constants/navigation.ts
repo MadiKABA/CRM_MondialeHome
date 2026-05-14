@@ -88,7 +88,7 @@ export const NAV_GROUPS: NavGroup[] = [
 
 export const NAV_BOTTOM_ITEMS: NavItem[] = [
   { title: "Paramètres", href: "/settings", icon: Settings, permission: null },
-  { title: "Administration", href: "/admin", icon: Shield, permission: "admin.read" },
+  { title: "Administration", href: "/admin", icon: Shield, permission: "admin.view.all" },
 ];
 
 // Rétrocompatibilité — liste plate pour les cas qui en ont besoin

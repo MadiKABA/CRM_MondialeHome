@@ -29,12 +29,26 @@ import { cn } from "@/lib/utils";
 import { ChevronUp, LogOut, User } from "lucide-react";
 import { signOut, useSession } from "@/lib/auth/client";
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  userPermissions?: string[];
+  isSuperAdmin?: boolean;
+}
+
+export function AppSidebar({
+  userPermissions = [],
+  isSuperAdmin = false,
+}: AppSidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const router = useRouter();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
+
+  function canSeeItem(permission: string | null): boolean {
+    if (!permission) return true;
+    if (isSuperAdmin) return true;
+    return userPermissions.includes(permission) || userPermissions.includes("*");
+  }
 
   const handleSignOut = async () => {
     await signOut();
@@ -72,47 +86,51 @@ export function AppSidebar() {
 
       {/* Navigation principale par groupes */}
       <SidebarContent className="gap-0">
-        {NAV_GROUPS.map((group) => (
-          <SidebarGroup key={group.label} className="py-2">
-            <SidebarGroupLabel className="text-sidebar-foreground/40 px-3 text-[10px] font-semibold tracking-widest uppercase">
-              {group.label}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      isActive={isActive(item.href)}
-                      tooltip={item.title}
-                      size="lg"
-                      render={<Link href={item.href} />}
-                      className={cn(
-                        "gap-3 transition-all duration-200",
-                        isActive(item.href) && "text-primary font-semibold"
-                      )}
-                    >
-                      <item.icon
+        {NAV_GROUPS.map((group) => {
+          const visibleItems = group.items.filter((item) => canSeeItem(item.permission));
+          if (visibleItems.length === 0) return null;
+          return (
+            <SidebarGroup key={group.label} className="py-2">
+              <SidebarGroupLabel className="text-sidebar-foreground/40 px-3 text-[10px] font-semibold tracking-widest uppercase">
+                {group.label}
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {visibleItems.map((item) => (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        isActive={isActive(item.href)}
+                        tooltip={item.title}
+                        size="lg"
+                        render={<Link href={item.href} />}
                         className={cn(
-                          "size-5 shrink-0",
-                          isActive(item.href)
-                            ? "text-primary"
-                            : "text-sidebar-foreground/60"
+                          "gap-3 transition-all duration-200",
+                          isActive(item.href) && "text-primary font-semibold"
                         )}
-                      />
-                      <span>{item.title}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+                      >
+                        <item.icon
+                          className={cn(
+                            "size-5 shrink-0",
+                            isActive(item.href)
+                              ? "text-primary"
+                              : "text-sidebar-foreground/60"
+                          )}
+                        />
+                        <span>{item.title}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          );
+        })}
       </SidebarContent>
 
       {/* Footer : paramètres + admin + user */}
       <SidebarFooter className="border-sidebar-border border-t pt-2">
         <SidebarMenu>
-          {NAV_BOTTOM_ITEMS.map((item) => (
+          {NAV_BOTTOM_ITEMS.filter((item) => canSeeItem(item.permission)).map((item) => (
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
                 isActive={isActive(item.href)}
