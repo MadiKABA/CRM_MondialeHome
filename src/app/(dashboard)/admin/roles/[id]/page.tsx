@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronRight, Shield, Users, Lock, Copy, Trash2 } from "lucide-react";
-import { requireAuth, checkPermission } from "@/lib/permissions";
+import { requireAuth, checkPermission } from "@/lib/permissions/server";
 import { getRoleById } from "@/features/admin/server/queries/roles.queries";
 import { PermissionsMatrix } from "@/features/admin/components/roles/permissions-matrix";
 import { Badge } from "@/components/ui/badge";

@@ -1,43 +1,9 @@
-import { auth } from "@/lib/auth/auth";
-import { headers } from "next/headers";
 import type { PermissionCode } from "./constants";
 
 // ============================================================
-// Server-side session helpers
+// Client-safe permission helpers (no server dependencies)
+// For server-only functions, import from "@/lib/permissions/server"
 // ============================================================
-
-export async function getServerSession() {
-  return auth.api.getSession({ headers: await headers() });
-}
-
-/**
- * Retourne la session ou throw UNAUTHORIZED.
- */
-export async function requireAuth() {
-  const session = await getServerSession();
-  if (!session) throw new Error("UNAUTHORIZED");
-  return session;
-}
-
-/**
- * Vérifie une permission côté serveur — throw FORBIDDEN si non autorisé.
- *
- * Utilise getEffectivePermissions de features/admin/lib/permissions.ts.
- * Super Admin court-circuite la vérification via le flag isSuperAdmin en session.
- */
-export async function checkPermission(permission: PermissionCode): Promise<void> {
-  const session = await getServerSession();
-  if (!session) throw new Error("UNAUTHORIZED");
-
-  // Super Admin : accès total sans requête DB
-  if ((session.user as { isSuperAdmin?: boolean }).isSuperAdmin) return;
-
-  // Chargement des permissions effectives depuis la DB (memoïsé par request)
-  const { hasPermission: dbHasPermission } =
-    await import("@/features/admin/lib/permissions");
-  const allowed = await dbHasPermission(session.user.id, permission);
-  if (!allowed) throw new Error(`FORBIDDEN: permission "${permission}" requise`);
-}
 
 /**
  * Vérifie sans throw — retourne boolean.

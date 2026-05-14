@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { requireAuth, checkPermission } from "@/lib/permissions";
+import { requireAuth, checkPermission } from "@/lib/permissions/server";
 import { getRoles } from "@/features/admin/server/queries/roles.queries";
 import { RoleCard } from "@/features/admin/components/roles/role-card";
 import { Button } from "@/components/ui/button";

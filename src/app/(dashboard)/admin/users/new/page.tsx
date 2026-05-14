@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { requireAuth, checkPermission } from "@/lib/permissions";
+import { requireAuth, checkPermission } from "@/lib/permissions/server";
 import { getAvailableRoles } from "@/features/admin/server/queries/users.queries";
 import { UserForm } from "@/features/admin/components/users/user-form";
 

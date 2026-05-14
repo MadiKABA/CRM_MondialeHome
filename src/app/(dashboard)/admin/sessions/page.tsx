@@ -2,7 +2,7 @@ import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import Link from "next/link";
 import { Monitor, Smartphone, Globe } from "lucide-react";
-import { requireAuth, checkPermission } from "@/lib/permissions";
+import { requireAuth, checkPermission } from "@/lib/permissions/server";
 import { getAllActiveSessions } from "@/features/admin/server/queries/sessions.queries";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 

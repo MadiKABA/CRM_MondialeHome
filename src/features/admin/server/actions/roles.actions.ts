@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireAuth, checkPermission } from "@/lib/permissions";
+import { requireAuth, checkPermission } from "@/lib/permissions/server";
 import { canDeleteRole } from "@/features/admin/lib/role-guards";
 import type { ActionResult } from "@/features/admin/types";
 

@@ -9,7 +9,7 @@ import { UserSessionsSection } from "@/features/admin/components/users/user-sess
 import { getUserById } from "@/features/admin/server/queries/users.queries";
 import { getUserSessions } from "@/features/admin/server/queries/sessions.queries";
 import { getEffectivePermissions } from "@/features/admin/lib/permissions";
-import { requireAuth } from "@/lib/permissions";
+import { requireAuth } from "@/lib/permissions/server";
 
 interface PageProps {
   params: Promise<{ id: string }>;

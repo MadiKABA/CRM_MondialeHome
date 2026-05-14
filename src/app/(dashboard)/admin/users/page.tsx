@@ -6,7 +6,7 @@ import { UsersTable } from "@/features/admin/components/users/users-table";
 import { UsersFilters } from "@/features/admin/components/users/users-filters";
 import { getUsers, getAdminStats } from "@/features/admin/server/queries/users.queries";
 import { db } from "@/lib/db";
-import { requireAuth } from "@/lib/permissions";
+import { requireAuth } from "@/lib/permissions/server";
 
 interface PageProps {
   searchParams: Promise<{

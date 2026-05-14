@@ -2,7 +2,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppHeader } from "@/components/layout/app-header";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { getServerSession } from "@/lib/permissions";
+import { getServerSession } from "@/lib/permissions/server";
 
 export default async function DashboardLayout({
   children,

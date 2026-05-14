@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAuth, checkPermission } from "@/lib/permissions";
+import { requireAuth, checkPermission } from "@/lib/permissions/server";
 import {
   getAuditLogs,
   getAuditEntities,

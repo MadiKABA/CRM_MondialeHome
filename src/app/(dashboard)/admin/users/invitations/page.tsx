@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ChevronRight, Mail } from "lucide-react";
-import { requireAuth, checkPermission } from "@/lib/permissions";
+import { requireAuth, checkPermission } from "@/lib/permissions/server";
 import { getInvitations } from "@/features/admin/server/queries/invitations.queries";
 import { getAvailableRoles } from "@/features/admin/server/queries/users.queries";
 import { InvitationsTable } from "@/features/admin/components/users/invitations-table";
