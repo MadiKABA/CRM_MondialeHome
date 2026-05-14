@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Camera, Loader2, Trash2 } from "lucide-react";
+import { Camera, Loader2, Trash2, Upload } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,7 +30,6 @@ export function AvatarUpload({ currentImage }: AvatarUploadProps) {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
 
-    // Réinitialiser immédiatement pour permettre le ré-upload du même fichier
     if (fileInputRef.current) fileInputRef.current.value = "";
 
     if (!file) return;
@@ -50,6 +49,7 @@ export function AvatarUpload({ currentImage }: AvatarUploadProps) {
 
     if (!cloudName || !uploadPreset) {
       toast.error("Configuration Cloudinary manquante.");
+      console.error("Cloudinary env vars missing:", { cloudName, uploadPreset });
       return;
     }
 
@@ -66,6 +66,8 @@ export function AvatarUpload({ currentImage }: AvatarUploadProps) {
       );
 
       if (!response.ok) {
+        const errorBody = await response.text();
+        console.error("Cloudinary upload failed:", response.status, errorBody);
         throw new Error(`Upload échoué : ${response.status}`);
       }
 
@@ -79,7 +81,8 @@ export function AvatarUpload({ currentImage }: AvatarUploadProps) {
       } else {
         toast.error(result.error);
       }
-    } catch {
+    } catch (error) {
+      console.error("Upload error:", error);
       toast.error("Échec de l'upload. Veuillez réessayer.");
     } finally {
       setIsUploading(false);
@@ -92,6 +95,7 @@ export function AvatarUpload({ currentImage }: AvatarUploadProps) {
       const result = await removeAvatar();
       if (result.success) {
         toast.success("Photo de profil supprimée");
+        setConfirmRemoveOpen(false);
       } else {
         toast.error(result.error);
       }
@@ -116,22 +120,30 @@ export function AvatarUpload({ currentImage }: AvatarUploadProps) {
         <DropdownMenuTrigger
           render={
             <button
-              className="bg-primary text-primary-foreground hover:bg-primary/90 absolute -right-1 -bottom-1 flex size-8 items-center justify-center rounded-full shadow-md transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-              aria-label="Modifier la photo de profil"
+              type="button"
               disabled={isUploading}
-            />
+              className="bg-gold-deep hover:bg-gold-darker absolute -right-1 -bottom-1 flex size-8 cursor-pointer items-center justify-center rounded-full text-white shadow-md transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label="Modifier la photo de profil"
+            >
+              {isUploading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Camera className="size-4" />
+              )}
+            </button>
           }
-        >
-          {isUploading ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Camera className="size-4" />
-          )}
-        </DropdownMenuTrigger>
+        />
 
         <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
-            <Camera className="size-4" />
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              fileInputRef.current?.click();
+            }}
+            disabled={isUploading}
+            className="cursor-pointer"
+          >
+            <Upload className="size-4" />
             Téléverser une photo
           </DropdownMenuItem>
 
@@ -143,7 +155,7 @@ export function AvatarUpload({ currentImage }: AvatarUploadProps) {
                   e.preventDefault();
                   setConfirmRemoveOpen(true);
                 }}
-                className="text-destructive focus:text-destructive"
+                className="text-destructive focus:text-destructive cursor-pointer"
               >
                 <Trash2 className="size-4" />
                 Supprimer la photo
