@@ -125,7 +125,7 @@ export function PersonalInfoForm({ profile }: PersonalInfoFormProps) {
               {profile.emailVerified ? (
                 <Badge
                   variant="outline"
-                  className="shrink-0 border-green-500/40 text-green-600"
+                  className="border-gold-deep/40 text-gold-deep shrink-0"
                 >
                   Vérifié
                 </Badge>

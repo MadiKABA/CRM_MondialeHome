@@ -41,7 +41,7 @@ function getStrengthColor(score: number): string {
   if (score <= 2) return "bg-orange-500";
   if (score <= 3) return "bg-yellow-500";
   if (score <= 4) return "bg-blue-500";
-  return "bg-green-500";
+  return "bg-gold-deep";
 }
 
 function getStrengthLabel(score: number): string {
@@ -207,7 +207,7 @@ export function ChangePasswordForm() {
                               ? "text-destructive"
                               : score <= 3
                                 ? "text-yellow-600"
-                                : "text-green-600"
+                                : "text-gold-deep"
                           )}
                         >
                           {getStrengthLabel(score)}
@@ -224,7 +224,7 @@ export function ChangePasswordForm() {
                               className="flex items-center gap-1.5 text-xs"
                             >
                               {met ? (
-                                <CheckCircle2 className="size-3.5 shrink-0 text-green-500" />
+                                <CheckCircle2 className="text-gold-deep size-3.5 shrink-0" />
                               ) : (
                                 <XCircle className="text-muted-foreground size-3.5 shrink-0" />
                               )}

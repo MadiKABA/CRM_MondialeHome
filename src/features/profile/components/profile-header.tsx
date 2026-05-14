@@ -69,7 +69,7 @@ export function ProfileHeader({ profile }: ProfileHeaderProps) {
               {profile.emailVerified && (
                 <Badge
                   variant="outline"
-                  className="ml-1 border-green-500/40 px-1.5 py-0 text-[10px] text-green-600"
+                  className="border-gold-deep/40 text-gold-deep ml-1 px-1.5 py-0 text-[10px]"
                 >
                   Vérifié
                 </Badge>

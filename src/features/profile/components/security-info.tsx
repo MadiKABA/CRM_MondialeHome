@@ -23,7 +23,7 @@ function SecurityRow({ label, status, value, action }: SecurityRowProps) {
     <div className="flex items-center justify-between gap-4 py-3">
       <div className="flex items-start gap-3">
         <div className="mt-0.5">
-          {status === "ok" && <CheckCircle2 className="size-4.5 text-green-500" />}
+          {status === "ok" && <CheckCircle2 className="text-gold-deep size-4.5" />}
           {status === "warning" && <XCircle className="size-4.5 text-yellow-500" />}
           {status === "info" && <Clock className="text-muted-foreground size-4.5" />}
         </div>
@@ -53,7 +53,7 @@ export function SecurityInfo({ profile }: SecurityInfoProps) {
             profile.emailVerified ? (
               <Badge
                 variant="outline"
-                className="shrink-0 border-green-500/40 text-green-600"
+                className="border-gold-deep/40 text-gold-deep shrink-0"
               >
                 Vérifié
               </Badge>
@@ -81,7 +81,7 @@ export function SecurityInfo({ profile }: SecurityInfoProps) {
               variant="outline"
               className={
                 profile.twoFactorEnabled
-                  ? "shrink-0 border-green-500/40 text-green-600"
+                  ? "border-gold-deep/40 text-gold-deep shrink-0"
                   : "shrink-0 border-yellow-500/40 text-yellow-600"
               }
             >

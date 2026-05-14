@@ -50,9 +50,14 @@
   /* Brand colors (extra — pour usage direct dans le code) */
   --color-brand-terracotta: #c4622d;
   --color-brand-sand: #d4a853;
-  --color-brand-moss: #4a6741;
   --color-brand-cream: #fdfaf6;
   --color-brand-bark: #8b7355;
+
+  /* Gold palette — Mondial Home */
+  --color-gold: oklch(0.71 0.1 80);
+  --color-gold-deep: oklch(0.58 0.12 70);
+  --color-gold-darker: oklch(0.48 0.1 65);
+  --color-gold-light: oklch(0.85 0.06 80);
 
   /* Radius */
   --radius-sm: calc(var(--radius) * 0.6);
@@ -97,9 +102,9 @@
   --muted: oklch(0.96 0.008 60);
   --muted-foreground: oklch(0.52 0.03 55);
 
-  /* Accent — Vert mousse #4A6741 */
-  --accent: oklch(0.48 0.08 145);
-  --accent-foreground: oklch(0.98 0.005 80);
+  /* Accent — Champagne doré (hover subtil) */
+  --accent: oklch(0.93 0.025 72);
+  --accent-foreground: oklch(0.2 0.02 50);
 
   /* Destructive */
   --destructive: oklch(0.577 0.245 27.325);
@@ -107,12 +112,12 @@
   /* Borders & Inputs */
   --border: oklch(0.9 0.01 60);
   --input: oklch(0.9 0.01 60);
-  --ring: oklch(0.556 0.151 42.5);
+  --ring: oklch(0.71 0.1 80);
 
   /* Charts — palette cohérente */
   --chart-1: oklch(0.556 0.151 42.5); /* Terracotta */
   --chart-2: oklch(0.76 0.098 72); /* Sable */
-  --chart-3: oklch(0.48 0.08 145); /* Mousse */
+  --chart-3: oklch(0.58 0.12 70); /* Doré profond */
   --chart-4: oklch(0.65 0.12 28); /* Brique */
   --chart-5: oklch(0.85 0.07 85); /* Champagne */
 
@@ -152,18 +157,18 @@
   --muted: oklch(0.25 0.015 40);
   --muted-foreground: oklch(0.65 0.03 55);
 
-  --accent: oklch(0.38 0.07 145);
+  --accent: oklch(0.28 0.03 65);
   --accent-foreground: oklch(0.93 0.01 60);
 
   --destructive: oklch(0.704 0.191 22.216);
 
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.62 0.16 42.5);
+  --ring: oklch(0.71 0.1 80);
 
   --chart-1: oklch(0.62 0.16 42.5);
   --chart-2: oklch(0.76 0.098 72);
-  --chart-3: oklch(0.55 0.1 145);
+  --chart-3: oklch(0.58 0.12 70);
   --chart-4: oklch(0.7 0.13 28);
   --chart-5: oklch(0.85 0.07 85);
 
