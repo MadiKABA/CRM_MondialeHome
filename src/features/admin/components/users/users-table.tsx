@@ -136,7 +136,7 @@ function UserCard({
           className="border-cream-darker text-gold-deep hover:text-gold-darker hover:bg-gold-light/30 flex-1"
           title="Modifier"
           aria-label={`Modifier ${user.name}`}
-          render={<Link href={`/admin/users/${user.id}?edit=true`} />}
+          render={<Link href={`/admin/users/${user.id}/edit`} />}
         >
           <Pencil className="mr-1.5 size-4" />
           Modifier
@@ -366,7 +366,7 @@ export function UsersTable({ users, currentUserId }: UsersTableProps) {
                         className="text-gold-deep hover:text-gold-darker hover:bg-gold-light/30"
                         title="Modifier"
                         aria-label={`Modifier ${user.name}`}
-                        render={<Link href={`/admin/users/${user.id}?edit=true`} />}
+                        render={<Link href={`/admin/users/${user.id}/edit`} />}
                       >
                         <Pencil className="size-4" />
                         <span className="ml-1.5 hidden lg:inline">Modifier</span>

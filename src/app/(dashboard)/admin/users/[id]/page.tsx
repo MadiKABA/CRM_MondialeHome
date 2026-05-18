@@ -6,6 +6,7 @@ import { UserDetail } from "@/features/admin/components/users/user-detail";
 import { UserRolesSection } from "@/features/admin/components/users/user-roles-section";
 import { UserEffectivePermissions } from "@/features/admin/components/users/user-effective-permissions";
 import { UserSessionsSection } from "@/features/admin/components/users/user-sessions-section";
+import { UserDangerZone } from "@/features/admin/components/users/user-danger-zone";
 import { getUserById } from "@/features/admin/server/queries/users.queries";
 import { getUserSessions } from "@/features/admin/server/queries/sessions.queries";
 import { getEffectivePermissions } from "@/features/admin/lib/permissions";
@@ -77,35 +78,9 @@ export default async function UserDetailPage({ params }: PageProps) {
       />
 
       {/* Section 5 — Zone de danger */}
-      {!user.isSuperAdmin && (
-        <div className="rounded-xl border border-red-200 p-6">
-          <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-red-700">
-            <AlertTriangle className="size-4" />
-            Zone de danger
-          </h3>
-          <p className="text-text-secondary mb-4 text-xs">
-            Ces actions sont irréversibles. Procédez avec précaution.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-amber-200 text-amber-700 hover:bg-amber-50"
-            >
-              {user.isActive ? "Désactiver le compte" : "Réactiver le compte"}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-red-200 text-red-600 hover:bg-red-50"
-            >
-              Supprimer définitivement
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {user.isSuperAdmin && (
+      {!user.isSuperAdmin ? (
+        <UserDangerZone user={user} />
+      ) : (
         <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
           <p className="flex items-center gap-2 text-xs text-amber-800">
             <AlertTriangle className="size-4 shrink-0" />

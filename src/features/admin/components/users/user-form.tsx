@@ -232,12 +232,21 @@ function CreateUserForm({ availableRoles }: { availableRoles: RoleListItemDTO[] 
 
 // ── Formulaire édition ────────────────────────────────────────
 
-function EditUserForm({ user }: { user: UserDetailDTO }) {
+interface EditUserFormProps {
+  user: UserDetailDTO;
+  availableRoles: RoleListItemDTO[];
+}
+
+function EditUserForm({ user, availableRoles }: EditUserFormProps) {
   const router = useRouter();
+
+  const currentRoleIds = user.roles.map((r) => r.id);
 
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<UpdateUserInput>({
     resolver: zodResolver(updateUserSchema),
@@ -249,8 +258,24 @@ function EditUserForm({ user }: { user: UserDetailDTO }) {
       department: user.department ?? "",
       language: (user.language as "fr" | "wo") ?? "fr",
       timezone: user.timezone ?? "Africa/Dakar",
+      roleIds: currentRoleIds,
     },
   });
+
+  const selectedRoleIds = watch("roleIds") ?? [];
+
+  function toggleRole(roleId: string) {
+    const current = selectedRoleIds;
+    if (current.includes(roleId)) {
+      setValue(
+        "roleIds",
+        current.filter((id) => id !== roleId),
+        { shouldValidate: true }
+      );
+    } else {
+      setValue("roleIds", [...current, roleId], { shouldValidate: true });
+    }
+  }
 
   async function onSubmit(data: UpdateUserInput) {
     const result = await updateUser(user.id, data);
@@ -307,6 +332,40 @@ function EditUserForm({ user }: { user: UserDetailDTO }) {
         </div>
       </div>
 
+      {/* Profils d'accès */}
+      <div className="border-cream-darker rounded-xl border p-6">
+        <h3 className="text-text-primary mb-1 font-semibold">{"Profils d'accès *"}</h3>
+        <p className="text-text-secondary mb-4 text-xs">
+          Les profils définissent ce que cet utilisateur peut faire dans le CRM.
+        </p>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {availableRoles.map((role) => (
+            <label
+              key={role.id}
+              className="border-cream-darker hover:bg-cream/50 flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors"
+            >
+              <Checkbox
+                checked={selectedRoleIds.includes(role.id)}
+                onCheckedChange={() => toggleRole(role.id)}
+                className="mt-0.5"
+              />
+              <div className="min-w-0">
+                <p className="text-text-primary text-sm font-medium">{role.name}</p>
+                {role.description && (
+                  <p className="text-text-secondary mt-0.5 text-xs">{role.description}</p>
+                )}
+                <p className="text-text-secondary mt-0.5 text-xs">
+                  {role.permissionCount} droit{role.permissionCount > 1 ? "s" : ""}
+                </p>
+              </div>
+            </label>
+          ))}
+        </div>
+        {errors.roleIds && (
+          <p className="mt-2 text-xs text-red-600">{errors.roleIds.message}</p>
+        )}
+      </div>
+
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button
@@ -336,5 +395,5 @@ export function UserForm(props: UserFormProps) {
   if (props.mode === "create") {
     return <CreateUserForm availableRoles={props.availableRoles} />;
   }
-  return <EditUserForm user={props.user} />;
+  return <EditUserForm user={props.user} availableRoles={props.availableRoles} />;
 }

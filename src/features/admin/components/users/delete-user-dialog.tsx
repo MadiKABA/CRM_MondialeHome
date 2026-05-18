@@ -15,10 +15,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { deleteUser } from "@/features/admin/server/actions/users.actions";
-import type { UserListItemDTO } from "@/features/admin/types";
 
 interface DeleteUserDialogProps {
-  user: UserListItemDTO;
+  user: { id: string; name: string };
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }

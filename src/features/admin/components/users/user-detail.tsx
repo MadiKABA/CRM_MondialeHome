@@ -150,7 +150,7 @@ export function UserDetail({ user }: UserDetailProps) {
             size="sm"
             variant="outline"
             className="border-cream-darker text-text-secondary"
-            render={<Link href={`/admin/users/${user.id}?edit=true`} />}
+            render={<Link href={`/admin/users/${user.id}/edit`} />}
           >
             Modifier
           </Button>

@@ -15,10 +15,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toggleUserStatus } from "@/features/admin/server/actions/users.actions";
-import type { UserListItemDTO } from "@/features/admin/types";
 
 interface ToggleStatusDialogProps {
-  user: UserListItemDTO;
+  user: { id: string; name: string };
   targetActive: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
