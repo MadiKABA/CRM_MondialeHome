@@ -1,20 +1,60 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { requireAuth, checkPermission } from "@/lib/permissions/server";
-import { canManageUser } from "@/features/admin/lib/role-guards";
+import { logger } from "@/lib/logger";
+import { checkPermission, requireAuth } from "@/lib/permissions/server";
+import { canManageUser, canRemoveSuperAdmin } from "@/features/admin/lib/role-guards";
 import {
   createUserSchema,
   updateUserSchema,
+  toggleUserStatusSchema,
+  deleteUserSchema,
+  inviteUserSchema,
   assignRoleSchema,
   removeRoleSchema,
+  type CreateUserInput,
+  type UpdateUserInput,
+  type ToggleUserStatusInput,
+  type DeleteUserInput,
+  type InviteUserInput,
 } from "@/features/admin/schemas/user.schema";
 import type { ActionResult } from "@/features/admin/types";
-import type {
-  CreateUserInput,
-  UpdateUserInput,
-} from "@/features/admin/schemas/user.schema";
+
+// ── Helpers ───────────────────────────────────────────────────
+
+async function getRequestMeta() {
+  const h = await headers();
+  return {
+    ipAddress: h.get("x-forwarded-for") ?? null,
+    userAgent: h.get("user-agent") ?? null,
+  };
+}
+
+async function audit(params: {
+  userId: string;
+  action: string;
+  entityId?: string;
+  oldValue?: Record<string, unknown>;
+  newValue?: Record<string, unknown>;
+}) {
+  const meta = await getRequestMeta();
+  await db.auditLog.create({
+    data: {
+      userId: params.userId,
+      action: params.action,
+      entity: "User",
+      entityId: params.entityId ?? null,
+      oldValue: (params.oldValue ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+      newValue: (params.newValue ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      status: "success",
+    },
+  });
+}
 
 // ── Créer un utilisateur ──────────────────────────────────────
 
@@ -76,9 +116,17 @@ export async function createUser(
       return created;
     });
 
+    await audit({
+      userId: session.user.id,
+      action: "user.create",
+      entityId: user.id,
+      newValue: { email: data.email, name, roleIds: data.roleIds },
+    });
+
     revalidatePath("/admin/users");
     return { success: true, data: { id: user.id } };
   } catch (err) {
+    logger.error({ err }, "Failed to create user");
     if (err instanceof Error) {
       if (err.message === "UNAUTHORIZED")
         return { success: false, error: "Non authentifié." };
@@ -109,14 +157,21 @@ export async function updateUser(
       };
     }
 
+    const oldUser = await db.user.findUnique({
+      where: { id: userId },
+      select: {
+        firstName: true,
+        lastName: true,
+        phone: true,
+        jobTitle: true,
+        isActive: true,
+      },
+    });
+
     const updateData: Record<string, unknown> = {};
     if (data.firstName !== undefined || data.lastName !== undefined) {
-      const user = await db.user.findUnique({
-        where: { id: userId },
-        select: { firstName: true, lastName: true },
-      });
-      const first = data.firstName ?? user?.firstName ?? "";
-      const last = data.lastName ?? user?.lastName ?? "";
+      const first = data.firstName ?? oldUser?.firstName ?? "";
+      const last = data.lastName ?? oldUser?.lastName ?? "";
       updateData.firstName = first;
       updateData.lastName = last;
       updateData.name = `${first} ${last}`.trim();
@@ -128,12 +183,35 @@ export async function updateUser(
     if (data.timezone !== undefined) updateData.timezone = data.timezone;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
-    await db.user.update({ where: { id: userId }, data: updateData });
+    await db.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: userId }, data: updateData });
+
+      if (data.roleIds !== undefined) {
+        await tx.userRole.deleteMany({ where: { userId } });
+        await tx.userRole.createMany({
+          data: data.roleIds.map((roleId) => ({
+            userId,
+            roleId,
+            assignedBy: session.user.id,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    });
+
+    await audit({
+      userId: session.user.id,
+      action: "user.update",
+      entityId: userId,
+      oldValue: oldUser ?? undefined,
+      newValue: { ...updateData, roleIds: data.roleIds },
+    });
 
     revalidatePath("/admin/users");
     revalidatePath(`/admin/users/${userId}`);
     return { success: true, data: undefined };
   } catch (err) {
+    logger.error({ err }, "Failed to update user");
     if (err instanceof Error) {
       if (err.message === "UNAUTHORIZED")
         return { success: false, error: "Non authentifié." };
@@ -144,27 +222,65 @@ export async function updateUser(
   }
 }
 
-// ── Désactiver un utilisateur ─────────────────────────────────
+// ── Activer / Désactiver un utilisateur ───────────────────────
 
-export async function deactivateUser(userId: string): Promise<ActionResult<void>> {
+export async function toggleUserStatus(
+  input: ToggleUserStatusInput
+): Promise<ActionResult<void>> {
   try {
     const session = await requireAuth();
     await checkPermission("admin.users.update.all");
 
-    const canManage = await canManageUser(session.user.id, userId);
-    if (!canManage) {
+    const data = toggleUserStatusSchema.parse(input);
+
+    if (data.userId === session.user.id) {
       return {
         success: false,
-        error: "Vous n'avez pas les droits pour désactiver cet utilisateur.",
+        error: "Vous ne pouvez pas modifier le statut de votre propre compte.",
       };
     }
 
-    await db.user.update({ where: { id: userId }, data: { isActive: false } });
+    const canManage = await canManageUser(session.user.id, data.userId);
+    if (!canManage) {
+      return {
+        success: false,
+        error: "Vous n'avez pas les droits pour modifier cet utilisateur.",
+      };
+    }
+
+    if (!data.isActive) {
+      const target = await db.user.findUnique({
+        where: { id: data.userId },
+        select: { isSuperAdmin: true },
+      });
+      if (target?.isSuperAdmin) {
+        const canRemove = await canRemoveSuperAdmin(data.userId);
+        if (!canRemove) {
+          return {
+            success: false,
+            error: "Impossible de désactiver le dernier Super Administrateur.",
+          };
+        }
+      }
+    }
+
+    await db.user.update({
+      where: { id: data.userId },
+      data: { isActive: data.isActive },
+    });
+
+    await audit({
+      userId: session.user.id,
+      action: data.isActive ? "user.activate" : "user.deactivate",
+      entityId: data.userId,
+      newValue: { isActive: data.isActive, reason: data.reason },
+    });
 
     revalidatePath("/admin/users");
-    revalidatePath(`/admin/users/${userId}`);
+    revalidatePath(`/admin/users/${data.userId}`);
     return { success: true, data: undefined };
   } catch (err) {
+    logger.error({ err }, "Failed to toggle user status");
     if (err instanceof Error) {
       if (err.message === "UNAUTHORIZED")
         return { success: false, error: "Non authentifié." };
@@ -175,45 +291,32 @@ export async function deactivateUser(userId: string): Promise<ActionResult<void>
   }
 }
 
-// ── Réactiver un utilisateur ──────────────────────────────────
+// Aliases conservés pour rétro-compatibilité avec les composants existants
+export async function deactivateUser(userId: string): Promise<ActionResult<void>> {
+  return toggleUserStatus({ userId, isActive: false, reason: "Désactivation manuelle" });
+}
 
 export async function activateUser(userId: string): Promise<ActionResult<void>> {
-  try {
-    const session = await requireAuth();
-    await checkPermission("admin.users.update.all");
-
-    const canManage = await canManageUser(session.user.id, userId);
-    if (!canManage) {
-      return {
-        success: false,
-        error: "Vous n'avez pas les droits pour réactiver cet utilisateur.",
-      };
-    }
-
-    await db.user.update({ where: { id: userId }, data: { isActive: true } });
-
-    revalidatePath("/admin/users");
-    revalidatePath(`/admin/users/${userId}`);
-    return { success: true, data: undefined };
-  } catch (err) {
-    if (err instanceof Error) {
-      if (err.message === "UNAUTHORIZED")
-        return { success: false, error: "Non authentifié." };
-      if (err.message.startsWith("FORBIDDEN"))
-        return { success: false, error: "Accès refusé." };
-    }
-    return { success: false, error: "Une erreur est survenue." };
-  }
+  return toggleUserStatus({ userId, isActive: true, reason: "Réactivation manuelle" });
 }
 
 // ── Supprimer un utilisateur (soft delete) ────────────────────
 
-export async function deleteUser(userId: string): Promise<ActionResult<void>> {
+export async function deleteUser(input: DeleteUserInput): Promise<ActionResult<void>> {
   try {
     const session = await requireAuth();
     await checkPermission("admin.users.delete.all");
 
-    const canManage = await canManageUser(session.user.id, userId);
+    const data = deleteUserSchema.parse(input);
+
+    if (data.userId === session.user.id) {
+      return {
+        success: false,
+        error: "Vous ne pouvez pas supprimer votre propre compte.",
+      };
+    }
+
+    const canManage = await canManageUser(session.user.id, data.userId);
     if (!canManage) {
       return {
         success: false,
@@ -221,14 +324,40 @@ export async function deleteUser(userId: string): Promise<ActionResult<void>> {
       };
     }
 
-    await db.user.update({
-      where: { id: userId },
-      data: { deletedAt: new Date(), isActive: false },
+    const target = await db.user.findUnique({
+      where: { id: data.userId },
+      select: { isSuperAdmin: true, email: true },
+    });
+
+    if (target?.isSuperAdmin) {
+      const canRemove = await canRemoveSuperAdmin(data.userId);
+      if (!canRemove) {
+        return {
+          success: false,
+          error: "Impossible de supprimer le dernier Super Administrateur.",
+        };
+      }
+    }
+
+    await db.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: data.userId },
+        data: { deletedAt: new Date(), isActive: false },
+      });
+      await tx.session.deleteMany({ where: { userId: data.userId } });
+    });
+
+    await audit({
+      userId: session.user.id,
+      action: "user.delete",
+      entityId: data.userId,
+      newValue: { email: target?.email },
     });
 
     revalidatePath("/admin/users");
     return { success: true, data: undefined };
   } catch (err) {
+    logger.error({ err }, "Failed to delete user");
     if (err instanceof Error) {
       if (err.message === "UNAUTHORIZED")
         return { success: false, error: "Non authentifié." };
@@ -239,7 +368,74 @@ export async function deleteUser(userId: string): Promise<ActionResult<void>> {
   }
 }
 
-// ── Assigner un rôle à un utilisateur ────────────────────────
+// ── Inviter un utilisateur par email ─────────────────────────
+
+export async function inviteUser(input: InviteUserInput): Promise<ActionResult<void>> {
+  try {
+    const session = await requireAuth();
+    await checkPermission("admin.users.create.all");
+
+    const data = inviteUserSchema.parse(input);
+
+    const existing = await db.user.findUnique({ where: { email: data.email } });
+    if (existing) {
+      return { success: false, error: "Un utilisateur avec cet email existe déjà." };
+    }
+
+    const existingInvite = await db.invitation.findFirst({
+      where: {
+        email: data.email,
+        status: "PENDING",
+        expiresAt: { gt: new Date() },
+      },
+    });
+    if (existingInvite) {
+      return {
+        success: false,
+        error: "Une invitation est déjà en attente pour cet email.",
+      };
+    }
+
+    const role = await db.role.findFirst({
+      where: { id: { in: data.roleIds } },
+      select: { id: true },
+    });
+
+    const { nanoid } = await import("nanoid");
+    await db.invitation.create({
+      data: {
+        email: data.email,
+        invitedById: session.user.id,
+        roleId: role?.id ?? null,
+        token: nanoid(32),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        status: "PENDING",
+      },
+    });
+
+    // TODO: envoyer l'email d'invitation via Brevo
+
+    await audit({
+      userId: session.user.id,
+      action: "user.invite",
+      newValue: { email: data.email, roleIds: data.roleIds },
+    });
+
+    revalidatePath("/admin/users");
+    return { success: true, data: undefined };
+  } catch (err) {
+    logger.error({ err }, "Failed to invite user");
+    if (err instanceof Error) {
+      if (err.message === "UNAUTHORIZED")
+        return { success: false, error: "Non authentifié." };
+      if (err.message.startsWith("FORBIDDEN"))
+        return { success: false, error: "Accès refusé." };
+    }
+    return { success: false, error: "Une erreur est survenue lors de l'invitation." };
+  }
+}
+
+// ── Assigner un rôle ──────────────────────────────────────────
 
 export async function assignRole(
   input: Parameters<typeof assignRoleSchema.parse>[0]
@@ -264,9 +460,17 @@ export async function assignRole(
       update: {},
     });
 
+    await audit({
+      userId: session.user.id,
+      action: "user.role.assign",
+      entityId: data.userId,
+      newValue: { roleId: data.roleId },
+    });
+
     revalidatePath(`/admin/users/${data.userId}`);
     return { success: true, data: undefined };
   } catch (err) {
+    logger.error({ err }, "Failed to assign role");
     if (err instanceof Error) {
       if (err.message === "UNAUTHORIZED")
         return { success: false, error: "Non authentifié." };
@@ -280,7 +484,7 @@ export async function assignRole(
   }
 }
 
-// ── Retirer un rôle d'un utilisateur ─────────────────────────
+// ── Retirer un rôle ───────────────────────────────────────────
 
 export async function removeRole(
   input: Parameters<typeof removeRoleSchema.parse>[0]
@@ -311,9 +515,17 @@ export async function removeRole(
       where: { userId_roleId: { userId: data.userId, roleId: data.roleId } },
     });
 
+    await audit({
+      userId: session.user.id,
+      action: "user.role.remove",
+      entityId: data.userId,
+      newValue: { roleId: data.roleId },
+    });
+
     revalidatePath(`/admin/users/${data.userId}`);
     return { success: true, data: undefined };
   } catch (err) {
+    logger.error({ err }, "Failed to remove role");
     if (err instanceof Error) {
       if (err.message === "UNAUTHORIZED")
         return { success: false, error: "Non authentifié." };
