@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { Plus, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UsersStats } from "@/features/admin/components/users/users-stats";
 import { UsersTable } from "@/features/admin/components/users/users-table";
 import { UsersFilters } from "@/features/admin/components/users/users-filters";
+import { UsersHeaderActions } from "@/features/admin/components/users/users-header";
 import { getUsers, getAdminStats } from "@/features/admin/server/queries/users.queries";
 import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/permissions/server";
@@ -40,7 +40,7 @@ export default async function UsersPage({ searchParams }: PageProps) {
     }),
     getAdminStats(),
     db.role.findMany({
-      select: { slug: true, name: true },
+      select: { id: true, slug: true, name: true },
       orderBy: { priority: "desc" },
     }),
   ]);
@@ -58,30 +58,7 @@ export default async function UsersPage({ searchParams }: PageProps) {
             {total > 1 ? "s" : ""})
           </p>
         </div>
-        <div className="flex shrink-0 gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-cream-darker text-text-secondary gap-2"
-            render={<Link href="/admin/users/invitations" />}
-          >
-            <Mail className="size-4" />
-            Invitations
-            {stats.pendingInvitations > 0 && (
-              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
-                {stats.pendingInvitations}
-              </span>
-            )}
-          </Button>
-          <Button
-            size="sm"
-            className="bg-gold-deep hover:bg-gold-deep/90 text-cream gap-2"
-            render={<Link href="/admin/users/new" />}
-          >
-            <Plus className="size-4" />
-            Nouveau membre
-          </Button>
-        </div>
+        <UsersHeaderActions roles={roles} pendingInvitations={stats.pendingInvitations} />
       </div>
 
       {/* Stats */}
