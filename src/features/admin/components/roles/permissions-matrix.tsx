@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ChevronDown, ChevronRight, Check } from "lucide-react";
+import { ChevronDown, ChevronRight, Check, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { MODULES, MODULE_ORDER, PERMISSIONS_BY_MODULE } from "@/lib/permissions";
@@ -14,16 +14,19 @@ import type { PermissionCode } from "@/lib/permissions";
 interface PermissionsMatrixProps {
   roleId: string;
   isSystem: boolean;
+  canEdit: boolean;
   grantedCodes: string[];
 }
 
 export function PermissionsMatrix({
   roleId,
   isSystem,
+  canEdit,
   grantedCodes,
 }: PermissionsMatrixProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set(grantedCodes));
   const [openModules, setOpenModules] = useState<Set<string>>(new Set(["clients"]));
+  const [search, setSearch] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const isDirty =
@@ -33,22 +36,30 @@ export function PermissionsMatrix({
   function toggleModule(moduleCode: string) {
     setOpenModules((prev) => {
       const next = new Set(prev);
-      next.has(moduleCode) ? next.delete(moduleCode) : next.add(moduleCode);
+      if (next.has(moduleCode)) {
+        next.delete(moduleCode);
+      } else {
+        next.add(moduleCode);
+      }
       return next;
     });
   }
 
   function togglePermission(code: string) {
-    if (isSystem) return;
+    if (!canEdit) return;
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(code) ? next.delete(code) : next.add(code);
+      if (next.has(code)) {
+        next.delete(code);
+      } else {
+        next.add(code);
+      }
       return next;
     });
   }
 
-  function toggleModulePermissions(moduleCode: string, allCodes: PermissionCode[]) {
-    if (isSystem) return;
+  function toggleModulePermissions(allCodes: PermissionCode[]) {
+    if (!canEdit) return;
     const allGranted = allCodes.every((c) => selected.has(c));
     setSelected((prev) => {
       const next = new Set(prev);
@@ -75,6 +86,10 @@ export function PermissionsMatrix({
     });
   }
 
+  function handleCancel() {
+    setSelected(new Set(grantedCodes));
+  }
+
   return (
     <div className="border-cream-darker rounded-xl border">
       {/* En-tête */}
@@ -84,10 +99,10 @@ export function PermissionsMatrix({
           <p className="text-text-secondary mt-0.5 text-xs">
             {selected.size} droit{selected.size > 1 ? "s" : ""} accordé
             {selected.size > 1 ? "s" : ""}
-            {isSystem && " — profil système (lecture seule)"}
+            {isSystem && " — profil système"}
           </p>
         </div>
-        {!isSystem && (
+        {canEdit && (
           <Button
             onClick={handleSave}
             disabled={!isDirty || isPending}
@@ -99,13 +114,46 @@ export function PermissionsMatrix({
         )}
       </div>
 
+      {/* Recherche */}
+      <div className="border-cream-darker flex items-center gap-2 border-b px-5 py-3">
+        <Search className="text-text-secondary size-4 shrink-0" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Rechercher un droit…"
+          className="text-text-primary placeholder:text-text-secondary flex-1 bg-transparent text-sm outline-none"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="text-text-secondary hover:text-text-primary transition-colors"
+            aria-label="Effacer la recherche"
+          >
+            <X className="size-4" />
+          </button>
+        )}
+      </div>
+
       {/* Matrice */}
       <div className="divide-cream-darker divide-y p-4">
         {MODULE_ORDER.map((moduleCode) => {
           const mod = MODULES[moduleCode];
-          const modPermissions = PERMISSIONS_BY_MODULE[moduleCode] ?? [];
+          const allModPermissions = PERMISSIONS_BY_MODULE[moduleCode] ?? [];
+          const searchLower = search.toLowerCase();
+          const modPermissions = search
+            ? allModPermissions.filter(
+                (code: PermissionCode) =>
+                  getPermissionLabel(code).toLowerCase().includes(searchLower) ||
+                  code.toLowerCase().includes(searchLower)
+              )
+            : allModPermissions;
+
+          if (modPermissions.length === 0) return null;
+
           const grantedCount = modPermissions.filter((p) => selected.has(p)).length;
-          const isOpen = openModules.has(moduleCode);
+          const isOpen = openModules.has(moduleCode) || search.length > 0;
           const allGranted = grantedCount === modPermissions.length;
 
           return (
@@ -138,10 +186,10 @@ export function PermissionsMatrix({
                     {grantedCount}/{modPermissions.length}
                   </span>
                 </button>
-                {!isSystem && (
+                {canEdit && (
                   <button
                     type="button"
-                    onClick={() => toggleModulePermissions(moduleCode, modPermissions)}
+                    onClick={() => toggleModulePermissions(modPermissions)}
                     className="text-gold-deep hover:text-gold-deep/70 shrink-0 px-3 py-3 text-xs font-medium transition-colors"
                     title={allGranted ? "Tout retirer" : "Tout accorder"}
                   >
@@ -161,8 +209,8 @@ export function PermissionsMatrix({
                       <label
                         key={code}
                         className={cn(
-                          "flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors",
-                          isSystem ? "cursor-default" : "hover:bg-cream/30",
+                          "flex items-center gap-3 px-4 py-2.5 transition-colors",
+                          canEdit ? "hover:bg-cream/30 cursor-pointer" : "cursor-default",
                           granted ? "" : "opacity-60"
                         )}
                         onClick={() => togglePermission(code)}
@@ -197,6 +245,34 @@ export function PermissionsMatrix({
           );
         })}
       </div>
+
+      {/* Barre flottante si modifications en cours */}
+      {canEdit && isDirty && (
+        <div className="border-cream-darker sticky bottom-4 mx-4 mb-4 flex items-center justify-between rounded-xl border bg-white px-4 py-3 shadow-lg">
+          <span className="text-text-secondary text-sm">
+            Modifications non enregistrées
+          </span>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleCancel}
+              disabled={isPending}
+              className="border-cream-darker text-text-secondary hover:bg-cream/50"
+            >
+              Annuler
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={isPending}
+              className="bg-gold-deep hover:bg-gold-deep/90 text-cream"
+            >
+              {isPending ? "Enregistrement…" : "Enregistrer"}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
