@@ -79,7 +79,7 @@ export default async function UsersPage({ searchParams }: PageProps) {
             render={<Link href="/admin/users/new" />}
           >
             <Plus className="size-4" />
-            Inviter un membre
+            Nouveau membre
           </Button>
         </div>
       </div>
