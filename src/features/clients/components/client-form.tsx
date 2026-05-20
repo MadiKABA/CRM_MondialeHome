@@ -20,10 +20,12 @@ import {
 import { cn } from "@/lib/utils";
 import { clientSchema, type ClientInput } from "../schemas/client.schema";
 import { createClient, updateClient } from "../server/actions";
+import { TagInput } from "./tag-input";
 import type { ClientDetailDTO } from "../types";
 
 interface ClientFormProps {
   client?: ClientDetailDTO;
+  tagSuggestions?: string[];
 }
 
 const SOURCES = [
@@ -51,7 +53,7 @@ function FieldError({ message }: { message?: string }) {
   return <p className="text-destructive mt-1 text-xs">{message}</p>;
 }
 
-export function ClientForm({ client }: ClientFormProps) {
+export function ClientForm({ client, tagSuggestions = [] }: ClientFormProps) {
   const router = useRouter();
   const isEdit = !!client;
 
@@ -375,6 +377,28 @@ export function ClientForm({ client }: ClientFormProps) {
             />
           ))}
         </div>
+      </section>
+
+      {/* Tags */}
+      <section className="space-y-4">
+        <SectionTitle>Tags</SectionTitle>
+        <Controller
+          control={control}
+          name="tags"
+          render={({ field }) => (
+            <div>
+              <TagInput
+                value={field.value ?? []}
+                onChange={field.onChange}
+                suggestions={tagSuggestions}
+                placeholder="Ajouter un tag (vip, revendeur, projet…)"
+              />
+              <p className="text-text-secondary mt-1 text-xs">
+                Appuyez sur Entrée ou virgule pour ajouter. Maximum 10 tags.
+              </p>
+            </div>
+          )}
+        />
       </section>
 
       {/* Notes */}

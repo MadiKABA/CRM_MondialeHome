@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getClientById } from "@/features/clients/server/queries";
+import { getClientById, getAllTags } from "@/features/clients/server/queries";
 import { ClientForm } from "@/features/clients/components/client-form";
 
 interface EditClientPageProps {
@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: EditClientPageProps) {
 
 export default async function EditClientPage({ params }: EditClientPageProps) {
   const { id } = await params;
-  const client = await getClientById(id);
+  const [client, tags] = await Promise.all([getClientById(id), getAllTags()]);
 
   if (!client) notFound();
 
@@ -41,7 +41,7 @@ export default async function EditClientPage({ params }: EditClientPageProps) {
       </div>
 
       <div className="border-border bg-card rounded-xl border p-6 shadow-sm">
-        <ClientForm client={client} />
+        <ClientForm client={client} tagSuggestions={tags.map((t) => t.tag)} />
       </div>
     </div>
   );

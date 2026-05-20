@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getAllTags } from "@/features/clients/server/queries";
 import { ClientForm } from "@/features/clients/components/client-form";
 
 export const metadata = { title: "Nouveau client — Mondial Home CRM" };
 
-export default function NewClientPage() {
+export default async function NewClientPage() {
+  const tags = await getAllTags();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -28,7 +31,7 @@ export default function NewClientPage() {
       </div>
 
       <div className="border-border bg-card rounded-xl border p-6 shadow-sm">
-        <ClientForm />
+        <ClientForm tagSuggestions={tags.map((t) => t.tag)} />
       </div>
     </div>
   );
