@@ -127,6 +127,14 @@ const PERMISSION_DEFS = [
     description: "Importer des articles",
     category: "Articles",
   },
+  {
+    code: "articles.manage_categories",
+    module: "articles",
+    action: "manage_categories",
+    scope: "all",
+    description: "Gérer les catégories du catalogue",
+    category: "Articles",
+  },
 
   // ── VENTES (8) ─────────────────────────────────────────────────────────────
   {

@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   Users,
   Package,
+  Tag,
   ShoppingCart,
   Megaphone,
   GitBranch,
@@ -35,13 +36,24 @@ export const NAV_GROUPS: NavGroup[] = [
         permission: null,
       },
       { title: "Clients", href: "/clients", icon: Users, permission: "clients.read" },
+      { title: "Ventes", href: "/sales", icon: ShoppingCart, permission: "sales.read" },
+    ],
+  },
+  {
+    label: "Catalogue",
+    items: [
+      {
+        title: "Catégories",
+        href: "/catalogue/categories",
+        icon: Tag,
+        permission: "articles.read.all",
+      },
       {
         title: "Articles",
-        href: "/articles",
+        href: "/catalogue/articles",
         icon: Package,
-        permission: "articles.read",
+        permission: "articles.read.all",
       },
-      { title: "Ventes", href: "/sales", icon: ShoppingCart, permission: "sales.read" },
     ],
   },
   {
