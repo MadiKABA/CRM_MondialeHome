@@ -46,6 +46,8 @@ export const clientFiltersSchema = z.object({
   city: z.string().optional(),
   district: z.string().optional(),
   source: z.string().optional(),
+  tag: z.string().optional(),
+  assigned: z.enum(["me", "all"]).optional(),
   status: z.enum(["ACTIVE", "INACTIVE", "UNSUBSCRIBED", "BLACKLISTED"]).optional(),
   isVip: z.boolean().optional(),
   hasPhone: z.boolean().optional(),
@@ -78,3 +80,74 @@ export type ImportRow = z.infer<typeof importRowSchema>;
 export const deleteClientSchema = z.object({
   clientId: z.string().cuid(),
 });
+
+// ── Statut rapide ─────────────────────────────────────────────────────────────
+export const updateClientStatusSchema = z.object({
+  clientId: z.string().cuid(),
+  status: z.enum(["ACTIVE", "INACTIVE", "UNSUBSCRIBED", "BLACKLISTED"]),
+  reason: z.string().max(200).optional().or(z.literal("")),
+});
+
+export type UpdateClientStatusInput = z.infer<typeof updateClientStatusSchema>;
+
+// ── Consentement ──────────────────────────────────────────────────────────────
+export const updateClientConsentSchema = z.object({
+  clientId: z.string().cuid(),
+  channel: z.enum(["sms", "whatsapp", "email"]),
+  consent: z.boolean(),
+  reason: z.string().max(200).optional().or(z.literal("")),
+});
+
+export type UpdateClientConsentInput = z.infer<typeof updateClientConsentSchema>;
+
+// ── Assignation ───────────────────────────────────────────────────────────────
+export const assignClientSchema = z.object({
+  clientId: z.string().cuid(),
+  assignedToId: z.string().cuid().nullable(),
+});
+
+export type AssignClientInput = z.infer<typeof assignClientSchema>;
+
+// ── Bulk actions ──────────────────────────────────────────────────────────────
+const clientIdsList = z
+  .array(z.string().cuid())
+  .min(1, "Sélectionnez au moins un client")
+  .max(500, "Maximum 500 clients par action");
+
+export const bulkUpdateStatusSchema = z.object({
+  clientIds: clientIdsList,
+  status: z.enum(["ACTIVE", "INACTIVE", "UNSUBSCRIBED", "BLACKLISTED"]),
+  reason: z.string().min(1, "Motif requis").max(200),
+});
+
+export type BulkUpdateStatusInput = z.infer<typeof bulkUpdateStatusSchema>;
+
+export const bulkAddTagSchema = z.object({
+  clientIds: clientIdsList,
+  tag: z.string().min(1, "Tag requis").max(50).toLowerCase(),
+});
+
+export type BulkAddTagInput = z.infer<typeof bulkAddTagSchema>;
+
+export const bulkRemoveTagSchema = z.object({
+  clientIds: clientIdsList,
+  tag: z.string().min(1),
+});
+
+export type BulkRemoveTagInput = z.infer<typeof bulkRemoveTagSchema>;
+
+export const bulkAssignSchema = z.object({
+  clientIds: clientIdsList,
+  assignedToId: z.string().cuid().nullable(),
+});
+
+export type BulkAssignInput = z.infer<typeof bulkAssignSchema>;
+
+export const bulkDeleteSchema = z.object({
+  clientIds: clientIdsList,
+  confirmation: z.string().refine((val): boolean => val === "SUPPRIMER", {
+    message: "Tapez SUPPRIMER pour confirmer",
+  }),
+});
+
+export type BulkDeleteInput = z.infer<typeof bulkDeleteSchema>;
