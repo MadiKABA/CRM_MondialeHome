@@ -126,6 +126,21 @@ export const PERMISSION_LABELS: Record<PermissionCode, PermissionLabel> = {
     isDangerous: false,
     superAdminOnly: false,
   },
+  "articles.manage_prices": {
+    code: "articles.manage_prices",
+    label: "Gérer les prix et promotions",
+    description: "Permet de modifier les prix de vente et de définir des promotions",
+    isDangerous: false,
+    superAdminOnly: false,
+  },
+  "articles.view_cost": {
+    code: "articles.view_cost",
+    label: "Voir les prix d'achat",
+    description:
+      "Permet de consulter les prix de revient (information confidentielle et marge)",
+    isDangerous: false,
+    superAdminOnly: false,
+  },
 
   // ── VENTES ────────────────────────────────────────────────────────────────
   "sales.read.own": {

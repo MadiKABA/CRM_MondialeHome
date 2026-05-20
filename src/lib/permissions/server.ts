@@ -29,3 +29,18 @@ export async function checkPermission(permission: PermissionCode): Promise<void>
   const allowed = await dbHasPermission(session.user.id, permission);
   if (!allowed) throw new Error(`FORBIDDEN: permission "${permission}" requise`);
 }
+
+/**
+ * Vérifie une permission côté serveur — retourne boolean sans throw.
+ * À utiliser pour les vérifications conditionnelles dans les Server Actions.
+ */
+export async function hasPermission(permission: PermissionCode): Promise<boolean> {
+  const session = await getServerSession();
+  if (!session) return false;
+
+  if ((session.user as { isSuperAdmin?: boolean }).isSuperAdmin) return true;
+
+  const { hasPermission: dbHasPermission } =
+    await import("@/features/admin/lib/permissions");
+  return dbHasPermission(session.user.id, permission);
+}
