@@ -15,13 +15,14 @@ export const PERMISSIONS = {
   CLIENTS_EXPORT_ALL: "clients.export.all",
   CLIENTS_IMPORT_ALL: "clients.import.all",
 
-  // ── ARTICLES (6) ────────────────────────────────────────
+  // ── ARTICLES (7) ────────────────────────────────────────
   ARTICLES_READ_ALL: "articles.read.all",
   ARTICLES_CREATE_ALL: "articles.create.all",
   ARTICLES_UPDATE_ALL: "articles.update.all",
   ARTICLES_DELETE_ALL: "articles.delete.all",
   ARTICLES_EXPORT_ALL: "articles.export.all",
   ARTICLES_IMPORT_ALL: "articles.import.all",
+  ARTICLES_MANAGE_CATEGORIES: "articles.manage_categories",
 
   // ── VENTES (8) ──────────────────────────────────────────
   SALES_READ_OWN: "sales.read.own",
@@ -107,6 +108,7 @@ export const PERMISSIONS_BY_MODULE: Record<string, PermissionCode[]> = {
     PERMISSIONS.ARTICLES_DELETE_ALL,
     PERMISSIONS.ARTICLES_EXPORT_ALL,
     PERMISSIONS.ARTICLES_IMPORT_ALL,
+    PERMISSIONS.ARTICLES_MANAGE_CATEGORIES,
   ],
   sales: [
     PERMISSIONS.SALES_READ_OWN,

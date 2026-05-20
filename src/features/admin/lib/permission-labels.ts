@@ -118,6 +118,14 @@ export const PERMISSION_LABELS: Record<PermissionCode, PermissionLabel> = {
     isDangerous: false,
     superAdminOnly: false,
   },
+  "articles.manage_categories": {
+    code: "articles.manage_categories",
+    label: "Gérer les catégories",
+    description:
+      "Permet de créer, modifier, réorganiser et supprimer les catégories du catalogue",
+    isDangerous: false,
+    superAdminOnly: false,
+  },
 
   // ── VENTES ────────────────────────────────────────────────────────────────
   "sales.read.own": {
