@@ -13,8 +13,8 @@ import {
   updateCategorySchema,
   reorderCategoriesSchema,
   generateSlug,
-  type CreateCategoryInput,
-  type UpdateCategoryInput,
+  type CreateCategoryOutput,
+  type UpdateCategoryOutput,
   type ReorderCategoriesInput,
 } from "../schemas/category.schema";
 import { wouldCreateCycle } from "./queries";
@@ -50,7 +50,7 @@ async function audit(
 }
 
 export async function createCategory(
-  input: CreateCategoryInput
+  input: CreateCategoryOutput
 ): Promise<Result<{ id: string }>> {
   try {
     const user = await getUser();
@@ -96,7 +96,7 @@ export async function createCategory(
 
 export async function updateCategory(
   categoryId: string,
-  input: UpdateCategoryInput
+  input: UpdateCategoryOutput
 ): Promise<Result> {
   try {
     const user = await getUser();

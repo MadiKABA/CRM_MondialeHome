@@ -34,6 +34,8 @@ export const reorderCategoriesSchema = z.object({
   ),
 });
 
-export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
-export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
+export type CreateCategoryInput = z.input<typeof createCategorySchema>;
+export type CreateCategoryOutput = z.output<typeof createCategorySchema>;
+export type UpdateCategoryInput = z.input<typeof updateCategorySchema>;
+export type UpdateCategoryOutput = z.output<typeof updateCategorySchema>;
 export type ReorderCategoriesInput = z.infer<typeof reorderCategoriesSchema>;
