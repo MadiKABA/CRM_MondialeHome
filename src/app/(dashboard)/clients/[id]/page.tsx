@@ -2,7 +2,11 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getClientById } from "@/features/clients/server/queries";
+import {
+  getClientById,
+  getClientConsentLogs,
+  getSellers,
+} from "@/features/clients/server/queries";
 import { ClientDetail } from "@/features/clients/components/client-detail";
 
 interface ClientPageProps {
@@ -17,7 +21,11 @@ export async function generateMetadata({ params }: ClientPageProps) {
 
 export default async function ClientPage({ params }: ClientPageProps) {
   const { id } = await params;
-  const client = await getClientById(id);
+  const [client, consentLogs, sellers] = await Promise.all([
+    getClientById(id),
+    getClientConsentLogs(id),
+    getSellers(),
+  ]);
 
   if (!client) notFound();
 
@@ -35,7 +43,7 @@ export default async function ClientPage({ params }: ClientPageProps) {
         </Button>
       </div>
 
-      <ClientDetail client={client} />
+      <ClientDetail client={client} consentLogs={consentLogs} sellers={sellers} />
     </div>
   );
 }

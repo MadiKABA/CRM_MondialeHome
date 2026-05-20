@@ -14,29 +14,30 @@ import {
   ShoppingBag,
   Globe,
   Tag,
-  CheckCircle2,
-  XCircle,
+  UserCheck,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ClientAvatar } from "./client-avatar";
-import { ClientStatusBadge } from "./client-status-badge";
+import { StatusChangeDropdown } from "./status-change-dropdown";
+import { ConsentSection } from "./consent-section";
+import { SellerAssignment } from "./seller-assignment";
 import { DeleteClientDialog } from "./delete-client-dialog";
 import { toggleClientVip } from "../server/actions";
-import type { ClientDetailDTO, ClientListItemDTO } from "../types";
+import type {
+  ClientDetailDTO,
+  ClientListItemDTO,
+  ConsentLogDTO,
+  SellerDTO,
+} from "../types";
 
 interface ClientDetailProps {
   client: ClientDetailDTO;
-}
-
-function ConsentIcon({ value }: { value: boolean }) {
-  return value ? (
-    <CheckCircle2 className="text-gold-deep size-4" />
-  ) : (
-    <XCircle className="text-text-secondary size-4" />
-  );
+  consentLogs: ConsentLogDTO[];
+  sellers: SellerDTO[];
 }
 
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
@@ -49,7 +50,7 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
   );
 }
 
-export function ClientDetail({ client }: ClientDetailProps) {
+export function ClientDetail({ client, consentLogs, sellers }: ClientDetailProps) {
   const router = useRouter();
   const [toDelete, setToDelete] = useState(false);
   const [vipLoading, setVipLoading] = useState(false);
@@ -74,6 +75,8 @@ export function ClientDetail({ client }: ClientDetailProps) {
     return p.replace(/(\+221)(\d{2})(\d{3})(\d{2})(\d{2})/, "$1 $2 $3 $4 $5");
   };
 
+  const currentSeller = client.assignedTo ?? null;
+
   return (
     <div className="space-y-6">
       {/* Profil card */}
@@ -85,7 +88,16 @@ export function ClientDetail({ client }: ClientDetailProps) {
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-heading text-2xl font-bold">{client.fullName}</h1>
-                <ClientStatusBadge status={client.status} isVip={client.isVip} />
+                <StatusChangeDropdown
+                  clientId={client.id}
+                  currentStatus={client.status}
+                  clientName={client.fullName}
+                />
+                {client.isVip && (
+                  <Badge className="bg-gold-deep border-0 text-xs font-medium text-white">
+                    VIP
+                  </Badge>
+                )}
               </div>
               {client.reference && (
                 <p className="text-text-secondary font-mono text-sm">
@@ -144,12 +156,12 @@ export function ClientDetail({ client }: ClientDetailProps) {
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Statistiques */}
+        {/* Statistiques d'achat */}
         <Card className="border-border">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-sm font-semibold">
               <ShoppingBag className="text-gold-deep size-4" />
-              {"Statistiques d’achat"}
+              {"Statistiques d'achat"}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -224,24 +236,8 @@ export function ClientDetail({ client }: ClientDetailProps) {
               }
             />
             <InfoRow label="Inscription" value={formatDate(client.acquisitionDate)} />
-            <Separator className="bg-cream-darker" />
-            <div className="space-y-1">
-              <p className="text-text-secondary text-xs font-medium">Consentements</p>
-              <div className="flex gap-4 text-sm">
-                <span className="flex items-center gap-1.5">
-                  <ConsentIcon value={client.smsConsent} />
-                  SMS
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <ConsentIcon value={client.whatsappConsent} />
-                  WA
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <ConsentIcon value={client.emailConsent} />
-                  Email
-                </span>
-              </div>
-            </div>
+            {client.address && <InfoRow label="Adresse" value={client.address} />}
+            {client.region && <InfoRow label="Région" value={client.region} />}
           </CardContent>
         </Card>
 
@@ -265,7 +261,7 @@ export function ClientDetail({ client }: ClientDetailProps) {
                   <Badge
                     key={tag}
                     variant="outline"
-                    className="border-cream-darker bg-cream text-text-secondary text-xs"
+                    className="border-gold/20 bg-gold-light/40 text-gold-darker text-xs"
                   >
                     <Tag className="size-2.5" />
                     {tag}
@@ -276,6 +272,42 @@ export function ClientDetail({ client }: ClientDetailProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Consentements */}
+      <Card className="border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+            <Shield className="text-gold-deep size-4" />
+            Consentements Marketing
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ConsentSection
+            clientId={client.id}
+            smsConsent={client.smsConsent}
+            whatsappConsent={client.whatsappConsent}
+            emailConsent={client.emailConsent}
+            consentLogs={consentLogs}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Vendeur assigné */}
+      <Card className="border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+            <UserCheck className="text-gold-deep size-4" />
+            Vendeur attitré
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SellerAssignment
+            clientId={client.id}
+            currentSeller={currentSeller}
+            sellers={sellers}
+          />
+        </CardContent>
+      </Card>
 
       {/* Bouton supprimer */}
       <div className="flex justify-end">

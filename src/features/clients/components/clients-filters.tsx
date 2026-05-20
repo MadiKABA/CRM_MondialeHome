@@ -2,7 +2,7 @@
 
 import { useCallback, useTransition } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { Search, X } from "lucide-react";
+import { Search, X, Tag, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,19 +16,25 @@ import {
 interface ClientsFiltersProps {
   cities: string[];
   sources: string[];
+  tags?: string[];
   defaultSearch?: string;
   defaultCity?: string;
   defaultStatus?: string;
   defaultSource?: string;
+  defaultTag?: string;
+  defaultAssigned?: "me" | "all";
 }
 
 export function ClientsFilters({
   cities,
   sources,
+  tags = [],
   defaultSearch = "",
   defaultCity = "",
   defaultStatus = "",
   defaultSource = "",
+  defaultTag = "",
+  defaultAssigned,
 }: ClientsFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -49,7 +55,13 @@ export function ClientsFilters({
     [router, pathname, searchParams]
   );
 
-  const hasFilters = defaultSearch || defaultCity || defaultStatus || defaultSource;
+  const hasFilters =
+    defaultSearch ||
+    defaultCity ||
+    defaultStatus ||
+    defaultSource ||
+    defaultTag ||
+    defaultAssigned;
 
   const reset = () => {
     startTransition(() => router.push(pathname));
@@ -57,6 +69,7 @@ export function ClientsFilters({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {/* Recherche texte */}
       <div className="relative min-w-[200px] flex-1">
         <Search className="text-text-secondary pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
         <Input
@@ -67,6 +80,7 @@ export function ClientsFilters({
         />
       </div>
 
+      {/* Filtre ville */}
       <Select
         value={defaultCity || "__all__"}
         onValueChange={(v) => updateParam("city", !v || v === "__all__" ? "" : v)}
@@ -84,6 +98,7 @@ export function ClientsFilters({
         </SelectContent>
       </Select>
 
+      {/* Filtre statut */}
       <Select
         value={defaultStatus || "__all__"}
         onValueChange={(v) => updateParam("status", !v || v === "__all__" ? "" : v)}
@@ -100,6 +115,7 @@ export function ClientsFilters({
         </SelectContent>
       </Select>
 
+      {/* Filtre source */}
       {sources.length > 0 && (
         <Select
           value={defaultSource || "__all__"}
@@ -119,6 +135,43 @@ export function ClientsFilters({
         </Select>
       )}
 
+      {/* Filtre tag */}
+      {tags.length > 0 && (
+        <Select
+          value={defaultTag || "__all__"}
+          onValueChange={(v) => updateParam("tag", !v || v === "__all__" ? "" : v)}
+        >
+          <SelectTrigger className="border-border bg-background w-[140px]">
+            <Tag className="size-3.5 shrink-0" />
+            <SelectValue placeholder="Tag" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Tous les tags</SelectItem>
+            {tags.map((tag) => (
+              <SelectItem key={tag} value={tag}>
+                {tag}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+
+      {/* Filtre assignation */}
+      <Button
+        variant={defaultAssigned === "me" ? "secondary" : "outline"}
+        size="sm"
+        className={
+          defaultAssigned === "me"
+            ? "border-gold-light bg-gold-light/30 text-gold-darker"
+            : "border-cream-darker text-text-secondary hover:bg-cream"
+        }
+        onClick={() => updateParam("assigned", defaultAssigned === "me" ? "" : "me")}
+      >
+        <User className="size-3.5" />
+        Mes clients
+      </Button>
+
+      {/* Réinitialiser */}
       {hasFilters && (
         <Button
           variant="ghost"

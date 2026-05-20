@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { Eye, Pencil, Trash2, Phone, Mail, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -14,15 +15,56 @@ import {
 } from "@/components/ui/table";
 import { ClientAvatar } from "./client-avatar";
 import { ClientStatusBadge } from "./client-status-badge";
+import { StatusChangeDropdown } from "./status-change-dropdown";
+import { BulkActionsBar } from "./bulk-actions-bar";
 import { DeleteClientDialog } from "./delete-client-dialog";
-import type { ClientListItemDTO } from "../types";
+import type { ClientListItemDTO, SellerDTO } from "../types";
 
 interface ClientsTableProps {
   clients: ClientListItemDTO[];
+  sellers?: SellerDTO[];
+  existingTags?: string[];
 }
 
-export function ClientsTable({ clients }: ClientsTableProps) {
+export function ClientsTable({
+  clients,
+  sellers = [],
+  existingTags = [],
+}: ClientsTableProps) {
   const [toDelete, setToDelete] = useState<ClientListItemDTO | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const allSelected = clients.length > 0 && clients.every((c) => selectedIds.has(c.id));
+  const someSelected = clients.some((c) => selectedIds.has(c.id));
+
+  const toggleAll = useCallback(() => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(clients.map((c) => c.id)));
+    }
+  }, [allSelected, clients]);
+
+  const toggleOne = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  const selectedIdsArray = Array.from(selectedIds);
+
+  // Compute tags from selected clients for bulk remove
+  const selectedClientTags = Array.from(
+    new Set(clients.filter((c) => selectedIds.has(c.id)).flatMap((c) => c.tags))
+  );
 
   if (clients.length === 0) {
     return (
@@ -39,12 +81,35 @@ export function ClientsTable({ clients }: ClientsTableProps) {
   }
 
   return (
-    <>
+    <div className="space-y-2">
+      {/* Barre d'actions en masse */}
+      <BulkActionsBar
+        selectedIds={selectedIdsArray}
+        onClearSelection={clearSelection}
+        sellers={sellers}
+        existingTags={existingTags}
+        selectedTags={selectedClientTags}
+      />
+
       {/* Desktop — tableau */}
       <div className="border-border hidden overflow-hidden rounded-xl border md:block">
         <Table>
           <TableHeader>
             <TableRow className="bg-cream hover:bg-cream border-cream-darker">
+              <TableHead className="w-10 pr-0">
+                <Checkbox
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) {
+                      (
+                        el as HTMLButtonElement & { indeterminate?: boolean }
+                      ).indeterminate = someSelected && !allSelected;
+                    }
+                  }}
+                  onCheckedChange={toggleAll}
+                  aria-label="Sélectionner tous les clients"
+                />
+              </TableHead>
               <TableHead className="font-semibold">Client</TableHead>
               <TableHead className="font-semibold">Contact</TableHead>
               <TableHead className="font-semibold">Ville</TableHead>
@@ -55,7 +120,17 @@ export function ClientsTable({ clients }: ClientsTableProps) {
           </TableHeader>
           <TableBody>
             {clients.map((client) => (
-              <TableRow key={client.id} className="hover:bg-cream/50 border-border">
+              <TableRow
+                key={client.id}
+                className={`hover:bg-cream/50 border-border ${selectedIds.has(client.id) ? "bg-gold-light/10" : ""}`}
+              >
+                <TableCell className="pr-0">
+                  <Checkbox
+                    checked={selectedIds.has(client.id)}
+                    onCheckedChange={() => toggleOne(client.id)}
+                    aria-label={`Sélectionner ${client.fullName}`}
+                  />
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <ClientAvatar name={client.fullName} id={client.id} />
@@ -99,7 +174,18 @@ export function ClientsTable({ clients }: ClientsTableProps) {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <ClientStatusBadge status={client.status} isVip={client.isVip} />
+                  <div className="flex items-center gap-1.5">
+                    <StatusChangeDropdown
+                      clientId={client.id}
+                      currentStatus={client.status}
+                      clientName={client.fullName}
+                    />
+                    {client.isVip && (
+                      <span className="bg-gold-deep rounded-full px-1.5 py-0.5 text-xs font-medium text-white">
+                        VIP
+                      </span>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="text-right">
                   <p className="text-sm font-medium">
@@ -159,10 +245,15 @@ export function ClientsTable({ clients }: ClientsTableProps) {
         {clients.map((client) => (
           <div
             key={client.id}
-            className="border-border bg-card rounded-xl border p-4 shadow-sm"
+            className={`border-border bg-card rounded-xl border p-4 shadow-sm ${selectedIds.has(client.id) ? "border-gold-light ring-gold-light/50 ring-1" : ""}`}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
+                <Checkbox
+                  checked={selectedIds.has(client.id)}
+                  onCheckedChange={() => toggleOne(client.id)}
+                  aria-label={`Sélectionner ${client.fullName}`}
+                />
                 <ClientAvatar name={client.fullName} id={client.id} />
                 <div className="min-w-0">
                   <p className="truncate font-semibold">{client.fullName}</p>
@@ -231,6 +322,6 @@ export function ClientsTable({ clients }: ClientsTableProps) {
         open={!!toDelete}
         onOpenChange={(open) => !open && setToDelete(null)}
       />
-    </>
+    </div>
   );
 }
