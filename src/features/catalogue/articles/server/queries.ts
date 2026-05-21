@@ -315,9 +315,9 @@ export async function getArticleStats(): Promise<ArticleStats> {
       db.$queryRaw<{ count: bigint }[]>`
         SELECT COUNT(*)::bigint as count
         FROM articles
-        WHERE deleted_at IS NULL
+        WHERE "deletedAt" IS NULL
           AND stock > 0
-          AND stock <= stock_alert
+          AND stock <= "stockAlert"
       `,
     ]);
 
