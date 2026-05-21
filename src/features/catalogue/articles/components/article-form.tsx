@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Plus, X, ImagePlus } from "lucide-react";
-import { CldUploadWidget } from "next-cloudinary";
+import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +26,7 @@ import {
   type ArticleOutput,
 } from "../schemas/article.schema";
 import { createArticle, updateArticle } from "../server/actions";
+import { ArticleImagesUpload } from "./article-images-upload";
 import type { ArticleDetailDTO } from "../types";
 import type { CategorySelectOption } from "@/features/catalogue/categories/types";
 
@@ -471,125 +471,13 @@ export function ArticleForm({
       {/* PHOTOS */}
       <section className="space-y-4">
         <h2 className="font-heading text-base font-semibold">Photos</h2>
-
-        <div className="space-y-2">
-          <Label>Image principale</Label>
-          {watchedMainImage && (
-            <div className="relative w-32">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={watchedMainImage}
-                alt="Image principale"
-                className="h-24 w-32 rounded-lg object-cover"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute -top-2 -right-2 size-6 rounded-full bg-white p-0 shadow"
-                onClick={() => setValue("mainImage", null)}
-              >
-                <X className="size-3" />
-              </Button>
-            </div>
-          )}
-          <CldUploadWidget
-            uploadPreset={
-              process.env["NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET"] ?? "mondial-home"
-            }
-            options={{ folder: "mondial-home/articles", maxFiles: 1 }}
-            onSuccess={(result) => {
-              if (
-                result.info &&
-                typeof result.info === "object" &&
-                "secure_url" in result.info
-              ) {
-                setValue("mainImage", result.info.secure_url as string);
-              }
-            }}
-          >
-            {({ open }) => (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => open()}
-                className="gap-2"
-              >
-                <ImagePlus className="size-4" />
-                {watchedMainImage ? "Changer l'image" : "Ajouter une image principale"}
-              </Button>
-            )}
-          </CldUploadWidget>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Photos supplémentaires ({(watchedImages ?? []).length}/10)</Label>
-          {(watchedImages ?? []).length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {(watchedImages ?? []).map((url, i) => (
-                <div key={i} className="relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={url}
-                    alt={`Photo ${i + 1}`}
-                    className="h-20 w-24 rounded-lg object-cover"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute -top-2 -right-2 size-6 rounded-full bg-white p-0 shadow"
-                    onClick={() =>
-                      setValue(
-                        "images",
-                        (watchedImages ?? []).filter((_, j) => j !== i)
-                      )
-                    }
-                  >
-                    <X className="size-3" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-          {(watchedImages ?? []).length < 10 && (
-            <CldUploadWidget
-              uploadPreset={
-                process.env["NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET"] ?? "mondial-home"
-              }
-              options={{
-                folder: "mondial-home/articles",
-                maxFiles: 10 - (watchedImages ?? []).length,
-              }}
-              onSuccess={(result) => {
-                if (
-                  result.info &&
-                  typeof result.info === "object" &&
-                  "secure_url" in result.info
-                ) {
-                  setValue("images", [
-                    ...(watchedImages ?? []),
-                    result.info.secure_url as string,
-                  ]);
-                }
-              }}
-            >
-              {({ open }) => (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => open()}
-                  className="gap-2"
-                >
-                  <Plus className="size-4" />
-                  Ajouter des photos
-                </Button>
-              )}
-            </CldUploadWidget>
-          )}
-        </div>
+        <ArticleImagesUpload
+          mainImage={watchedMainImage ?? null}
+          images={watchedImages ?? []}
+          onMainImageChange={(url) => setValue("mainImage", url, { shouldDirty: true })}
+          onImagesChange={(urls) => setValue("images", urls, { shouldDirty: true })}
+          disabled={isPending}
+        />
       </section>
 
       <Separator />
