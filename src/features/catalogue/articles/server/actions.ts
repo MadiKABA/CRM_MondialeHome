@@ -12,11 +12,12 @@ import {
   bulkArticleActionSchema,
   updateStockSchema,
   type ArticleInput,
+  type ArticleFilters,
   type BulkArticleActionInput,
   type UpdateStockInput,
 } from "../schemas/article.schema";
 import { isReferenceUnique } from "./queries";
-import type { ActionResult } from "../types";
+import type { ActionResult, ArticleListItemDTO } from "../types";
 
 async function getUser() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -299,6 +300,27 @@ export async function updateArticleStock(input: UpdateStockInput): Promise<Actio
       success: false,
       error: "Une erreur est survenue lors de la mise à jour du stock",
     };
+  }
+}
+
+// ── EXPORT ─────────────────────────────────────────────────────────────────
+
+export async function exportArticles(
+  filters: Partial<ArticleFilters>
+): Promise<ActionResult<{ articles: ArticleListItemDTO[] }>> {
+  try {
+    const user = await getUser();
+    if (!user) return { success: false, error: "Non authentifié" };
+
+    await checkPermission("articles.export.all");
+
+    const { getArticlesForExport } = await import("./queries");
+    const articles = await getArticlesForExport(filters);
+
+    return { success: true, data: { articles } };
+  } catch (err) {
+    logger.error({ err }, "Failed to export articles");
+    return { success: false, error: "Une erreur est survenue lors de l'export" };
   }
 }
 

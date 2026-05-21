@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getArticlesForExport } from "../server/queries";
+import { exportArticles } from "../server/actions";
 import type { ArticleListItemDTO } from "../types";
 
 function formatPrice(price: number): string {
@@ -79,7 +79,9 @@ export function ExportButton({ canViewCost = false }: ExportButtonProps) {
   const handleExport = async (format: "csv" | "xlsx") => {
     try {
       setIsLoading(true);
-      const articles = await getArticlesForExport({});
+      const result = await exportArticles({});
+      if (!result.success) throw new Error(result.error);
+      const articles = result.data?.articles ?? [];
       if (format === "csv") {
         await exportToCSV(articles, canViewCost);
       } else {
