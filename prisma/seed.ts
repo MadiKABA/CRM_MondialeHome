@@ -1681,7 +1681,13 @@ async function main() {
     const categoryId = categoryMap.get(artDef.slug) ?? null;
     await db.article.upsert({
       where: { reference: artDef.reference },
-      update: { name: artDef.name, price: artDef.price, stock: artDef.stock },
+      update: {
+        name: artDef.name,
+        price: artDef.price,
+        stock: artDef.stock,
+        status: artDef.status,
+        deletedAt: null,
+      },
       create: {
         reference: artDef.reference,
         name: artDef.name,
