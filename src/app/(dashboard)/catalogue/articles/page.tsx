@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/auth/auth";
@@ -84,10 +84,11 @@ export default async function ArticlesPage({ searchParams }: PageProps) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) redirect("/login");
 
-  const [canCreate, canExport, canViewCost] = await Promise.all([
+  const [canCreate, canExport, canViewCost, canImport] = await Promise.all([
     hasPermission("articles.create.all"),
     hasPermission("articles.export.all"),
     hasPermission("articles.view_cost"),
+    hasPermission("articles.import.all"),
   ]);
 
   const params = await searchParams;
@@ -103,6 +104,16 @@ export default async function ArticlesPage({ searchParams }: PageProps) {
         </div>
         <div className="flex items-center gap-2">
           {canExport && <ExportButton canViewCost={canViewCost} />}
+          {canImport && (
+            <Button
+              variant="outline"
+              render={<Link href="/catalogue/articles/import" />}
+              className="gap-2"
+            >
+              <Upload className="size-4" />
+              Importer
+            </Button>
+          )}
           {canCreate && (
             <Button render={<Link href="/catalogue/articles/new" />} className="gap-2">
               <Plus className="size-4" />
