@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Plus, X } from "lucide-react";
+import { Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +27,11 @@ import {
 } from "../schemas/article.schema";
 import { createArticle, updateArticle } from "../server/actions";
 import { ArticleImagesUpload } from "./article-images-upload";
+import {
+  ArticleMainImagePicker,
+  type SelectedImageFile,
+} from "./article-main-image-picker";
+import { uploadArticleImage } from "../lib/upload";
 import type { ArticleDetailDTO } from "../types";
 import type { CategorySelectOption } from "@/features/catalogue/categories/types";
 
@@ -48,6 +53,9 @@ export function ArticleForm({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [tagInput, setTagInput] = useState("");
+  const [selectedImageFile, setSelectedImageFile] = useState<SelectedImageFile | null>(
+    null
+  );
   const isEditing = !!article;
 
   const {
@@ -145,9 +153,26 @@ export function ArticleForm({
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
+      let finalValues = values;
+
+      // En mode création, uploader l'image sélectionnée avant de créer l'article
+      if (!isEditing && selectedImageFile) {
+        try {
+          const secureUrl = await uploadArticleImage(selectedImageFile.file);
+          URL.revokeObjectURL(selectedImageFile.previewUrl);
+          setSelectedImageFile(null);
+          finalValues = { ...values, mainImage: secureUrl };
+        } catch (err) {
+          const msg =
+            err instanceof Error ? err.message : "Erreur lors de l'upload de l'image";
+          toast.error("Échec de l'upload image", { description: msg });
+          return;
+        }
+      }
+
       const result = isEditing
-        ? await updateArticle(article.id, values)
-        : await createArticle(values);
+        ? await updateArticle(article.id, finalValues)
+        : await createArticle(finalValues);
 
       if (result.success) {
         toast.success(isEditing ? "Article modifié" : "Article créé");
@@ -471,13 +496,38 @@ export function ArticleForm({
       {/* PHOTOS */}
       <section className="space-y-4">
         <h2 className="font-heading text-base font-semibold">Photos</h2>
-        <ArticleImagesUpload
-          mainImage={watchedMainImage ?? null}
-          images={watchedImages ?? []}
-          onMainImageChange={(url) => setValue("mainImage", url, { shouldDirty: true })}
-          onImagesChange={(urls) => setValue("images", urls, { shouldDirty: true })}
-          disabled={isPending}
-        />
+
+        {isEditing ? (
+          // Mode édition : composant complet avec images multiples uploadées immédiatement
+          <ArticleImagesUpload
+            mainImage={watchedMainImage ?? null}
+            images={watchedImages ?? []}
+            onMainImageChange={(url) => setValue("mainImage", url, { shouldDirty: true })}
+            onImagesChange={(urls) => setValue("images", urls, { shouldDirty: true })}
+            disabled={isPending}
+          />
+        ) : (
+          // Mode création : sélection locale, upload différé au submit
+          <div className="space-y-2">
+            <ArticleMainImagePicker
+              value={selectedImageFile ?? watchedMainImage ?? null}
+              onChange={(selected) => {
+                setSelectedImageFile(selected);
+                // Stocker l'URL blob dans RHF pour passer la validation (acceptée par le schéma)
+                setValue("mainImage", selected?.previewUrl ?? null, {
+                  shouldValidate: false,
+                });
+              }}
+              disabled={isPending}
+            />
+            {selectedImageFile && (
+              <p className="flex items-center gap-1 text-xs text-amber-600">
+                <span>⏳</span>
+                L&apos;image sera uploadée lors de la création de l&apos;article
+              </p>
+            )}
+          </div>
+        )}
       </section>
 
       <Separator />
@@ -531,13 +581,23 @@ export function ArticleForm({
           Annuler
         </Button>
         <Button type="submit" disabled={isPending}>
-          {isPending
-            ? isEditing
-              ? "Enregistrement…"
-              : "Création…"
-            : isEditing
-              ? "Enregistrer les modifications"
-              : "Créer l'article"}
+          {isPending ? (
+            <>
+              <Loader2 className="mr-2 size-4 animate-spin" />
+              {isEditing
+                ? "Enregistrement…"
+                : selectedImageFile
+                  ? "Upload image…"
+                  : "Création…"}
+            </>
+          ) : isEditing ? (
+            "Enregistrer les modifications"
+          ) : (
+            <>
+              <Plus className="mr-2 size-4" />
+              Créer l&apos;article
+            </>
+          )}
         </Button>
       </div>
     </form>

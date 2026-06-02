@@ -50,13 +50,13 @@ export const articleSchema = z
 
     mainImage: z
       .string()
-      .url()
       .optional()
       .nullable()
-      .refine(
-        (url) => !url || url.includes("res.cloudinary.com"),
-        "L'image doit être hébergée sur Cloudinary"
-      ),
+      .refine((url) => {
+        if (!url) return true;
+        if (url.startsWith("blob:")) return true; // aperçu local temporaire
+        return url.includes("res.cloudinary.com");
+      }, "L'image doit être hébergée sur Cloudinary"),
     images: z
       .array(
         z

@@ -47,7 +47,7 @@ function checkCloudinaryConfig(): {
   error?: string;
 } {
   const cloudName = process.env["NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME"] ?? "";
-  const uploadPreset = process.env["NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET_ARTICLES"] ?? "";
+  const uploadPreset = process.env["NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET"] ?? "";
 
   if (!cloudName) {
     return {
