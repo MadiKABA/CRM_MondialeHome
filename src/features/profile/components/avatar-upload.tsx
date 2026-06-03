@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Camera, Loader2, Trash2, Upload } from "lucide-react";
+import { Camera, Loader2, Trash2, Upload, AlertTriangle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,11 +10,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { updateAvatar, removeAvatar } from "../server/actions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { uploadAvatar, deleteAvatar } from "../server/actions";
 
-const MAX_FILE_SIZE = 2_000_000;
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const CLIENT_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const CLIENT_MAX_SIZE_MB = 5;
 
 interface AvatarUploadProps {
   currentImage: string | null;
@@ -24,32 +33,20 @@ interface AvatarUploadProps {
 export function AvatarUpload({ currentImage }: AvatarUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
-  const [isRemoving, setIsRemoving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-
     if (fileInputRef.current) fileInputRef.current.value = "";
-
     if (!file) return;
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    if (!CLIENT_ALLOWED_TYPES.includes(file.type)) {
       toast.error("Format non supporté. Utilisez JPG, PNG ou WebP.");
       return;
     }
-
-    if (file.size > MAX_FILE_SIZE) {
-      toast.error("Fichier trop volumineux. Taille maximale : 2 Mo.");
-      return;
-    }
-
-    const cloudName = process.env["NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME"];
-    const uploadPreset = process.env["NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET"];
-
-    if (!cloudName || !uploadPreset) {
-      toast.error("Configuration Cloudinary manquante.");
-      console.error("Cloudinary env vars missing:", { cloudName, uploadPreset });
+    if (file.size > CLIENT_MAX_SIZE_MB * 1024 * 1024) {
+      toast.error(`Fichier trop volumineux. Taille maximale : ${CLIENT_MAX_SIZE_MB} Mo.`);
       return;
     }
 
@@ -57,50 +54,31 @@ export function AvatarUpload({ currentImage }: AvatarUploadProps) {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("upload_preset", uploadPreset);
-      formData.append("folder", "mondial-home/avatars");
 
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-        { method: "POST", body: formData }
-      );
+      const result = await uploadAvatar(formData);
 
-      if (!response.ok) {
-        const errorBody = await response.text();
-        console.error("Cloudinary upload failed:", response.status, errorBody);
-        throw new Error(`Upload échoué : ${response.status}`);
-      }
-
-      const data = (await response.json()) as Record<string, unknown>;
-      const secureUrl = typeof data.secure_url === "string" ? data.secure_url : undefined;
-      if (!secureUrl) throw new Error("URL manquante dans la réponse Cloudinary");
-
-      const result = await updateAvatar({ imageUrl: secureUrl });
       if (result.success) {
         toast.success("Photo de profil mise à jour");
       } else {
         toast.error(result.error);
       }
-    } catch (error) {
-      console.error("Upload error:", error);
-      toast.error("Échec de l'upload. Veuillez réessayer.");
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleRemove = async () => {
-    setIsRemoving(true);
+  const handleDelete = async () => {
+    setIsDeleting(true);
     try {
-      const result = await removeAvatar();
+      const result = await deleteAvatar();
       if (result.success) {
         toast.success("Photo de profil supprimée");
-        setConfirmRemoveOpen(false);
+        setShowDeleteDialog(false);
       } else {
         toast.error(result.error);
       }
     } finally {
-      setIsRemoving(false);
+      setIsDeleting(false);
     }
   };
 
@@ -153,7 +131,7 @@ export function AvatarUpload({ currentImage }: AvatarUploadProps) {
               <DropdownMenuItem
                 onSelect={(e) => {
                   e.preventDefault();
-                  setConfirmRemoveOpen(true);
+                  setShowDeleteDialog(true);
                 }}
                 className="text-destructive focus:text-destructive cursor-pointer"
               >
@@ -165,19 +143,43 @@ export function AvatarUpload({ currentImage }: AvatarUploadProps) {
 
           <DropdownMenuSeparator />
           <div className="text-muted-foreground px-2 py-1 text-[11px]">
-            JPG, PNG, WebP · max 2 Mo
+            JPG, PNG, WebP · max {CLIENT_MAX_SIZE_MB} Mo
           </div>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <ConfirmDialog
-        open={confirmRemoveOpen}
-        onOpenChange={setConfirmRemoveOpen}
-        title="Supprimer la photo de profil ?"
-        description="Votre avatar sera remplacé par vos initiales."
-        confirmLabel={isRemoving ? "Suppression…" : "Supprimer"}
-        onConfirm={handleRemove}
-      />
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="mb-1 flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-full bg-red-50">
+                <AlertTriangle className="size-5 text-red-600" />
+              </div>
+              <AlertDialogTitle>Supprimer la photo de profil ?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              Votre avatar sera remplacé par vos initiales. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Suppression…
+                </>
+              ) : (
+                "Supprimer"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
