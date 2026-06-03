@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus, Download } from "lucide-react";
+import { Plus, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getServerSession, hasPermission } from "@/lib/permissions/server";
 import { getSales } from "@/features/sales/server/queries";
@@ -73,6 +73,12 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
             <Button variant="outline" size="sm" render={<Link href="/sales/export" />}>
               <Download className="mr-2 size-4" />
               Exporter
+            </Button>
+          )}
+          {canCreate && (
+            <Button variant="outline" size="sm" render={<Link href="/sales/import" />}>
+              <Upload className="mr-2 size-4" />
+              Importer
             </Button>
           )}
           {canCreate && (
