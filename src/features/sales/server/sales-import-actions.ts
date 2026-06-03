@@ -6,8 +6,10 @@ import { z } from "zod";
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { checkPermission } from "@/lib/permissions/server";
+import { hasPermission } from "@/lib/permissions/server";
 import { PERMISSIONS } from "@/lib/permissions/constants";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { auditSale } from "./audit";
 import type { MappedSaleGroup } from "../lib/sales-import-mapper";
 
 type Result<T = void> = { success: true; data?: T } | { success: false; error: string };
@@ -62,29 +64,48 @@ export interface ImportSalesResult {
   errorDetails: Array<{ saleRef: string; error: string }>;
 }
 
-export async function importSales(
-  sales: MappedSaleGroup[]
-): Promise<Result<ImportSalesResult>> {
+export async function importSales(sales: unknown): Promise<Result<ImportSalesResult>> {
+  // 1. AUTH
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) return { success: false, error: "Non authentifié" };
+
+  // 2. RATE LIMIT
+  const rl = await checkRateLimit({
+    key: `import_sales:${session.user.id}`,
+    limit: RATE_LIMITS.IMPORT_SALES.limit,
+    windowMs: RATE_LIMITS.IMPORT_SALES.windowMs,
+  });
+  if (!rl.allowed) {
+    return {
+      success: false,
+      error: `Import limité à ${RATE_LIMITS.IMPORT_SALES.limit} fois toutes les 5 minutes.`,
+    };
+  }
+
+  // 3. RBAC
+  const canCreate = await hasPermission(PERMISSIONS.SALES_CREATE_ALL);
+  if (!canCreate) return { success: false, error: "Permission insuffisante" };
+
+  // 4. VALIDATION DU FORMAT
+  if (!Array.isArray(sales)) {
+    return { success: false, error: "Format invalide" };
+  }
+  if (sales.length === 0) return { success: false, error: "Aucune vente à importer" };
+  if (sales.length > 2000) {
+    return { success: false, error: "Maximum 2000 ventes par import" };
+  }
+
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) return { success: false, error: "Non authentifié" };
-
-    await checkPermission(PERMISSIONS.SALES_CREATE_ALL);
-
-    if (sales.length === 0) return { success: false, error: "Aucune vente à importer" };
-    if (sales.length > 2000) {
-      return { success: false, error: "Maximum 2000 ventes par import" };
-    }
-
-    const validSales = sales.filter((s) => s.isValid);
+    const typedSales = sales as MappedSaleGroup[];
+    const validSales = typedSales.filter((s) => s.isValid);
     if (validSales.length === 0) {
       return { success: false, error: "Aucune vente valide. Corrigez les erreurs." };
     }
 
     const result: ImportSalesResult = {
-      total: sales.length,
+      total: typedSales.length,
       created: 0,
-      skipped: sales.length - validSales.length,
+      skipped: typedSales.length - validSales.length,
       errors: 0,
       clientsCreated: 0,
       totalRevenue: 0,
@@ -156,6 +177,7 @@ export async function importSales(
 
       for (const sale of batch) {
         try {
+          // Validation Zod côté serveur — ne jamais faire confiance au mapping client
           const parsed = importedSaleSchema.safeParse(sale);
           if (!parsed.success) {
             result.errors++;
@@ -199,7 +221,7 @@ export async function importSales(
             }
           }
 
-          // Calcul des totaux côté serveur
+          // Recalcul des totaux côté serveur
           const itemsSubtotal = data.items.reduce(
             (sum, item) => sum + Math.max(0, item.totalPrice),
             0
@@ -283,20 +305,13 @@ export async function importSales(
       await recalculateClientStats(clientId);
     }
 
-    await db.auditLog.create({
-      data: {
-        userId: session.user.id,
-        action: "sales.import",
-        entity: "Sale",
-        newValue: {
-          total: result.total,
-          created: result.created,
-          skipped: result.skipped,
-          errors: result.errors,
-          clientsCreated: result.clientsCreated,
-        } as never,
-        status: "success",
-      },
+    // Audit avec IP/userAgent via le helper centralisé
+    await auditSale(session.user.id, "sales.import", undefined, {
+      total: result.total,
+      created: result.created,
+      skipped: result.skipped,
+      errors: result.errors,
+      clientsCreated: result.clientsCreated,
     });
 
     revalidatePath("/sales");
