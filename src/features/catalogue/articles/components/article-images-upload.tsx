@@ -1,38 +1,42 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
-import {
-  ImagePlus,
-  Loader2,
-  Trash2,
-  Star,
-  X,
-  AlertCircle,
-  Upload,
-  Eye,
-} from "lucide-react";
+import { ImagePlus, Loader2, Trash2, Star, AlertTriangle, Eye, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import {
+  uploadArticleMainImage,
+  uploadArticleSecondaryImage,
+  deleteArticleMainImage,
+  deleteArticleSecondaryImage,
+  setArticleMainImage,
+} from "../server/image-actions";
 
-const MAX_FILES = 10;
+const MAX_FILES = 5; // max secondary images
 const MAX_SIZE_MB = 5;
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-const ALLOWED_EXTENSIONS = ".jpg,.jpeg,.png,.webp";
-const CLOUDINARY_FOLDER = "mondial-home/articles";
 
-interface ImageItem {
+interface UploadingItem {
   localId: string;
-  localUrl: string;
-  file: File;
-  status: "pending" | "uploading" | "done" | "error";
-  remoteUrl: string | null;
-  errorMessage?: string;
+  previewUrl: string;
+  filename: string;
 }
 
 interface ArticleImagesUploadProps {
+  articleId: string;
   mainImage: string | null;
   images: string[];
   onMainImageChange: (url: string | null) => void;
@@ -40,138 +44,101 @@ interface ArticleImagesUploadProps {
   disabled?: boolean;
 }
 
-function checkCloudinaryConfig(): {
-  ok: boolean;
-  cloudName: string;
-  uploadPreset: string;
-  error?: string;
-} {
-  const cloudName = process.env["NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME"] ?? "";
-  const uploadPreset = process.env["NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET"] ?? "";
-
-  if (!cloudName) {
-    return {
-      ok: false,
-      cloudName,
-      uploadPreset,
-      error: "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME manquant dans .env.local",
-    };
-  }
-  if (!uploadPreset) {
-    return {
-      ok: false,
-      cloudName,
-      uploadPreset,
-      error: "NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET_ARTICLES manquant dans .env.local",
-    };
-  }
-  return { ok: true, cloudName, uploadPreset };
-}
-
 export function ArticleImagesUpload({
+  articleId,
   mainImage,
   images,
   onMainImageChange,
   onImagesChange,
   disabled = false,
 }: ArticleImagesUploadProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadQueue, setUploadQueue] = useState<ImageItem[]>([]);
+  const mainInputRef = useRef<HTMLInputElement>(null);
+  const secondaryInputRef = useRef<HTMLInputElement>(null);
+
+  const [uploadingMain, setUploadingMain] = useState(false);
+  const [uploadingSecondary, setUploadingSecondary] = useState<UploadingItem[]>([]);
+  const [deletingMain, setDeletingMain] = useState(false);
+  const [deletingUrl, setDeletingUrl] = useState<string | null>(null);
+  const [confirmDeleteMain, setConfirmDeleteMain] = useState(false);
+  const [confirmDeleteSecondary, setConfirmDeleteSecondary] = useState<string | null>(
+    null
+  );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const allRemoteUrls = [
-    ...(mainImage ? [mainImage] : []),
-    ...images.filter((img) => img !== mainImage),
-  ];
+  const canAddMore = images.length + uploadingSecondary.length < MAX_FILES;
 
-  const config = checkCloudinaryConfig();
+  // ── Main image ──────────────────────────────────────────────────────────────
 
-  const uploadFile = useCallback(async (item: ImageItem): Promise<string> => {
-    const { cloudName, uploadPreset } = checkCloudinaryConfig();
+  const handleMainFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (mainInputRef.current) mainInputRef.current.value = "";
+    if (!file) return;
 
-    const formData = new FormData();
-    formData.append("file", item.file);
-    formData.append("upload_preset", uploadPreset);
-    formData.append("folder", CLOUDINARY_FOLDER);
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast.error("Format non supporté (JPG, PNG ou WebP)");
+      return;
+    }
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+      toast.error(`Image trop volumineuse (max ${MAX_SIZE_MB} Mo)`);
+      return;
+    }
 
-    let response: Response;
+    setUploadingMain(true);
     try {
-      response = await fetch(
-        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-        { method: "POST", body: formData }
-      );
-    } catch (err) {
-      if (err instanceof TypeError) {
-        throw new Error(
-          "Erreur réseau. Vérifiez : 1) votre connexion internet, " +
-            "2) que NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME est correct dans .env.local, " +
-            "3) que le preset « mondial_home_articles » existe sur Cloudinary en mode Unsigned."
-        );
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const result = await uploadArticleMainImage(articleId, formData);
+
+      if (!result.success) {
+        toast.error("Échec de l'upload", { description: result.error });
+        return;
       }
-      throw err;
-    }
 
-    if (!response.ok) {
-      let errorMsg = `Erreur Cloudinary ${response.status}`;
-      try {
-        const body = (await response.json()) as {
-          error?: { message?: string };
-        };
-        if (body.error?.message) {
-          errorMsg = body.error.message;
-          if (errorMsg.includes("Upload preset") || errorMsg.includes("unsigned")) {
-            errorMsg =
-              "Le preset Cloudinary n'est pas en mode Unsigned. " +
-              "Allez dans Cloudinary › Settings › Upload Presets et passez-le en Unsigned.";
-          }
-        }
-      } catch {
-        // ignore JSON parse errors
+      onMainImageChange(result.data!.url);
+      toast.success("Image principale mise à jour");
+    } finally {
+      setUploadingMain(false);
+    }
+  };
+
+  const handleDeleteMain = async () => {
+    setDeletingMain(true);
+    try {
+      const result = await deleteArticleMainImage(articleId);
+      if (!result.success) {
+        toast.error(result.error);
+        return;
       }
-      throw new Error(errorMsg);
+      onMainImageChange(null);
+      toast.success("Image principale supprimée");
+    } finally {
+      setDeletingMain(false);
+      setConfirmDeleteMain(false);
     }
+  };
 
-    const data = (await response.json()) as Record<string, unknown>;
-    const secureUrl = typeof data["secure_url"] === "string" ? data["secure_url"] : null;
+  // ── Secondary images ────────────────────────────────────────────────────────
 
-    if (!secureUrl || !secureUrl.includes("res.cloudinary.com")) {
-      throw new Error("URL Cloudinary invalide ou absente. Réessayez.");
-    }
-
-    return secureUrl;
-  }, []);
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSecondaryFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (secondaryInputRef.current) secondaryInputRef.current.value = "";
     if (!files.length) return;
 
-    if (!config.ok) {
-      toast.error(config.error ?? "Configuration Cloudinary manquante", {
-        duration: 8000,
-        description: "Vérifiez votre fichier .env.local",
-      });
+    const available = MAX_FILES - images.length - uploadingSecondary.length;
+    if (available <= 0) {
+      toast.error(`Maximum ${MAX_FILES} images secondaires`);
       return;
     }
 
-    const inFlight = uploadQueue.filter(
-      (q) => q.status === "uploading" || q.status === "pending"
-    ).length;
-    const remaining = MAX_FILES - allRemoteUrls.length - inFlight;
-
-    if (remaining <= 0) {
-      toast.error(`Maximum ${MAX_FILES} images par article`);
-      return;
-    }
-
-    const toProcess = files.slice(0, remaining);
-    if (files.length > remaining) {
-      toast.warning(`Seulement ${remaining} image(s) prise(s) en compte`);
+    const toProcess = files.slice(0, available);
+    if (files.length > available) {
+      toast.warning(`Seulement ${available} image(s) prise(s) en compte`);
     }
 
     for (const file of toProcess) {
       if (!ALLOWED_TYPES.includes(file.type)) {
-        toast.error(`${file.name} : format non supporté (JPG, PNG ou WebP)`);
+        toast.error(`${file.name} : format non supporté`);
         return;
       }
       if (file.size > MAX_SIZE_MB * 1024 * 1024) {
@@ -180,191 +147,135 @@ export function ArticleImagesUpload({
       }
     }
 
-    const newItems: ImageItem[] = toProcess.map((file) => ({
-      localId: `local-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      localUrl: URL.createObjectURL(file),
-      file,
-      status: "uploading" as const,
-      remoteUrl: null,
-    }));
+    for (const file of toProcess) {
+      const localId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const previewUrl = URL.createObjectURL(file);
+      const item: UploadingItem = { localId, previewUrl, filename: file.name };
 
-    setUploadQueue((prev) => [...prev, ...newItems]);
+      setUploadingSecondary((prev) => [...prev, item]);
 
-    for (const item of newItems) {
       try {
-        const remoteUrl = await uploadFile(item);
+        const formData = new FormData();
+        formData.append("file", file);
 
-        setUploadQueue((prev) =>
-          prev.map((q) =>
-            q.localId === item.localId ? { ...q, status: "done", remoteUrl } : q
-          )
-        );
+        const result = await uploadArticleSecondaryImage(articleId, formData);
 
-        if (!mainImage && allRemoteUrls.length === 0) {
-          onMainImageChange(remoteUrl);
+        if (!result.success) {
+          toast.error("Échec de l'upload", { description: result.error });
         } else {
-          onImagesChange([...images, remoteUrl]);
+          onImagesChange([...images, result.data!.url]);
+          toast.success(`${file.name} uploadé`);
         }
-        toast.success(`${item.file.name} uploadé`);
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : "Erreur inconnue";
-        console.error(`Upload failed for ${item.file.name}:`, err);
-
-        setUploadQueue((prev) =>
-          prev.map((q) =>
-            q.localId === item.localId
-              ? { ...q, status: "error", errorMessage: errorMsg }
-              : q
-          )
-        );
-
-        toast.error(`Échec : ${item.file.name}`, {
-          description: errorMsg,
-          duration: 8000,
-        });
+      } catch {
+        toast.error(`Erreur lors de l'upload de ${file.name}`);
+      } finally {
+        URL.revokeObjectURL(previewUrl);
+        setUploadingSecondary((prev) => prev.filter((i) => i.localId !== localId));
       }
     }
-
-    setTimeout(() => {
-      setUploadQueue((prev) => {
-        const errors = prev.filter((q) => q.status === "error");
-        prev
-          .filter((q) => q.status === "done")
-          .forEach((q) => URL.revokeObjectURL(q.localUrl));
-        return errors;
-      });
-    }, 3000);
   };
 
-  const handleSetMain = (url: string) => {
-    if (url === mainImage) return;
-    const otherImages = [
-      ...(mainImage ? [mainImage] : []),
-      ...images.filter((img) => img !== url),
-    ];
-    onMainImageChange(url);
-    onImagesChange(otherImages);
-  };
-
-  const handleRemoveRemote = (url: string) => {
-    if (url === mainImage) {
-      const remaining = images.filter((img) => img !== url);
-      onMainImageChange(remaining[0] ?? null);
-      onImagesChange(remaining.slice(1));
-    } else {
-      onImagesChange(images.filter((img) => img !== url));
-    }
-  };
-
-  const handleRemoveFromQueue = (localId: string) => {
-    setUploadQueue((prev) => {
-      const item = prev.find((q) => q.localId === localId);
-      if (item) URL.revokeObjectURL(item.localUrl);
-      return prev.filter((q) => q.localId !== localId);
-    });
-  };
-
-  const handleRetry = async (item: ImageItem) => {
-    setUploadQueue((prev) =>
-      prev.map((q) =>
-        q.localId === item.localId
-          ? { ...q, status: "uploading", errorMessage: undefined }
-          : q
-      )
-    );
-
+  const handleDeleteSecondary = async (url: string) => {
+    setDeletingUrl(url);
     try {
-      const remoteUrl = await uploadFile(item);
-      setUploadQueue((prev) =>
-        prev.map((q) =>
-          q.localId === item.localId ? { ...q, status: "done", remoteUrl } : q
-        )
-      );
-      if (!mainImage) onMainImageChange(remoteUrl);
-      else onImagesChange([...images, remoteUrl]);
-      toast.success("Image uploadée avec succès");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erreur";
-      setUploadQueue((prev) =>
-        prev.map((q) =>
-          q.localId === item.localId ? { ...q, status: "error", errorMessage: msg } : q
-        )
-      );
-      toast.error(`Toujours en échec : ${msg}`);
+      const result = await deleteArticleSecondaryImage(articleId, url);
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      onImagesChange(images.filter((img) => img !== url));
+      toast.success("Image supprimée");
+    } finally {
+      setDeletingUrl(null);
+      setConfirmDeleteSecondary(null);
     }
   };
 
-  const hasUploading = uploadQueue.some((q) => q.status === "uploading");
-  const totalCount =
-    allRemoteUrls.length +
-    uploadQueue.filter((q) => q.status === "uploading" || q.status === "pending").length;
+  const handleSetMain = async (url: string) => {
+    try {
+      const result = await setArticleMainImage(articleId, url);
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      // Update local state to reflect the swap
+      const newImages = images.filter((img) => img !== url);
+      if (mainImage) newImages.unshift(mainImage);
+      onMainImageChange(url);
+      onImagesChange(newImages);
+      toast.success("Image principale mise à jour");
+    } catch {
+      toast.error("Erreur lors de la mise à jour");
+    }
+  };
 
   return (
-    <div className="space-y-4">
-      {/* Alerte config manquante */}
-      {!config.ok && (
-        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          <AlertCircle className="mt-0.5 size-4 shrink-0" />
-          <div>
-            <p className="font-medium">Configuration Cloudinary manquante</p>
-            <p className="mt-0.5 text-xs text-red-600">{config.error}</p>
-          </div>
-        </div>
-      )}
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept={ALLOWED_EXTENSIONS}
-        multiple
-        className="sr-only"
-        onChange={handleFileChange}
-        aria-hidden="true"
-        tabIndex={-1}
-        disabled={disabled}
-      />
-
-      {/* IMAGE PRINCIPALE */}
+    <div className="space-y-6">
+      {/* ── IMAGE PRINCIPALE ─────────────────────────────────────────────── */}
       <div className="space-y-2">
+        <input
+          ref={mainInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="sr-only"
+          onChange={handleMainFileChange}
+          aria-hidden="true"
+          tabIndex={-1}
+          disabled={disabled}
+        />
+
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium">
             <Star className="mr-1.5 inline size-4 text-amber-500" />
             Image principale
           </p>
-          {!mainImage && (
-            <span className="text-muted-foreground text-xs">
-              La première image ajoutée devient l&apos;image principale
-            </span>
-          )}
         </div>
 
         {mainImage ? (
-          <div className="bg-muted relative aspect-video w-full max-w-sm overflow-hidden rounded-xl border-2 border-amber-400">
+          <div className="bg-muted group relative aspect-video w-full max-w-sm overflow-hidden rounded-xl border-2 border-amber-400">
             <Image
               src={mainImage}
               alt="Image principale"
               fill
               className="object-contain"
               sizes="400px"
+              unoptimized={mainImage.startsWith("/uploads/")}
             />
-            <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition-colors hover:bg-black/40 hover:opacity-100">
+            <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition-colors group-hover:bg-black/40 group-hover:opacity-100">
               <button
                 type="button"
                 onClick={() => setPreviewUrl(mainImage)}
-                className="text-foreground rounded-lg bg-white/90 p-2 transition-colors hover:bg-white"
+                className="text-foreground rounded-lg bg-white/90 p-2 hover:bg-white"
                 title="Prévisualiser"
               >
                 <Eye className="size-4" />
               </button>
-              <button
-                type="button"
-                onClick={() => handleRemoveRemote(mainImage)}
-                disabled={disabled}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/80 rounded-lg p-2 transition-colors disabled:opacity-50"
-                title="Supprimer"
-              >
-                <Trash2 className="size-4" />
-              </button>
+              {!disabled && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => mainInputRef.current?.click()}
+                    disabled={uploadingMain}
+                    className="rounded-lg bg-amber-500 p-2 text-white hover:bg-amber-600 disabled:opacity-50"
+                    title="Changer l'image"
+                  >
+                    {uploadingMain ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <ImagePlus className="size-4" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteMain(true)}
+                    disabled={deletingMain}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/80 rounded-lg p-2 disabled:opacity-50"
+                    title="Supprimer"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </>
+              )}
             </div>
             <div className="absolute top-2 left-2">
               <Badge className="gap-1 bg-amber-500 text-xs text-white">
@@ -376,39 +287,53 @@ export function ArticleImagesUpload({
         ) : (
           <button
             type="button"
-            onClick={() => !disabled && config.ok && fileInputRef.current?.click()}
-            disabled={disabled || !config.ok}
+            onClick={() => !disabled && mainInputRef.current?.click()}
+            disabled={disabled || uploadingMain}
             className={cn(
               "aspect-video w-full max-w-sm rounded-xl",
               "border-border border-2 border-dashed",
               "flex flex-col items-center justify-center gap-2",
               "text-muted-foreground transition-all",
-              !disabled &&
-                config.ok &&
-                "hover:border-primary/50 hover:bg-muted/30 hover:text-foreground cursor-pointer",
-              (disabled || !config.ok) && "cursor-not-allowed opacity-50"
+              !disabled && !uploadingMain
+                ? "hover:border-primary/50 hover:bg-muted/30 hover:text-foreground cursor-pointer"
+                : "cursor-not-allowed opacity-50"
             )}
           >
-            <ImagePlus className="size-8" />
-            <p className="text-sm">Ajouter l&apos;image principale</p>
+            {uploadingMain ? (
+              <Loader2 className="size-8 animate-spin" />
+            ) : (
+              <ImagePlus className="size-8" />
+            )}
+            <p className="text-sm">
+              {uploadingMain ? "Upload en cours…" : "Ajouter l&apos;image principale"}
+            </p>
           </button>
         )}
       </div>
 
-      {/* IMAGES SECONDAIRES */}
+      {/* ── IMAGES SECONDAIRES ───────────────────────────────────────────── */}
       <div className="space-y-2">
+        <input
+          ref={secondaryInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          className="sr-only"
+          onChange={handleSecondaryFileChange}
+          aria-hidden="true"
+          tabIndex={-1}
+          disabled={disabled}
+        />
+
         <p className="text-sm font-medium">
-          Images supplémentaires
+          Images secondaires
           <span className="text-muted-foreground ml-2 font-normal">
-            (
-            {allRemoteUrls.length +
-              uploadQueue.filter((q) => q.status !== "error").length}
-            /{MAX_FILES})
+            ({images.length + uploadingSecondary.length}/{MAX_FILES})
           </span>
         </p>
 
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-          {/* Images déjà uploadées (secondaires) */}
+          {/* Uploaded secondary images */}
           {images.map((url) => (
             <div
               key={url}
@@ -416,10 +341,11 @@ export function ArticleImagesUpload({
             >
               <Image
                 src={url}
-                alt="Image article"
+                alt="Image secondaire"
                 fill
                 className="object-cover"
                 sizes="120px"
+                unoptimized={url.startsWith("/uploads/")}
               />
               <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/0 opacity-0 transition-colors hover:bg-black/50 hover:opacity-100">
                 <button
@@ -440,116 +366,67 @@ export function ArticleImagesUpload({
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleRemoveRemote(url)}
-                  disabled={disabled}
+                  onClick={() => setConfirmDeleteSecondary(url)}
+                  disabled={disabled || deletingUrl === url}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/80 rounded p-1.5 disabled:opacity-50"
                   title="Supprimer"
                 >
-                  <Trash2 className="size-3.5" />
+                  {deletingUrl === url ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-3.5" />
+                  )}
                 </button>
               </div>
             </div>
           ))}
 
-          {/* Images en cours d'upload */}
-          {uploadQueue.map((item) => (
+          {/* Uploading placeholders */}
+          {uploadingSecondary.map((item) => (
             <div
               key={item.localId}
-              className={cn(
-                "relative aspect-square overflow-hidden rounded-lg border",
-                item.status === "uploading" && "border-primary/50",
-                item.status === "done" && "border-amber-500",
-                item.status === "error" && "border-destructive"
-              )}
+              className="border-primary/50 bg-muted relative aspect-square overflow-hidden rounded-lg border"
             >
               <Image
-                src={item.localUrl}
+                src={item.previewUrl}
                 alt="Upload en cours"
                 fill
-                className={cn(
-                  "object-cover",
-                  (item.status === "uploading" || item.status === "error") && "opacity-60"
-                )}
+                className="object-cover opacity-50"
                 sizes="120px"
+                unoptimized
               />
-
-              {item.status === "uploading" && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/30">
-                  <Loader2 className="size-5 animate-spin text-white" />
-                  <span className="text-[10px] text-white">Upload…</span>
-                </div>
-              )}
-
-              {item.status === "done" && (
-                <div className="absolute inset-0 flex items-center justify-center bg-amber-500/20">
-                  <div className="rounded-full bg-amber-500 p-1">
-                    <Upload className="size-3 text-white" />
-                  </div>
-                </div>
-              )}
-
-              {item.status === "error" && (
-                <div className="bg-destructive/60 absolute inset-0 flex flex-col items-center justify-center gap-1 p-1">
-                  <AlertCircle className="size-4 text-white" />
-                  <span className="text-center text-[9px] leading-tight text-white">
-                    {item.errorMessage?.slice(0, 40)}
-                  </span>
-                  <div className="mt-0.5 flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => handleRetry(item)}
-                      className="rounded bg-white/20 px-1 text-[9px] text-white hover:bg-white/30"
-                    >
-                      Réessayer
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveFromQueue(item.localId)}
-                      className="bg-destructive hover:bg-destructive/80 rounded px-1 text-[9px] text-white"
-                    >
-                      <X className="size-2.5" />
-                    </button>
-                  </div>
-                </div>
-              )}
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/30">
+                <Loader2 className="size-5 animate-spin text-white" />
+                <span className="text-[10px] text-white">Upload…</span>
+              </div>
             </div>
           ))}
 
-          {/* Bouton ajouter */}
-          {totalCount < MAX_FILES && (
+          {/* Add button */}
+          {canAddMore && !disabled && (
             <button
               type="button"
-              onClick={() => !disabled && config.ok && fileInputRef.current?.click()}
-              disabled={disabled || !config.ok || hasUploading}
+              onClick={() => secondaryInputRef.current?.click()}
               className={cn(
                 "border-border aspect-square rounded-lg border-2 border-dashed",
                 "flex flex-col items-center justify-center gap-1",
-                "text-muted-foreground transition-all",
-                !disabled &&
-                  config.ok &&
-                  !hasUploading &&
-                  "hover:border-primary/50 hover:bg-muted/30 hover:text-foreground cursor-pointer",
-                (disabled || !config.ok || hasUploading) &&
-                  "cursor-not-allowed opacity-50"
+                "text-muted-foreground cursor-pointer transition-all",
+                "hover:border-primary/50 hover:bg-muted/30 hover:text-foreground"
               )}
             >
-              {hasUploading ? (
-                <Loader2 className="size-5 animate-spin" />
-              ) : (
-                <ImagePlus className="size-5" />
-              )}
-              <span className="text-[10px]">{hasUploading ? "…" : "Ajouter"}</span>
+              <ImagePlus className="size-5" />
+              <span className="text-[10px]">Ajouter</span>
             </button>
           )}
         </div>
+
+        <p className="text-muted-foreground text-xs">
+          JPG, PNG, WebP · max {MAX_SIZE_MB} Mo · {MAX_FILES} images secondaires maximum.
+          Survolez une image secondaire pour la définir comme principale (⭐).
+        </p>
       </div>
 
-      <p className="text-muted-foreground text-xs">
-        JPG, PNG, WebP · max {MAX_SIZE_MB} Mo par image · {MAX_FILES} images maximum.
-        Survolez une image secondaire pour la définir comme principale (⭐).
-      </p>
-
-      {/* Dialog prévisualisation */}
+      {/* ── Prévisualisation ─────────────────────────────────────────────── */}
       <Dialog open={!!previewUrl} onOpenChange={() => setPreviewUrl(null)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
@@ -563,11 +440,108 @@ export function ArticleImagesUpload({
                 fill
                 className="object-contain"
                 sizes="800px"
+                unoptimized={previewUrl.startsWith("/uploads/")}
               />
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ── Confirmation suppression image principale ─────────────────────── */}
+      <AlertDialog open={confirmDeleteMain} onOpenChange={setConfirmDeleteMain}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="mb-1 flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-full bg-red-50">
+                <AlertTriangle className="size-5 text-red-600" />
+              </div>
+              <AlertDialogTitle>Supprimer l&apos;image principale ?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              L&apos;image sera définitivement supprimée. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingMain}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteMain}
+              disabled={deletingMain}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {deletingMain ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Suppression…
+                </>
+              ) : (
+                "Supprimer"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Confirmation suppression image secondaire ─────────────────────── */}
+      <AlertDialog
+        open={!!confirmDeleteSecondary}
+        onOpenChange={(open) => !open && setConfirmDeleteSecondary(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="mb-1 flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-full bg-red-50">
+                <AlertTriangle className="size-5 text-red-600" />
+              </div>
+              <AlertDialogTitle>Supprimer cette image ?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              L&apos;image sera définitivement supprimée. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!deletingUrl}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() =>
+                confirmDeleteSecondary && handleDeleteSecondary(confirmDeleteSecondary)
+              }
+              disabled={!!deletingUrl}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {deletingUrl ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Suppression…
+                </>
+              ) : (
+                "Supprimer"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Dialog zoom prévisualisation ─────────────────────────────────── */}
+      {previewUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setPreviewUrl(null)}
+        >
+          <button
+            className="absolute top-4 right-4 rounded-full bg-white/20 p-2 text-white hover:bg-white/40"
+            onClick={() => setPreviewUrl(null)}
+          >
+            <X className="size-5" />
+          </button>
+          <Image
+            src={previewUrl}
+            alt="Aperçu"
+            width={1200}
+            height={800}
+            className="max-h-[90vh] max-w-full rounded-lg object-contain"
+            unoptimized={previewUrl.startsWith("/uploads/")}
+          />
+        </div>
+      )}
     </div>
   );
 }

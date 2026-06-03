@@ -26,12 +26,12 @@ import {
   type ArticleOutput,
 } from "../schemas/article.schema";
 import { createArticle, updateArticle } from "../server/actions";
+import { uploadArticleMainImage } from "../server/image-actions";
 import { ArticleImagesUpload } from "./article-images-upload";
 import {
   ArticleMainImagePicker,
   type SelectedImageFile,
 } from "./article-main-image-picker";
-import { uploadArticleImage } from "../lib/upload";
 import type { ArticleDetailDTO } from "../types";
 import type { CategorySelectOption } from "@/features/catalogue/categories/types";
 
@@ -153,36 +153,43 @@ export function ArticleForm({
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
-      let finalValues = values;
+      if (isEditing) {
+        const result = await updateArticle(article.id, values);
+        if (result.success) {
+          toast.success("Article modifié");
+          router.push(`/catalogue/articles/${article.id}`);
+        } else {
+          toast.error(result.error);
+        }
+        return;
+      }
 
-      // En mode création, uploader l'image sélectionnée avant de créer l'article
-      if (!isEditing && selectedImageFile) {
-        try {
-          const secureUrl = await uploadArticleImage(selectedImageFile.file);
-          URL.revokeObjectURL(selectedImageFile.previewUrl);
-          setSelectedImageFile(null);
-          finalValues = { ...values, mainImage: secureUrl };
-        } catch (err) {
-          const msg =
-            err instanceof Error ? err.message : "Erreur lors de l'upload de l'image";
-          toast.error("Échec de l'upload image", { description: msg });
-          return;
+      // Mode création : créer l'article sans image d'abord, puis uploader
+      const createResult = await createArticle({ ...values, mainImage: null });
+      if (!createResult.success) {
+        toast.error(createResult.error);
+        return;
+      }
+
+      const articleId = (createResult as { data?: { id: string } }).data?.id;
+
+      if (articleId && selectedImageFile) {
+        const formData = new FormData();
+        formData.append("file", selectedImageFile.file);
+        URL.revokeObjectURL(selectedImageFile.previewUrl);
+        setSelectedImageFile(null);
+
+        const imgResult = await uploadArticleMainImage(articleId, formData);
+        if (!imgResult.success) {
+          toast.warning("Article créé, mais l'image n'a pas pu être uploadée", {
+            description: imgResult.error,
+            duration: 6000,
+          });
         }
       }
 
-      const result = isEditing
-        ? await updateArticle(article.id, finalValues)
-        : await createArticle(finalValues);
-
-      if (result.success) {
-        toast.success(isEditing ? "Article modifié" : "Article créé");
-        const id = isEditing
-          ? article.id
-          : (result as { data?: { id: string } }).data?.id;
-        router.push(id ? `/catalogue/articles/${id}` : "/catalogue/articles");
-      } else {
-        toast.error(result.error);
-      }
+      toast.success("Article créé");
+      router.push(articleId ? `/catalogue/articles/${articleId}` : "/catalogue/articles");
     });
   };
 
@@ -498,8 +505,9 @@ export function ArticleForm({
         <h2 className="font-heading text-base font-semibold">Photos</h2>
 
         {isEditing ? (
-          // Mode édition : composant complet avec images multiples uploadées immédiatement
+          // Mode édition : upload immédiat via Server Actions
           <ArticleImagesUpload
+            articleId={article.id}
             mainImage={watchedMainImage ?? null}
             images={watchedImages ?? []}
             onMainImageChange={(url) => setValue("mainImage", url, { shouldDirty: true })}
@@ -584,11 +592,7 @@ export function ArticleForm({
           {isPending ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" />
-              {isEditing
-                ? "Enregistrement…"
-                : selectedImageFile
-                  ? "Upload image…"
-                  : "Création…"}
+              {isEditing ? "Enregistrement…" : "Création…"}
             </>
           ) : isEditing ? (
             "Enregistrer les modifications"
