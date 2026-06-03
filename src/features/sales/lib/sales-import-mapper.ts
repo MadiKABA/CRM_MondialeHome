@@ -181,7 +181,7 @@ export function parseImportDate(raw: string): Date | null {
   }
 
   const match = s.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})/);
-  if (match) {
+  if (match?.[1] && match[2] && match[3]) {
     const d = new Date(
       `${match[3]}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`
     );
@@ -263,6 +263,7 @@ export function mapAndGroupSaleRows(
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
+    if (!row) continue;
 
     const get = (field: string): string => {
       const header = Object.entries(mapping).find(([, f]) => f === field)?.[0];
