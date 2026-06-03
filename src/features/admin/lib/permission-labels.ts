@@ -283,6 +283,13 @@ export const PERMISSION_LABELS: Record<PermissionCode, PermissionLabel> = {
     isDangerous: false,
     superAdminOnly: false,
   },
+  "segments.manage_members.all": {
+    code: "segments.manage_members.all",
+    label: "Gérer les membres",
+    description: "Permet d'ajouter ou retirer des clients d'un groupe statique",
+    isDangerous: false,
+    superAdminOnly: false,
+  },
 
   // ── AUTOMATISATIONS ───────────────────────────────────────────────────────
   "automations.read.all": {
