@@ -5,18 +5,127 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { validateUploadedFile } from "@/lib/upload/sanitize";
+import { compressAvatar } from "@/lib/upload/compress";
+import { saveFile, deleteFile } from "@/lib/upload/storage";
+import { UPLOAD_CONFIG } from "@/lib/upload/config";
+import { checkRateLimit } from "@/lib/rate-limit";
 import {
   updateProfileSchema,
   changePasswordSchema,
-  avatarSchema,
   type UpdateProfileInput,
   type ChangePasswordInput,
-  type AvatarInput,
 } from "../schemas/profile.schema";
 
 type ActionResult<T = void> =
   | { success: true; data?: T }
   | { success: false; error: string };
+
+// ── Upload avatar ─────────────────────────────────────────────────────────────
+
+export async function uploadAvatar(
+  formData: FormData
+): Promise<ActionResult<{ url: string }>> {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user) return { success: false, error: "Non authentifié" };
+
+    const rateCheck = await checkRateLimit({
+      key: `upload_avatar:${session.user.id}`,
+      limit: 5,
+      windowMs: 60_000,
+    });
+    if (!rateCheck.allowed) {
+      return { success: false, error: "Trop de tentatives. Attendez une minute." };
+    }
+
+    const file = formData.get("file");
+    if (!file || !(file instanceof File)) {
+      return { success: false, error: "Aucun fichier reçu" };
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    const validation = validateUploadedFile(buffer, file.name, file.type, buffer.length);
+    if (!validation.valid) return { success: false, error: validation.error! };
+
+    const compressed = await compressAvatar(buffer);
+
+    const url = await saveFile(
+      `avatars/${session.user.id}`,
+      UPLOAD_CONFIG.AVATAR.FILENAME,
+      compressed.buffer
+    );
+
+    await db.user.update({
+      where: { id: session.user.id },
+      data: { image: url },
+    });
+
+    await db.auditLog.create({
+      data: {
+        userId: session.user.id,
+        action: "avatar.upload",
+        entity: "User",
+        entityId: session.user.id,
+        newValue: {
+          url,
+          originalSize: compressed.originalSize,
+          compressedSize: compressed.sizeBytes,
+          savings: compressed.savings,
+        },
+        status: "success",
+      },
+    });
+
+    logger.info(
+      { userId: session.user.id, savings: compressed.savings },
+      "Avatar uploaded"
+    );
+    revalidatePath("/settings/profile");
+    revalidatePath("/dashboard");
+
+    return { success: true, data: { url } };
+  } catch (error) {
+    logger.error({ error }, "Failed to upload avatar");
+    return { success: false, error: "Erreur lors de l'upload" };
+  }
+}
+
+// ── Supprimer avatar ──────────────────────────────────────────────────────────
+
+export async function deleteAvatar(): Promise<ActionResult> {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user) return { success: false, error: "Non authentifié" };
+
+    await deleteFile(`avatars/${session.user.id}`, UPLOAD_CONFIG.AVATAR.FILENAME);
+
+    await db.user.update({
+      where: { id: session.user.id },
+      data: { image: null },
+    });
+
+    await db.auditLog.create({
+      data: {
+        userId: session.user.id,
+        action: "avatar.delete",
+        entity: "User",
+        entityId: session.user.id,
+        status: "success",
+      },
+    });
+
+    logger.info({ userId: session.user.id }, "Avatar deleted");
+    revalidatePath("/settings/profile");
+    revalidatePath("/dashboard");
+
+    return { success: true };
+  } catch (error) {
+    logger.error({ error }, "Failed to delete avatar");
+    return { success: false, error: "Erreur lors de la suppression" };
+  }
+}
 
 async function getRequestMeta() {
   const h = await headers();
@@ -143,76 +252,6 @@ export async function changePassword(input: ChangePasswordInput): Promise<Action
     return { success: true };
   } catch (error) {
     logger.error({ error }, "Failed to change password");
-    return { success: false, error: "Une erreur est survenue" };
-  }
-}
-
-export async function updateAvatar(input: AvatarInput): Promise<ActionResult> {
-  try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) return { success: false, error: "Non authentifié" };
-
-    const result = avatarSchema.safeParse(input);
-    if (!result.success) return { success: false, error: "URL invalide" };
-
-    const url = new URL(result.data.imageUrl);
-    if (url.hostname !== "res.cloudinary.com") {
-      return { success: false, error: "Domaine d'image non autorisé" };
-    }
-
-    await db.user.update({
-      where: { id: session.user.id },
-      data: { image: result.data.imageUrl },
-    });
-
-    await db.auditLog.create({
-      data: {
-        userId: session.user.id,
-        action: "avatar.update",
-        entity: "User",
-        entityId: session.user.id,
-        status: "success",
-      },
-    });
-
-    logger.info({ userId: session.user.id }, "Avatar updated");
-    revalidatePath("/settings/profile");
-    revalidatePath("/dashboard");
-
-    return { success: true };
-  } catch (error) {
-    logger.error({ error }, "Failed to update avatar");
-    return { success: false, error: "Une erreur est survenue" };
-  }
-}
-
-export async function removeAvatar(): Promise<ActionResult> {
-  try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) return { success: false, error: "Non authentifié" };
-
-    await db.user.update({
-      where: { id: session.user.id },
-      data: { image: null },
-    });
-
-    await db.auditLog.create({
-      data: {
-        userId: session.user.id,
-        action: "avatar.remove",
-        entity: "User",
-        entityId: session.user.id,
-        status: "success",
-      },
-    });
-
-    logger.info({ userId: session.user.id }, "Avatar removed");
-    revalidatePath("/settings/profile");
-    revalidatePath("/dashboard");
-
-    return { success: true };
-  } catch (error) {
-    logger.error({ error }, "Failed to remove avatar");
     return { success: false, error: "Une erreur est survenue" };
   }
 }

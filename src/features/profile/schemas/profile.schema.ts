@@ -59,9 +59,3 @@ export const changePasswordSchema = z
   });
 
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
-
-export const avatarSchema = z.object({
-  imageUrl: z.string().url("URL invalide"),
-});
-
-export type AvatarInput = z.infer<typeof avatarSchema>;
