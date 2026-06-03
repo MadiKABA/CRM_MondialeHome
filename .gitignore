@@ -47,6 +47,10 @@ prisma/dev.db-journal
 
 # Logs
 logs/
+
+# Uploads utilisateurs — jamais commiter les images
+/public/uploads/*
+!/public/uploads/.gitkeep
 *.log
 
 # Editor

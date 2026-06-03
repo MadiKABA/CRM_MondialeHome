@@ -17,7 +17,7 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.sentry-cdn.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://res.cloudinary.com",
+      "img-src 'self' data: blob:",
       "connect-src 'self' https://*.sentry.io wss://localhost:*",
       "frame-ancestors 'none'",
     ].join("; "),
@@ -28,14 +28,9 @@ const nextConfig: NextConfig = {
   output: "standalone",
 
   images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "res.cloudinary.com",
-        pathname: "/**",
-      },
-    ],
+    // Images locales dans public/uploads/ — servies statiquement, pas de remotePattern nécessaire
     formats: ["image/avif", "image/webp"],
+    deviceSizes: [640, 750, 828, 1080, 1200],
   },
 
   async headers() {
@@ -49,7 +44,7 @@ const nextConfig: NextConfig = {
 
   experimental: {
     serverActions: {
-      bodySizeLimit: "4mb",
+      bodySizeLimit: "6mb",
     },
   },
 
