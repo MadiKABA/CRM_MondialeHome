@@ -5,8 +5,9 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { checkPermission } from "@/lib/permissions/server";
+import { hasPermission } from "@/lib/permissions/server";
 import { PERMISSIONS } from "@/lib/permissions/constants";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import {
   createSaleSchema,
   addPaymentSchema,
@@ -16,35 +17,13 @@ import {
   type CancelSaleInput,
 } from "../schemas/sale.schema";
 import { generateSaleReference } from "./queries";
+import { auditSale } from "./audit";
 
 type Result<T = void> = { success: true; data?: T } | { success: false; error: string };
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function getUser() {
   const session = await auth.api.getSession({ headers: await headers() });
   return session?.user ?? null;
-}
-
-async function audit(
-  userId: string,
-  action: string,
-  entityId?: string,
-  meta?: Record<string, unknown>
-) {
-  const h = await headers();
-  await db.auditLog.create({
-    data: {
-      userId,
-      action,
-      entity: "Sale",
-      entityId,
-      newValue: meta as never,
-      ipAddress: h.get("x-forwarded-for"),
-      userAgent: h.get("user-agent"),
-      status: "success",
-    },
-  });
 }
 
 async function recalculateClientStats(clientId: string): Promise<void> {
@@ -95,43 +74,85 @@ async function recalculateClientStats(clientId: string): Promise<void> {
 export async function createSale(
   input: CreateSaleInput
 ): Promise<Result<{ id: string; reference: string }>> {
+  // 1. AUTH
+  const user = await getUser();
+  if (!user) return { success: false, error: "Non authentifié" };
+
+  // 2. RATE LIMIT
+  const rl = await checkRateLimit({
+    key: `create_sale:${user.id}`,
+    limit: RATE_LIMITS.CREATE_SALE.limit,
+    windowMs: RATE_LIMITS.CREATE_SALE.windowMs,
+  });
+  if (!rl.allowed) {
+    return { success: false, error: "Trop de requêtes. Attendez une minute." };
+  }
+
+  // 3. RBAC
+  const canCreate = await hasPermission(PERMISSIONS.SALES_CREATE_ALL);
+  if (!canCreate) return { success: false, error: "Permission insuffisante" };
+
+  // 4. VALIDATION ZOD
+  const parsed = createSaleSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues.map((e) => e.message).join(", "),
+    };
+  }
+  const data = parsed.data;
+
   try {
-    const user = await getUser();
-    if (!user) return { success: false, error: "Non authentifié" };
+    // 5. GUARDS MÉTIER — vérifier que les IDs existent en DB
+    if (data.clientId) {
+      const clientExists = await db.client.findUnique({
+        where: { id: data.clientId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!clientExists) {
+        return { success: false, error: "Client introuvable" };
+      }
+    }
 
-    await checkPermission(PERMISSIONS.SALES_CREATE_ALL);
+    for (const item of data.items) {
+      if (item.articleId) {
+        const articleExists = await db.article.findUnique({
+          where: { id: item.articleId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!articleExists) {
+          return {
+            success: false,
+            error: `Article "${item.articleName}" introuvable`,
+          };
+        }
+      }
+    }
 
-    const data = createSaleSchema.parse(input);
-
-    // Calculer le sous-total des lignes
-    const itemsTotal = data.items.reduce((sum, item) => {
-      return sum + Math.max(0, item.unitPrice * item.quantity - item.discount);
+    // 6. CALCULS CÔTÉ SERVEUR — ne jamais faire confiance aux totaux du client
+    const itemsSubtotal = data.items.reduce((sum, item) => {
+      const lineTotal = item.unitPrice * item.quantity - item.discount;
+      return sum + Math.max(0, lineTotal);
     }, 0);
 
-    // Remise globale — percent prime sur le montant fixe
-    let discountAmount = 0;
-    if (data.discountPercent) {
-      discountAmount = (itemsTotal * data.discountPercent) / 100;
-    } else if (data.discountAmount) {
-      discountAmount = Math.min(data.discountAmount, itemsTotal);
-    }
+    const discountAmount = data.discountPercent
+      ? Math.min((itemsSubtotal * data.discountPercent) / 100, itemsSubtotal)
+      : Math.min(data.discountAmount ?? 0, itemsSubtotal);
 
-    const totalAmount = Math.max(0, itemsTotal - discountAmount);
+    const totalAmount = Math.max(0, itemsSubtotal - discountAmount);
     const paidAmount = data.payments.reduce((sum, p) => sum + p.amount, 0);
+    const safePaidAmount = Math.min(paidAmount, totalAmount);
 
-    let status: "PENDING" | "PAID" | "PARTIAL" | "UNPAID";
-    if (data.payments.length === 0) {
-      status = "UNPAID";
-    } else if (paidAmount >= totalAmount) {
-      status = "PAID";
-    } else if (paidAmount > 0) {
-      status = "PARTIAL";
-    } else {
-      status = "UNPAID";
-    }
+    const status: "PAID" | "PARTIAL" | "UNPAID" =
+      safePaidAmount >= totalAmount && totalAmount > 0
+        ? "PAID"
+        : safePaidAmount > 0
+          ? "PARTIAL"
+          : "UNPAID";
 
     const reference = await generateSaleReference();
 
+    // 7. OPÉRATION DB
     const sale = await db.$transaction(async (tx) => {
       const newSale = await tx.sale.create({
         data: {
@@ -141,7 +162,7 @@ export async function createSale(
           campaignId: data.campaignId ?? null,
           status,
           totalAmount,
-          paidAmount,
+          paidAmount: safePaidAmount,
           discountAmount,
           discountPercent: data.discountPercent ?? null,
           notes: data.notes || null,
@@ -177,17 +198,20 @@ export async function createSale(
       return newSale;
     });
 
+    // 8. STATS CLIENT
     if (data.clientId) {
       await recalculateClientStats(data.clientId);
     }
 
-    await audit(user.id, "sale.create", sale.id, {
+    // 9. AUDIT
+    await auditSale(user.id, "sale.create", sale.id, {
       reference,
       totalAmount,
       status,
       clientId: data.clientId,
     });
 
+    // 10. REVALIDATION
     revalidatePath("/sales");
     if (data.clientId) revalidatePath(`/clients/${data.clientId}`);
 
@@ -200,14 +224,35 @@ export async function createSale(
 
 // ── AJOUTER UN PAIEMENT ───────────────────────────────────────────────────────
 export async function addPayment(input: AddPaymentInput): Promise<Result> {
+  // 1. AUTH
+  const user = await getUser();
+  if (!user) return { success: false, error: "Non authentifié" };
+
+  // 2. RATE LIMIT
+  const rl = await checkRateLimit({
+    key: `add_payment:${user.id}`,
+    limit: RATE_LIMITS.ADD_PAYMENT.limit,
+    windowMs: RATE_LIMITS.ADD_PAYMENT.windowMs,
+  });
+  if (!rl.allowed) {
+    return { success: false, error: "Trop de requêtes. Attendez une minute." };
+  }
+
+  // 3. RBAC
+  const canUpdate = await hasPermission(PERMISSIONS.SALES_UPDATE_ALL);
+  if (!canUpdate) return { success: false, error: "Permission insuffisante" };
+
+  // 4. VALIDATION
+  const parsed = addPaymentSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues.map((e) => e.message).join(", "),
+    };
+  }
+  const data = parsed.data;
+
   try {
-    const user = await getUser();
-    if (!user) return { success: false, error: "Non authentifié" };
-
-    await checkPermission(PERMISSIONS.SALES_UPDATE_ALL);
-
-    const data = addPaymentSchema.parse(input);
-
     const sale = await db.sale.findUnique({
       where: { id: data.saleId, deletedAt: null },
       select: { totalAmount: true, paidAmount: true, status: true, clientId: true },
@@ -220,9 +265,24 @@ export async function addPayment(input: AddPaymentInput): Promise<Result> {
         error: "Impossible d'ajouter un paiement à une vente annulée",
       };
     }
+    if (sale.status === "REFUNDED") {
+      return {
+        success: false,
+        error: "Impossible d'ajouter un paiement à une vente remboursée",
+      };
+    }
 
-    const newPaidAmount = Number(sale.paidAmount) + data.amount;
     const totalAmount = Number(sale.totalAmount);
+    const currentPaid = Number(sale.paidAmount);
+
+    // Plafonner le paiement au restant dû
+    const remaining = Math.max(0, totalAmount - currentPaid);
+    if (remaining === 0) {
+      return { success: false, error: "Cette vente est déjà intégralement réglée" };
+    }
+
+    const safeAmount = Math.min(data.amount, remaining);
+    const newPaidAmount = currentPaid + safeAmount;
     const newStatus: "PAID" | "PARTIAL" | "UNPAID" =
       newPaidAmount >= totalAmount ? "PAID" : newPaidAmount > 0 ? "PARTIAL" : "UNPAID";
 
@@ -231,7 +291,7 @@ export async function addPayment(input: AddPaymentInput): Promise<Result> {
         data: {
           saleId: data.saleId,
           method: data.method,
-          amount: data.amount,
+          amount: safeAmount,
           reference: data.reference || null,
           notes: data.notes || null,
         },
@@ -244,9 +304,9 @@ export async function addPayment(input: AddPaymentInput): Promise<Result> {
 
     if (sale.clientId) await recalculateClientStats(sale.clientId);
 
-    await audit(user.id, "sale.payment.add", data.saleId, {
+    await auditSale(user.id, "sale.payment.add", data.saleId, {
       method: data.method,
-      amount: data.amount,
+      amount: safeAmount,
       newStatus,
     });
 
@@ -262,38 +322,63 @@ export async function addPayment(input: AddPaymentInput): Promise<Result> {
 
 // ── ANNULER UNE VENTE ─────────────────────────────────────────────────────────
 export async function cancelSale(input: CancelSaleInput): Promise<Result> {
+  // 1. AUTH
+  const user = await getUser();
+  if (!user) return { success: false, error: "Non authentifié" };
+
+  // 2. RATE LIMIT
+  const rl = await checkRateLimit({
+    key: `cancel_sale:${user.id}`,
+    limit: RATE_LIMITS.CANCEL_SALE.limit,
+    windowMs: RATE_LIMITS.CANCEL_SALE.windowMs,
+  });
+  if (!rl.allowed) {
+    return { success: false, error: "Trop de requêtes. Attendez une minute." };
+  }
+
+  // 3. RBAC
+  const canCancel = await hasPermission(PERMISSIONS.SALES_CANCEL_ALL);
+  if (!canCancel) return { success: false, error: "Permission insuffisante" };
+
+  // 4. VALIDATION
+  const parsed = cancelSaleSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues.map((e) => e.message).join(", "),
+    };
+  }
+  const data = parsed.data;
+
   try {
-    const user = await getUser();
-    if (!user) return { success: false, error: "Non authentifié" };
-
-    await checkPermission(PERMISSIONS.SALES_CANCEL_ALL);
-
-    const data = cancelSaleSchema.parse(input);
-
     const sale = await db.sale.findUnique({
       where: { id: data.saleId, deletedAt: null },
-      select: { status: true, clientId: true, reference: true },
+      select: { status: true, clientId: true, reference: true, totalAmount: true },
     });
 
     if (!sale) return { success: false, error: "Vente introuvable" };
     if (sale.status === "CANCELLED") {
       return { success: false, error: "Cette vente est déjà annulée" };
     }
+    if (sale.status === "REFUNDED") {
+      return { success: false, error: "Cette vente a déjà été remboursée" };
+    }
 
     await db.sale.update({
       where: { id: data.saleId },
       data: {
         status: "CANCELLED",
-        notes: data.reason,
         deletedAt: new Date(),
+        notes: data.reason,
       },
     });
 
     if (sale.clientId) await recalculateClientStats(sale.clientId);
 
-    await audit(user.id, "sale.cancel", data.saleId, {
+    await auditSale(user.id, "sale.cancel", data.saleId, {
       reference: sale.reference,
       reason: data.reason,
+      amount: Number(sale.totalAmount),
     });
 
     revalidatePath("/sales");
@@ -312,21 +397,31 @@ export async function createQuickClient(input: {
   lastName?: string;
   phone?: string;
 }): Promise<Result<{ id: string; fullName: string }>> {
+  // 1. AUTH
+  const user = await getUser();
+  if (!user) return { success: false, error: "Non authentifié" };
+
+  // 2. RATE LIMIT
+  const rl = await checkRateLimit({
+    key: `create_client:${user.id}`,
+    limit: RATE_LIMITS.CREATE_CLIENT.limit,
+    windowMs: RATE_LIMITS.CREATE_CLIENT.windowMs,
+  });
+  if (!rl.allowed) {
+    return { success: false, error: "Trop de requêtes. Attendez une minute." };
+  }
+
+  // 3. RBAC
+  const canCreate = await hasPermission(PERMISSIONS.CLIENTS_CREATE_ALL);
+  if (!canCreate) return { success: false, error: "Permission insuffisante" };
+
   try {
-    const user = await getUser();
-    if (!user) return { success: false, error: "Non authentifié" };
-
-    await checkPermission(PERMISSIONS.CLIENTS_CREATE_ALL);
-
     const fullName = `${input.firstName.trim()} ${(input.lastName ?? "").trim()}`.trim();
 
     if (input.phone) {
       const exists = await db.client.findFirst({ where: { phone: input.phone } });
       if (exists) {
-        return {
-          success: false,
-          error: "Un client avec ce numéro existe déjà",
-        };
+        return { success: false, error: "Un client avec ce numéro existe déjà" };
       }
     }
 
@@ -342,6 +437,11 @@ export async function createQuickClient(input: {
         reference,
         createdById: user.id,
       },
+    });
+
+    await auditSale(user.id, "client.create_quick", client.id, {
+      fullName,
+      phone: input.phone,
     });
 
     revalidatePath("/clients");
