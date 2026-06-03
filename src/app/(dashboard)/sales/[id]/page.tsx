@@ -13,19 +13,20 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
 
   const { id } = await params;
 
-  const [sale, canReadAll, canUpdate, canCancel] = await Promise.all([
-    getSaleById(id),
+  // Résoudre RBAC avant de charger la vente pour appliquer le filtre ownership en DB
+  const [canReadAll, canReadOwn, canUpdate, canCancel] = await Promise.all([
     hasPermission("sales.read.all"),
+    hasPermission("sales.read.own"),
     hasPermission("sales.update.all"),
     hasPermission("sales.cancel.all"),
   ]);
 
+  if (!canReadAll && !canReadOwn) redirect("/sales");
+
+  // getSaleById applique le filtre sellerId si le vendeur n'a pas canReadAll
+  const sale = await getSaleById(id, session.user.id, canReadAll);
+
   if (!sale) notFound();
-
-  const canReadOwn = await hasPermission("sales.read.own");
-  const isOwnSale = sale.sellerId === session.user.id;
-
-  if (!canReadAll && !(canReadOwn && isOwnSale)) redirect("/sales");
 
   return <SaleDetail sale={sale} canUpdate={canUpdate} canCancel={canCancel} />;
 }

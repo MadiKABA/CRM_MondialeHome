@@ -155,9 +155,18 @@ export async function getSales(
   };
 }
 
-export async function getSaleById(id: string): Promise<SaleDetailDTO | null> {
+export async function getSaleById(
+  id: string,
+  currentUserId: string,
+  canReadAll: boolean
+): Promise<SaleDetailDTO | null> {
   const s = await db.sale.findUnique({
-    where: { id, deletedAt: null },
+    where: {
+      id,
+      deletedAt: null,
+      // Vendeur ne voit que ses propres ventes
+      ...(!canReadAll && { sellerId: currentUserId }),
+    },
     include: {
       client: { select: { firstName: true, lastName: true, phone: true } },
       seller: { select: { name: true } },
