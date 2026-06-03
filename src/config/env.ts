@@ -16,11 +16,6 @@ const serverEnvSchema = z.object({
   // Redis
   REDIS_URL: z.string().url("REDIS_URL must be a valid URL"),
 
-  // Cloudinary
-  CLOUDINARY_CLOUD_NAME: z.string().min(1),
-  CLOUDINARY_API_KEY: z.string().min(1),
-  CLOUDINARY_API_SECRET: z.string().min(1),
-
   // Africa's Talking
   AT_USERNAME: z.string().min(1),
   AT_API_KEY: z.string().min(1),
@@ -98,11 +93,6 @@ export const env = {
 
   // Redis
   REDIS_URL: process.env["REDIS_URL"] as string,
-
-  // Cloudinary
-  CLOUDINARY_CLOUD_NAME: process.env["CLOUDINARY_CLOUD_NAME"] as string,
-  CLOUDINARY_API_KEY: process.env["CLOUDINARY_API_KEY"] as string,
-  CLOUDINARY_API_SECRET: process.env["CLOUDINARY_API_SECRET"] as string,
 
   // Africa's Talking
   AT_USERNAME: process.env["AT_USERNAME"] as string,

@@ -48,27 +48,8 @@ export const articleSchema = z
     isNew: z.boolean().default(false),
     arrivalDate: z.coerce.date().optional().nullable(),
 
-    mainImage: z
-      .string()
-      .optional()
-      .nullable()
-      .refine((url) => {
-        if (!url) return true;
-        if (url.startsWith("blob:")) return true; // aperçu local temporaire
-        return url.includes("res.cloudinary.com");
-      }, "L'image doit être hébergée sur Cloudinary"),
-    images: z
-      .array(
-        z
-          .string()
-          .url()
-          .refine(
-            (url) => url.includes("res.cloudinary.com"),
-            "Les images doivent être hébergées sur Cloudinary"
-          )
-      )
-      .max(10, "Maximum 10 images")
-      .default([]),
+    mainImage: z.string().optional().nullable(),
+    images: z.array(z.string()).max(5, "Maximum 5 images secondaires").default([]),
     videoUrl: z.string().url("URL vidéo invalide").optional().or(z.literal("")),
 
     tags: z.array(z.string().max(50)).max(20).default([]),
