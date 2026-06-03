@@ -1,14 +1,16 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Check, Copy, Eye, EyeOff, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 import { createUser, updateUser } from "@/features/admin/server/actions/users.actions";
 import { createUserSchema, updateUserSchema } from "@/features/admin/schemas/user.schema";
 import type {
@@ -17,6 +19,16 @@ import type {
   UpdateUserInput,
 } from "@/features/admin/schemas/user.schema";
 import type { UserDetailDTO, RoleListItemDTO } from "@/features/admin/types";
+
+// ── Générateur de mot de passe temporaire ─────────────────────
+
+function generateTempPassword(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$!";
+  return Array.from(
+    { length: 12 },
+    () => chars[Math.floor(Math.random() * chars.length)]
+  ).join("");
+}
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -37,6 +49,9 @@ type UserFormProps = UserFormCreateProps | UserFormEditProps;
 
 function CreateUserForm({ availableRoles }: { availableRoles: RoleListItemDTO[] }) {
   const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [generatedPwd, setGeneratedPwd] = useState(() => generateTempPassword());
 
   const {
     register,
@@ -56,11 +71,31 @@ function CreateUserForm({ availableRoles }: { availableRoles: RoleListItemDTO[] 
       language: "fr",
       timezone: "Africa/Dakar",
       roleIds: [],
-      sendInvitation: true,
+      password: "",
+      sendInvitation: false,
     },
   });
 
+  // Synchronise le mot de passe généré avec le champ du formulaire
+  useEffect(() => {
+    setValue("password", generatedPwd, { shouldValidate: false });
+  }, [generatedPwd, setValue]);
+
   const selectedRoleIds = watch("roleIds");
+
+  function handleGenerate() {
+    const pwd = generateTempPassword();
+    setGeneratedPwd(pwd);
+    setCopied(false);
+  }
+
+  async function handleCopy() {
+    const pwd = watch("password");
+    if (!pwd) return;
+    await navigator.clipboard.writeText(pwd);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   function toggleRole(roleId: string) {
     const current = selectedRoleIds ?? [];
@@ -78,7 +113,10 @@ function CreateUserForm({ availableRoles }: { availableRoles: RoleListItemDTO[] 
   async function onSubmit(data: CreateUserOutput) {
     const result = await createUser(data);
     if (result.success) {
-      toast.success("Utilisateur créé avec succès.");
+      toast.success(`${data.firstName} ${data.lastName} a été créé`, {
+        description: `Les identifiants ont été envoyés à ${data.email}`,
+        duration: 6000,
+      });
       router.push(`/admin/users/${result.data.id}`);
     } else {
       toast.error(result.error);
@@ -128,6 +166,68 @@ function CreateUserForm({ availableRoles }: { availableRoles: RoleListItemDTO[] 
               <p className="text-xs text-red-600">{errors.phone.message}</p>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Mot de passe temporaire */}
+      <div className="border-cream-darker rounded-xl border p-6">
+        <h3 className="text-text-primary mb-1 font-semibold">Mot de passe temporaire</h3>
+        <p className="text-text-secondary mb-4 text-xs">
+          Le membre pourra se connecter immédiatement avec ces identifiants.
+          Transmettez-lui ce mot de passe.
+        </p>
+        <div className="space-y-1.5">
+          <Label htmlFor="c-password">Mot de passe *</Label>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Input
+                id="c-password"
+                type={showPassword ? "text" : "password"}
+                {...register("password")}
+                className="pr-10 font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="text-text-secondary hover:text-text-primary absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+              </button>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={handleGenerate}
+              className="border-cream-darker text-text-secondary hover:bg-cream/50 shrink-0"
+              title="Générer un nouveau mot de passe"
+            >
+              <RefreshCw className="size-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={handleCopy}
+              className={cn(
+                "border-cream-darker shrink-0 transition-colors",
+                copied
+                  ? "border-green-200 bg-green-50 text-green-600"
+                  : "text-text-secondary hover:bg-cream/50"
+              )}
+              title="Copier le mot de passe"
+            >
+              {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+            </Button>
+          </div>
+          {errors.password && (
+            <p className="text-xs text-red-600">{errors.password.message}</p>
+          )}
         </div>
       </div>
 
@@ -188,25 +288,6 @@ function CreateUserForm({ availableRoles }: { availableRoles: RoleListItemDTO[] 
         )}
       </div>
 
-      {/* Options */}
-      <div className="border-cream-darker rounded-xl border p-6">
-        <label className="flex cursor-pointer items-start gap-3">
-          <Checkbox
-            defaultChecked
-            onCheckedChange={(checked) => setValue("sendInvitation", Boolean(checked))}
-            className="mt-0.5"
-          />
-          <div>
-            <p className="text-text-primary text-sm font-medium">
-              Envoyer une invitation par email
-            </p>
-            <p className="text-text-secondary text-xs">
-              {"L'utilisateur recevra un lien pour définir son mot de passe."}
-            </p>
-          </div>
-        </label>
-      </div>
-
       {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button
@@ -223,7 +304,7 @@ function CreateUserForm({ availableRoles }: { availableRoles: RoleListItemDTO[] 
           className="bg-gold-deep hover:bg-gold-deep/90 text-cream"
         >
           {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-          {"Créer l'utilisateur"}
+          Créer le membre
         </Button>
       </div>
     </form>

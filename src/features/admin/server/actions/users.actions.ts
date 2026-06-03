@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { Prisma } from "@prisma/client";
+import { hashPassword } from "better-auth/crypto";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { checkPermission, requireAuth } from "@/lib/permissions/server";
 import { canManageUser, canRemoveSuperAdmin } from "@/features/admin/lib/role-guards";
+import { sendInvitationEmail } from "@/lib/email/send";
 import {
   createUserSchema,
   updateUserSchema,
@@ -87,6 +89,10 @@ export async function createUser(
     const lastName = data.lastName;
     const name = `${firstName} ${lastName}`.trim();
 
+    // Capturer le mot de passe en clair avant hashage pour l'email d'invitation
+    const plainPassword = data.password;
+    const hashedPwd = await hashPassword(plainPassword);
+
     const user = await db.$transaction(async (tx) => {
       const created = await tx.user.create({
         data: {
@@ -102,6 +108,16 @@ export async function createUser(
           isActive: true,
         },
         select: { id: true },
+      });
+
+      // Compte credential Better Auth — accountId = user.id (convention)
+      await tx.account.create({
+        data: {
+          userId: created.id,
+          providerId: "credential",
+          accountId: created.id,
+          password: hashedPwd,
+        },
       });
 
       await tx.userRole.createMany({
@@ -122,6 +138,28 @@ export async function createUser(
       entityId: user.id,
       newValue: { email: data.email, name, roleIds: data.roleIds },
     });
+
+    // Récupérer les noms des rôles pour l'email d'invitation
+    const roleNames = await db.role.findMany({
+      where: { id: { in: data.roleIds } },
+      select: { name: true },
+    });
+
+    const emailResult = await sendInvitationEmail({
+      to: data.email,
+      recipientName: firstName,
+      inviterName: session.user.name ?? "L'administrateur",
+      email: data.email,
+      tempPassword: plainPassword,
+      roleName: roleNames.map((r) => r.name).join(", "),
+    });
+
+    if (!emailResult.success) {
+      logger.warn(
+        { error: emailResult.error, userId: user.id },
+        "User created but invitation email failed"
+      );
+    }
 
     revalidatePath("/admin/users");
     return { success: true, data: { id: user.id } };
