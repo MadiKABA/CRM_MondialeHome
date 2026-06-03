@@ -309,6 +309,14 @@ const PERMISSION_DEFS = [
     description: "Recalculer des segments",
     category: "Segments",
   },
+  {
+    code: "segments.manage_members.all",
+    module: "segments",
+    action: "manage_members",
+    scope: "all",
+    description: "Ajouter ou retirer des clients d'un groupe",
+    category: "Segments",
+  },
 
   // ── AUTOMATISATIONS (5) ────────────────────────────────────────────────────
   {
@@ -580,6 +588,7 @@ const ROLE_DEFS = [
       "segments.update.all",
       "segments.delete.all",
       "segments.compute.all",
+      "segments.manage_members.all",
       "automations.read.all",
       "automations.create.all",
       "automations.update.all",
@@ -610,6 +619,7 @@ const ROLE_DEFS = [
       // Pas de campaigns.send ni campaigns.delete
       "segments.read.all",
       "segments.create.all",
+      "segments.manage_members.all",
       "templates.read.all",
       "templates.create.all",
       "templates.duplicate.all",
@@ -1713,54 +1723,131 @@ async function main() {
   }
   console.log(`  OK: ${articleCount} articles\n`);
 
-  // 9. Segments système
-  console.log("Création des segments système...");
-  const systemSegments = [
+  // 9. Segments RFM prédéfinis
+  console.log("Création des segments RFM...");
+
+  const now = new Date();
+  const daysAgo = (days: number) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - days);
+    return d.toISOString();
+  };
+
+  const rfmSegments = [
     {
-      name: "Tous les clients",
-      slug: "tous-les-clients",
+      name: "Tous les clients actifs",
+      slug: "tous-les-clients-actifs",
       description: "Segment contenant tous les clients actifs",
-      type: "DYNAMIC" as const,
-      rules: [{ field: "status", operator: "equals", value: "ACTIVE" }],
       color: "#4A6741",
+      criteria: {
+        operator: "AND",
+        criteria: [{ field: "status", operator: "eq", value: "ACTIVE" }],
+      },
+      isSystem: true,
     },
     {
       name: "Clients VIP",
       slug: "clients-vip",
       description: "Clients avec statut VIP",
-      type: "DYNAMIC" as const,
-      rules: [{ field: "isVip", operator: "equals", value: true }],
       color: "#D4A853",
+      criteria: {
+        operator: "AND",
+        criteria: [{ field: "isVip", operator: "is_true", value: true }],
+      },
+      isSystem: true,
     },
     {
-      name: "Clients inactifs (90j+)",
-      slug: "clients-inactifs-90j",
-      description: "Clients sans achat depuis 90 jours",
-      type: "DYNAMIC" as const,
-      rules: [{ field: "lastPurchaseAt", operator: "before", value: "90_days_ago" }],
-      color: "#C4622D",
+      name: "Champions",
+      slug: "champions-rfm",
+      description: "Meilleurs clients : gros acheteurs, fidèles et récents",
+      color: "#8B6914",
+      criteria: {
+        operator: "AND",
+        criteria: [
+          { field: "totalSpent", operator: "gte", value: 500000 },
+          { field: "totalOrders", operator: "gte", value: 3 },
+          { field: "lastPurchaseAt", operator: "last_days", value: 90 },
+        ],
+      },
+      isSystem: false,
     },
     {
-      name: "Nouveaux clients (30j)",
-      slug: "nouveaux-clients-30j",
-      description: "Clients inscrits dans les 30 derniers jours",
-      type: "DYNAMIC" as const,
-      rules: [{ field: "acquisitionDate", operator: "after", value: "30_days_ago" }],
-      color: "#5B9BD5",
+      name: "Clients fidèles",
+      slug: "clients-fideles-rfm",
+      description: "Achètent régulièrement, panier moyen élevé",
+      color: "#B8945F",
+      criteria: {
+        operator: "AND",
+        criteria: [
+          { field: "totalOrders", operator: "gte", value: 2 },
+          { field: "lastPurchaseAt", operator: "last_days", value: 180 },
+        ],
+      },
+      isSystem: false,
+    },
+    {
+      name: "Clients à risque",
+      slug: "clients-a-risque-rfm",
+      description: "Anciens bons clients sans achat depuis 3 mois",
+      color: "#D97706",
+      criteria: {
+        operator: "AND",
+        criteria: [
+          { field: "totalOrders", operator: "gte", value: 2 },
+          { field: "lastPurchaseAt", operator: "before", value: daysAgo(90) },
+        ],
+      },
+      isSystem: false,
+    },
+    {
+      name: "Clients perdus",
+      slug: "clients-perdus-rfm",
+      description: "Aucun achat depuis plus de 6 mois",
+      color: "#6B7280",
+      criteria: {
+        operator: "AND",
+        criteria: [{ field: "lastPurchaseAt", operator: "before", value: daysAgo(180) }],
+      },
+      isSystem: false,
+    },
+    {
+      name: "Nouveaux clients",
+      slug: "nouveaux-clients-rfm",
+      description: "Inscrits dans les 30 derniers jours",
+      color: "#059669",
+      criteria: {
+        operator: "AND",
+        criteria: [{ field: "createdAt", operator: "last_days", value: 30 }],
+      },
+      isSystem: false,
+    },
+    {
+      name: "Clients Dakar",
+      slug: "clients-dakar-rfm",
+      description: "Clients basés à Dakar avec consentement SMS",
+      color: "#7C3AED",
+      criteria: {
+        operator: "AND",
+        criteria: [
+          { field: "city", operator: "eq", value: "Dakar" },
+          { field: "smsConsent", operator: "is_true", value: true },
+        ],
+      },
+      isSystem: false,
     },
   ];
 
-  for (const seg of systemSegments) {
+  for (const seg of rfmSegments) {
     await db.segment.upsert({
       where: { slug: seg.slug },
-      update: {},
+      update: { criteria: seg.criteria as object },
       create: {
         name: seg.name,
         slug: seg.slug,
         description: seg.description,
-        type: seg.type,
-        rules: seg.rules,
-        isSystem: true,
+        type: "DYNAMIC",
+        criteria: seg.criteria as object,
+        isSystem: seg.isSystem,
         isActive: true,
         color: seg.color,
         createdById: superAdmin.id,
@@ -1769,6 +1856,321 @@ async function main() {
     console.log(`  OK: ${seg.name}`);
   }
   console.log();
+
+  // 10. Clients de démonstration
+  console.log("Création des clients de démonstration...");
+  type ClientStatusType =
+    | "ACTIVE"
+    | "INACTIVE"
+    | "UNSUBSCRIBED"
+    | "BLACKLISTED"
+    | "DELETED";
+
+  const CLIENT_DEFS: Array<{
+    firstName: string;
+    lastName: string;
+    phone: string;
+    email?: string;
+    city: string;
+    district: string;
+    status: ClientStatusType;
+    isVip: boolean;
+  }> = [
+    {
+      firstName: "Mamadou",
+      lastName: "Diallo",
+      phone: "+221771234567",
+      email: "mamadou.diallo@gmail.com",
+      city: "Dakar",
+      district: "Almadies",
+      status: "ACTIVE",
+      isVip: true,
+    },
+    {
+      firstName: "Aïssatou",
+      lastName: "Kouyaté",
+      phone: "+221783456789",
+      email: "aissatou.k@yahoo.fr",
+      city: "Dakar",
+      district: "Mermoz",
+      status: "ACTIVE",
+      isVip: false,
+    },
+    {
+      firstName: "Ousmane",
+      lastName: "Ba",
+      phone: "+221776543210",
+      city: "Dakar",
+      district: "Plateau",
+      status: "ACTIVE",
+      isVip: false,
+    },
+    {
+      firstName: "Fatou",
+      lastName: "Sow",
+      phone: "+221779876543",
+      email: "fatou.sow@orange.sn",
+      city: "Thiès",
+      district: "Centre",
+      status: "ACTIVE",
+      isVip: true,
+    },
+    {
+      firstName: "Ibrahima",
+      lastName: "Ndiaye",
+      phone: "+221701122334",
+      city: "Dakar",
+      district: "Ouakam",
+      status: "ACTIVE",
+      isVip: false,
+    },
+    {
+      firstName: "Mariama",
+      lastName: "Bah",
+      phone: "+221775566778",
+      city: "Saint-Louis",
+      district: "Nord",
+      status: "ACTIVE",
+      isVip: false,
+    },
+    {
+      firstName: "Cheikh",
+      lastName: "Fall",
+      phone: "+221782233445",
+      city: "Dakar",
+      district: "Parcelles",
+      status: "ACTIVE",
+      isVip: false,
+    },
+    {
+      firstName: "Rokhaya",
+      lastName: "Sarr",
+      phone: "+221773344556",
+      email: "rokhaya.sarr@gmail.com",
+      city: "Dakar",
+      district: "Liberté",
+      status: "ACTIVE",
+      isVip: false,
+    },
+  ];
+
+  let clientCount = 0;
+  const clientIds: string[] = [];
+  for (const cDef of CLIENT_DEFS) {
+    const existingCount = await db.client.count();
+    const ref = `MH-${String(existingCount + 1).padStart(5, "0")}`;
+    const fullName = `${cDef.firstName} ${cDef.lastName}`;
+    const existing = await db.client.findFirst({ where: { phone: cDef.phone } });
+    if (existing) {
+      clientIds.push(existing.id);
+      continue;
+    }
+    const c = await db.client.create({
+      data: {
+        reference: ref,
+        firstName: cDef.firstName,
+        lastName: cDef.lastName,
+        fullName,
+        phone: cDef.phone,
+        email: cDef.email ?? null,
+        city: cDef.city,
+        district: cDef.district,
+        status: cDef.status,
+        isVip: cDef.isVip,
+        createdById: superAdmin.id,
+      },
+    });
+    clientIds.push(c.id);
+    clientCount++;
+  }
+  console.log(`  OK: ${clientCount} nouveaux clients\n`);
+
+  // 11. Ventes de démonstration
+  console.log("Création des ventes de démonstration...");
+  const allArticles = await db.article.findMany({
+    where: { deletedAt: null, status: "AVAILABLE" },
+    take: 10,
+  });
+  const existingSalesCount = await db.sale.count();
+
+  if (existingSalesCount === 0 && allArticles.length > 0) {
+    const now = new Date();
+    type PaymentMethodSeed = "WAVE" | "ORANGE_MONEY" | "CASH" | "CREDIT" | "FREE_MONEY";
+    type SaleStatusSeed = "PAID" | "PARTIAL" | "UNPAID";
+
+    const SALE_DEFS: Array<{
+      clientIndex: number;
+      daysAgo: number;
+      status: SaleStatusSeed;
+      paymentMethod: PaymentMethodSeed | null;
+      articleIndexes: number[];
+    }> = [
+      {
+        clientIndex: 0,
+        daysAgo: 2,
+        status: "PAID",
+        paymentMethod: "WAVE",
+        articleIndexes: [0, 4],
+      },
+      {
+        clientIndex: 1,
+        daysAgo: 5,
+        status: "PAID",
+        paymentMethod: "CASH",
+        articleIndexes: [2],
+      },
+      {
+        clientIndex: 2,
+        daysAgo: 7,
+        status: "PARTIAL",
+        paymentMethod: "ORANGE_MONEY",
+        articleIndexes: [1, 3],
+      },
+      {
+        clientIndex: 3,
+        daysAgo: 10,
+        status: "PAID",
+        paymentMethod: "WAVE",
+        articleIndexes: [0],
+      },
+      {
+        clientIndex: 4,
+        daysAgo: 12,
+        status: "UNPAID",
+        paymentMethod: null,
+        articleIndexes: [5],
+      },
+      {
+        clientIndex: 5,
+        daysAgo: 15,
+        status: "PAID",
+        paymentMethod: "CASH",
+        articleIndexes: [6, 7],
+      },
+      {
+        clientIndex: 6,
+        daysAgo: 18,
+        status: "PARTIAL",
+        paymentMethod: "CREDIT",
+        articleIndexes: [1],
+      },
+      {
+        clientIndex: 0,
+        daysAgo: 20,
+        status: "PAID",
+        paymentMethod: "WAVE",
+        articleIndexes: [3, 8],
+      },
+      {
+        clientIndex: 1,
+        daysAgo: 22,
+        status: "PAID",
+        paymentMethod: "FREE_MONEY",
+        articleIndexes: [0],
+      },
+      {
+        clientIndex: 7,
+        daysAgo: 25,
+        status: "UNPAID",
+        paymentMethod: null,
+        articleIndexes: [9],
+      },
+      {
+        clientIndex: 2,
+        daysAgo: 27,
+        status: "PAID",
+        paymentMethod: "CASH",
+        articleIndexes: [4, 6],
+      },
+      {
+        clientIndex: 3,
+        daysAgo: 29,
+        status: "PAID",
+        paymentMethod: "WAVE",
+        articleIndexes: [2, 5],
+      },
+    ];
+
+    let saleCount = 0;
+    for (const sDef of SALE_DEFS) {
+      const soldAt = new Date(now);
+      soldAt.setDate(soldAt.getDate() - sDef.daysAgo);
+
+      const items = sDef.articleIndexes.map((idx) => {
+        const art = allArticles[idx % allArticles.length]!;
+        const qty = Math.floor(Math.random() * 2) + 1;
+        const price = Number(art.price);
+        return {
+          articleId: art.id,
+          articleName: art.name,
+          articleRef: art.reference,
+          unitPrice: price,
+          quantity: qty,
+          discount: 0,
+          totalPrice: price * qty,
+        };
+      });
+
+      const totalAmount = items.reduce((s, it) => s + it.totalPrice, 0);
+      let paidAmount = 0;
+      if (sDef.status === "PAID") paidAmount = totalAmount;
+      else if (sDef.status === "PARTIAL") paidAmount = Math.floor(totalAmount * 0.5);
+
+      const refCount = await db.sale.count();
+      const year = soldAt.getFullYear().toString().slice(-2);
+      const month = String(soldAt.getMonth() + 1).padStart(2, "0");
+      const reference = `VTE-${year}${month}-${String(refCount + 1).padStart(4, "0")}`;
+
+      const sale = await db.sale.create({
+        data: {
+          reference,
+          clientId: clientIds[sDef.clientIndex] ?? null,
+          sellerId: superAdmin.id,
+          status: sDef.status,
+          totalAmount,
+          paidAmount,
+          discountAmount: 0,
+          soldAt,
+          items: { createMany: { data: items.map((it) => ({ ...it })) } },
+        },
+      });
+
+      if (sDef.paymentMethod && paidAmount > 0) {
+        await db.payment.create({
+          data: { saleId: sale.id, method: sDef.paymentMethod, amount: paidAmount },
+        });
+      }
+
+      // Mettre à jour les stats du client
+      if (clientIds[sDef.clientIndex]) {
+        const cId = clientIds[sDef.clientIndex]!;
+        const agg = await db.sale.aggregate({
+          where: {
+            clientId: cId,
+            deletedAt: null,
+            status: { notIn: ["CANCELLED", "REFUNDED"] },
+          },
+          _sum: { totalAmount: true },
+          _count: { id: true },
+          _avg: { totalAmount: true },
+        });
+        await db.client.update({
+          where: { id: cId },
+          data: {
+            totalSpent: agg._sum.totalAmount ?? 0,
+            totalOrders: agg._count.id,
+            averageBasket: agg._avg.totalAmount ?? 0,
+            lastPurchaseAt: soldAt,
+          },
+        });
+      }
+
+      saleCount++;
+    }
+    console.log(`  OK: ${saleCount} ventes de démonstration\n`);
+  } else {
+    console.log(`  SKIP: ${existingSalesCount} vente(s) déjà présente(s)\n`);
+  }
 
   // Résumé
   console.log("=".repeat(60));
