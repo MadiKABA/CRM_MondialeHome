@@ -67,6 +67,7 @@ model User {
   assignedClients    Client[]   @relation("AssignedTo")
   createdClients     Client[]   @relation("CreatedBy")
   invitationsSent    Invitation[] @relation("InvitedBy")
+  createdSegments    Segment[]
 
   @@index([email])
   @@map("users")
@@ -423,17 +424,19 @@ model Segment {
   name        String
   slug        String      @unique
   description String?
-  color       String?
+  color       String?     @default("#8B6914")
   icon        String?
   type        SegmentType @default(DYNAMIC)
-  rules       Json        @default("[]")
+  criteria    Json        @default("{}")
   isSystem    Boolean     @default(false)
   isActive    Boolean     @default(true)
+  autoRefresh Boolean     @default(true)
 
-  memberCount    Int       @default(0)
-  lastComputedAt DateTime?
+  memberCount     Int       @default(0)
+  lastRefreshedAt DateTime?
 
   createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -456,6 +459,7 @@ model SegmentMember {
   client    Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   addedAt DateTime @default(now())
+  addedBy String?
 
   @@unique([segmentId, clientId])
   @@index([segmentId])
@@ -567,60 +571,39 @@ enum ArticleStatus {
 // ============================================================================
 
 model Sale {
-  id            String @id @default(cuid())
-  invoiceNumber String @unique
-
-  clientId String
-  client   Client @relation(fields: [clientId], references: [id])
-  sellerId String?
-  seller   User?  @relation("Seller", fields: [sellerId], references: [id])
-
-  // Montants
-  subtotal     Decimal @db.Decimal(15, 2)
-  discount     Decimal @default(0) @db.Decimal(15, 2)
-  discountType String?
-  tax          Decimal @default(0) @db.Decimal(15, 2)
-  total        Decimal @db.Decimal(15, 2)
-  amountPaid   Decimal @default(0) @db.Decimal(15, 2)
-  amountDue    Decimal @default(0) @db.Decimal(15, 2)
-  currency     String  @default("XOF")
-
-  // Paiement
-  paymentMethod  PaymentMethod?
-  paymentStatus  PaymentStatus @default(PAID)
-  paymentDetails Json          @default("{}")
+  id          String  @id @default(cuid())
+  reference   String  @unique
+  clientId    String?
+  client      Client?  @relation(fields: [clientId], references: [id])
+  sellerId    String?
+  seller      User?    @relation("Seller", fields: [sellerId], references: [id])
+  campaignId  String?
+  campaign    Campaign? @relation(fields: [campaignId], references: [id])
 
   // Statut
-  status SaleStatus @default(COMPLETED)
+  status SaleStatus @default(PENDING)
 
-  // Lieu et source
-  location   String?
-  source     String?
-  campaignId String?
-  campaign   Campaign? @relation(fields: [campaignId], references: [id])
-
-  // Livraison
-  deliveryRequired Boolean  @default(false)
-  deliveryAddress  String?
-  deliveryDate     DateTime?
-  deliveryStatus   String?
+  // Montants
+  totalAmount     Decimal @default(0) @db.Decimal(15, 2)
+  paidAmount      Decimal @default(0) @db.Decimal(15, 2)
+  discountAmount  Decimal @default(0) @db.Decimal(15, 2)
+  discountPercent Float?
+  currency        String  @default("XOF")
 
   // Métadonnées
-  notes    String?
-  metadata Json    @default("{}")
+  notes     String?
+  soldAt    DateTime  @default(now())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  saleDate    DateTime  @default(now())
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  cancelledAt DateTime?
-  refundedAt  DateTime?
-
-  items SaleItem[]
+  items    SaleItem[]
+  payments Payment[]
 
   @@index([clientId])
   @@index([sellerId])
   @@index([campaignId])
-  @@index([saleDate])
+  @@index([soldAt])
   @@index([status])
   @@map("sales")
 }
@@ -637,41 +620,50 @@ enum PaymentMethod {
   OTHER
 }
 
-enum PaymentStatus {
+enum SaleStatus {
+  PENDING
   PAID
   PARTIAL
-  PENDING
-  OVERDUE
-  REFUNDED
-}
-
-enum SaleStatus {
-  DRAFT
-  COMPLETED
+  UNPAID
   CANCELLED
   REFUNDED
-  RETURNED
 }
 
 model SaleItem {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   saleId    String
-  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  articleId String
-  article   Article @relation(fields: [articleId], references: [id])
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  articleId String?
+  article   Article? @relation(fields: [articleId], references: [id])
 
-  quantity  Int
-  unitPrice Decimal @db.Decimal(15, 2)
-  discount  Decimal @default(0) @db.Decimal(15, 2)
-  subtotal  Decimal @db.Decimal(15, 2)
-
-  notes String?
+  // Snapshot immuable au moment de la vente
+  articleName String
+  articleRef  String
+  unitPrice   Decimal @db.Decimal(15, 2)
+  quantity    Int     @default(1)
+  discount    Decimal @default(0) @db.Decimal(15, 2)
+  totalPrice  Decimal @db.Decimal(15, 2)
 
   createdAt DateTime @default(now())
 
   @@index([saleId])
   @@index([articleId])
   @@map("sale_items")
+}
+
+model Payment {
+  id        String        @id @default(cuid())
+  saleId    String
+  sale      Sale          @relation(fields: [saleId], references: [id])
+  method    PaymentMethod
+  amount    Decimal       @db.Decimal(15, 2)
+  reference String?
+  paidAt    DateTime      @default(now())
+  notes     String?
+  createdAt DateTime      @default(now())
+
+  @@index([saleId])
+  @@map("payments")
 }
 
 // ============================================================================

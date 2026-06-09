@@ -1,16 +1,24 @@
-import { Plus } from "lucide-react";
 import { requireAuth, checkPermission } from "@/lib/permissions/server";
 import { getRoles } from "@/features/admin/server/queries/roles.queries";
 import { RoleCard } from "@/features/admin/components/roles/role-card";
-import { Button } from "@/components/ui/button";
+import { CreateRoleDialog } from "@/features/admin/components/roles/create-role-dialog";
+import { db } from "@/lib/db";
 
 export const metadata = { title: "Profils d'accès — Administration" };
 
 export default async function RolesPage() {
-  await requireAuth();
+  const session = await requireAuth();
   await checkPermission("admin.roles.read.all");
 
-  const roles = await getRoles();
+  const [roles, dbUser] = await Promise.all([
+    getRoles(),
+    db.user.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    }),
+  ]);
+
+  const isSuperAdmin = dbUser?.isSuperAdmin ?? false;
 
   return (
     <div className="space-y-6">
@@ -25,10 +33,7 @@ export default async function RolesPage() {
             ce que chaque membre peut faire dans le CRM.
           </p>
         </div>
-        <Button className="bg-gold-deep hover:bg-gold-deep/90 text-cream gap-1.5">
-          <Plus className="size-4" />
-          Nouveau profil
-        </Button>
+        {isSuperAdmin && <CreateRoleDialog />}
       </div>
 
       {/* Bannière info rôles système */}
@@ -41,6 +46,16 @@ export default async function RolesPage() {
         </p>
       </div>
 
+      {!isSuperAdmin && (
+        <div className="border-cream-darker bg-cream/30 rounded-xl border px-5 py-4">
+          <p className="text-text-secondary text-xs leading-relaxed">
+            <span className="text-text-primary font-medium">Lecture seule</span> — vous
+            consultez les profils en lecture seule. Seul le Super Administrateur peut
+            créer, modifier ou supprimer des profils.
+          </p>
+        </div>
+      )}
+
       {/* Grille de cartes */}
       {roles.length === 0 ? (
         <div className="border-cream-darker rounded-xl border py-16 text-center">
@@ -49,7 +64,12 @@ export default async function RolesPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {roles.map((role) => (
-            <RoleCard key={role.id} role={role} />
+            <RoleCard
+              key={role.id}
+              role={role}
+              isSuperAdmin={isSuperAdmin}
+              allRoles={roles}
+            />
           ))}
         </div>
       )}

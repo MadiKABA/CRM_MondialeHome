@@ -29,7 +29,8 @@ async function ArticlesContent({
 }: {
   searchParams: Record<string, string>;
 }) {
-  const filters = articleFiltersSchema.parse(searchParams);
+  const parsed = articleFiltersSchema.safeParse(searchParams);
+  const filters = parsed.success ? parsed.data : articleFiltersSchema.parse({});
   const [result, categories, brands] = await Promise.all([
     getArticles(filters),
     getCategoriesForSelect(),

@@ -3,7 +3,13 @@ import "server-only";
 import { type Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import type { ClientFilters } from "../schemas/client.schema";
-import type { ClientListItemDTO, ClientDetailDTO, PaginatedClients } from "../types";
+import type {
+  ClientListItemDTO,
+  ClientDetailDTO,
+  PaginatedClients,
+  ConsentLogDTO,
+  SellerDTO,
+} from "../types";
 
 type ClientRow = Prisma.ClientGetPayload<{
   select: {
@@ -29,6 +35,8 @@ type ClientRow = Prisma.ClientGetPayload<{
     lastPurchaseAt: true;
     createdAt: true;
     tags: true;
+    assignedToId: true;
+    assignedTo: { select: { id: true; name: true; image: true } };
   };
 }>;
 
@@ -56,6 +64,8 @@ function toListItem(c: ClientRow): ClientListItemDTO {
     lastPurchaseAt: c.lastPurchaseAt,
     createdAt: c.createdAt,
     tags: c.tags,
+    assignedToId: c.assignedToId,
+    assignedTo: c.assignedTo ?? null,
   };
 }
 
@@ -82,9 +92,14 @@ const LIST_SELECT = {
   lastPurchaseAt: true,
   createdAt: true,
   tags: true,
+  assignedToId: true,
+  assignedTo: { select: { id: true, name: true, image: true } },
 } satisfies Prisma.ClientSelect;
 
-function buildWhere(filters: Partial<ClientFilters>): Prisma.ClientWhereInput {
+function buildWhere(
+  filters: Partial<ClientFilters>,
+  currentUserId?: string
+): Prisma.ClientWhereInput {
   return {
     deletedAt: null,
     ...(filters.status && { status: filters.status }),
@@ -96,8 +111,12 @@ function buildWhere(filters: Partial<ClientFilters>): Prisma.ClientWhereInput {
       district: { contains: filters.district, mode: "insensitive" as const },
     }),
     ...(filters.source && { source: filters.source }),
+    ...(filters.tag && { tags: { has: filters.tag } }),
     ...(filters.hasPhone && { phone: { not: null } }),
     ...(filters.hasEmail && { email: { not: null } }),
+    ...(filters.assigned === "me" && currentUserId
+      ? { assignedToId: currentUserId }
+      : {}),
     ...(filters.search && {
       OR: [
         { firstName: { contains: filters.search, mode: "insensitive" as const } },
@@ -111,9 +130,12 @@ function buildWhere(filters: Partial<ClientFilters>): Prisma.ClientWhereInput {
   };
 }
 
-export async function getClients(filters: ClientFilters): Promise<PaginatedClients> {
+export async function getClients(
+  filters: ClientFilters,
+  currentUserId?: string
+): Promise<PaginatedClients> {
   const skip = (filters.page - 1) * filters.limit;
-  const where = buildWhere(filters);
+  const where = buildWhere(filters, currentUserId);
   const orderBy: Prisma.ClientOrderByWithRelationInput = {
     [filters.sortBy]: filters.sortDir,
   };
@@ -144,7 +166,10 @@ export async function getClients(filters: ClientFilters): Promise<PaginatedClien
 }
 
 export async function getClientById(id: string): Promise<ClientDetailDTO | null> {
-  const c = await db.client.findUnique({ where: { id, deletedAt: null } });
+  const c = await db.client.findUnique({
+    where: { id, deletedAt: null },
+    include: { assignedTo: { select: { id: true, name: true, image: true } } },
+  });
   if (!c) return null;
 
   const listItem = toListItem({
@@ -193,6 +218,46 @@ export async function getClientStats() {
     db.client.count({ where: { deletedAt: null, email: { not: null } } }),
   ]);
   return { total, active, vip, withPhone, withEmail };
+}
+
+export async function getAllTags(): Promise<Array<{ tag: string; count: number }>> {
+  const result = await db.$queryRaw<Array<{ tag: string; count: bigint }>>`
+    SELECT tag, COUNT(*) as count
+    FROM clients, unnest(tags) as tag
+    WHERE "deletedAt" IS NULL
+    GROUP BY tag
+    ORDER BY count DESC
+    LIMIT 100
+  `;
+  return result.map((r) => ({ tag: r.tag, count: Number(r.count) }));
+}
+
+export async function getClientConsentLogs(clientId: string): Promise<ConsentLogDTO[]> {
+  const logs = await db.consentLog.findMany({
+    where: { clientId },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    select: {
+      id: true,
+      channel: true,
+      consent: true,
+      reason: true,
+      source: true,
+      createdAt: true,
+    },
+  });
+  return logs as ConsentLogDTO[];
+}
+
+export async function getSellers(): Promise<SellerDTO[]> {
+  return db.user.findMany({
+    where: {
+      isActive: true,
+      deletedAt: null,
+    },
+    select: { id: true, name: true, image: true },
+    orderBy: { name: "asc" },
+  });
 }
 
 export async function getDistinctLocations() {

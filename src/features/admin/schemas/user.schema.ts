@@ -31,7 +31,8 @@ export const createUserSchema = z.object({
   language: z.enum(["fr", "wo"]).default("fr"),
   timezone: z.string().default("Africa/Dakar"),
   roleIds: z.array(z.string().cuid()).min(1, "Au moins un profil est requis"),
-  sendInvitation: z.boolean().default(true),
+  password: z.string().min(8, "Minimum 8 caractères").max(128, "Mot de passe trop long"),
+  sendInvitation: z.boolean().default(false),
 });
 
 export type CreateUserInput = z.input<typeof createUserSchema>;

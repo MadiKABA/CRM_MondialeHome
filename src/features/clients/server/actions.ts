@@ -11,8 +11,24 @@ import { PERMISSIONS } from "@/lib/permissions/constants";
 import {
   clientSchema,
   importRowSchema,
+  updateClientStatusSchema,
+  updateClientConsentSchema,
+  assignClientSchema,
+  bulkUpdateStatusSchema,
+  bulkAddTagSchema,
+  bulkRemoveTagSchema,
+  bulkAssignSchema,
+  bulkDeleteSchema,
   type ClientInput,
   type ImportRow,
+  type UpdateClientStatusInput,
+  type UpdateClientConsentInput,
+  type AssignClientInput,
+  type BulkUpdateStatusInput,
+  type BulkAddTagInput,
+  type BulkRemoveTagInput,
+  type BulkAssignInput,
+  type BulkDeleteInput,
 } from "../schemas/client.schema";
 import type { ImportResult } from "../types";
 
@@ -218,6 +234,341 @@ export async function toggleClientVip(clientId: string, isVip: boolean): Promise
     return { success: true };
   } catch (error) {
     logger.error({ error }, "Failed to toggle VIP");
+    return { success: false, error: "Une erreur est survenue" };
+  }
+}
+
+// ── STATUT RAPIDE ─────────────────────────────────────────────────────────────
+export async function updateClientStatus(
+  input: UpdateClientStatusInput
+): Promise<Result> {
+  try {
+    const user = await getUser();
+    if (!user) return { success: false, error: "Non authentifié" };
+
+    await checkPermission(PERMISSIONS.CLIENTS_UPDATE_ALL);
+
+    const data = updateClientStatusSchema.parse(input);
+
+    await db.$transaction(async (tx) => {
+      await tx.client.update({
+        where: { id: data.clientId },
+        data: {
+          status: data.status,
+          ...(data.status === "UNSUBSCRIBED" && {
+            smsConsent: false,
+            whatsappConsent: false,
+            emailConsent: false,
+          }),
+        },
+      });
+
+      if (data.status === "UNSUBSCRIBED") {
+        await tx.consentLog.createMany({
+          data: (["sms", "whatsapp", "email"] as const).map((channel) => ({
+            clientId: data.clientId,
+            channel,
+            consent: false,
+            reason: data.reason || "Statut UNSUBSCRIBED",
+            source: "admin",
+          })),
+        });
+      }
+    });
+
+    await audit(user.id, `client.status.${data.status.toLowerCase()}`, data.clientId, {
+      status: data.status,
+      reason: data.reason,
+    });
+    revalidatePath("/clients");
+    revalidatePath(`/clients/${data.clientId}`);
+
+    return { success: true };
+  } catch (error) {
+    logger.error({ error }, "Failed to update client status");
+    return { success: false, error: "Une erreur est survenue" };
+  }
+}
+
+// ── CONSENTEMENT ──────────────────────────────────────────────────────────────
+export async function updateClientConsent(
+  input: UpdateClientConsentInput
+): Promise<Result> {
+  try {
+    const user = await getUser();
+    if (!user) return { success: false, error: "Non authentifié" };
+
+    await checkPermission(PERMISSIONS.CLIENTS_UPDATE_ALL);
+
+    const data = updateClientConsentSchema.parse(input);
+
+    const consentField = {
+      sms: "smsConsent",
+      whatsapp: "whatsappConsent",
+      email: "emailConsent",
+    }[data.channel] as "smsConsent" | "whatsappConsent" | "emailConsent";
+
+    await db.$transaction(async (tx) => {
+      await tx.client.update({
+        where: { id: data.clientId },
+        data: { [consentField]: data.consent },
+      });
+
+      await tx.consentLog.create({
+        data: {
+          clientId: data.clientId,
+          channel: data.channel,
+          consent: data.consent,
+          reason: data.reason || null,
+          source: "admin",
+        },
+      });
+    });
+
+    await audit(
+      user.id,
+      `client.consent.${data.channel}.${data.consent ? "on" : "off"}`,
+      data.clientId
+    );
+    revalidatePath(`/clients/${data.clientId}`);
+
+    return { success: true };
+  } catch (error) {
+    logger.error({ error }, "Failed to update client consent");
+    return { success: false, error: "Une erreur est survenue" };
+  }
+}
+
+// ── ASSIGNATION ───────────────────────────────────────────────────────────────
+export async function assignClientToUser(input: AssignClientInput): Promise<Result> {
+  try {
+    const user = await getUser();
+    if (!user) return { success: false, error: "Non authentifié" };
+
+    await checkPermission(PERMISSIONS.CLIENTS_UPDATE_ALL);
+
+    const data = assignClientSchema.parse(input);
+
+    await db.client.update({
+      where: { id: data.clientId },
+      data: { assignedToId: data.assignedToId },
+    });
+
+    await audit(user.id, "client.assign", data.clientId, {
+      assignedToId: data.assignedToId,
+    });
+    revalidatePath("/clients");
+    revalidatePath(`/clients/${data.clientId}`);
+
+    return { success: true };
+  } catch (error) {
+    logger.error({ error }, "Failed to assign client");
+    return { success: false, error: "Une erreur est survenue" };
+  }
+}
+
+// ── BULK : CHANGER STATUT ─────────────────────────────────────────────────────
+export async function bulkUpdateStatus(
+  input: BulkUpdateStatusInput
+): Promise<Result<{ updated: number }>> {
+  try {
+    const user = await getUser();
+    if (!user) return { success: false, error: "Non authentifié" };
+
+    await checkPermission(PERMISSIONS.CLIENTS_UPDATE_ALL);
+
+    const data = bulkUpdateStatusSchema.parse(input);
+
+    await db.$transaction(async (tx) => {
+      await tx.client.updateMany({
+        where: { id: { in: data.clientIds }, deletedAt: null },
+        data: {
+          status: data.status,
+          ...(data.status === "UNSUBSCRIBED" && {
+            smsConsent: false,
+            whatsappConsent: false,
+            emailConsent: false,
+          }),
+        },
+      });
+
+      if (data.status === "UNSUBSCRIBED") {
+        await tx.consentLog.createMany({
+          data: data.clientIds.flatMap((clientId) =>
+            (["sms", "whatsapp", "email"] as const).map((channel) => ({
+              clientId,
+              channel,
+              consent: false,
+              reason: data.reason,
+              source: "admin_bulk",
+            }))
+          ),
+        });
+      }
+    });
+
+    await audit(user.id, `client.bulk.status.${data.status.toLowerCase()}`, undefined, {
+      count: data.clientIds.length,
+      reason: data.reason,
+    });
+    revalidatePath("/clients");
+
+    return { success: true, data: { updated: data.clientIds.length } };
+  } catch (error) {
+    logger.error({ error }, "Failed to bulk update status");
+    return { success: false, error: "Une erreur est survenue" };
+  }
+}
+
+// ── BULK : AJOUTER TAG ────────────────────────────────────────────────────────
+export async function bulkAddTag(
+  input: BulkAddTagInput
+): Promise<Result<{ updated: number }>> {
+  try {
+    const user = await getUser();
+    if (!user) return { success: false, error: "Non authentifié" };
+
+    await checkPermission(PERMISSIONS.CLIENTS_UPDATE_ALL);
+
+    const data = bulkAddTagSchema.parse(input);
+
+    const clients = await db.client.findMany({
+      where: { id: { in: data.clientIds }, deletedAt: null },
+      select: { id: true, tags: true },
+    });
+
+    const BATCH = 50;
+    let updated = 0;
+    for (let i = 0; i < clients.length; i += BATCH) {
+      const batch = clients.slice(i, i + BATCH);
+      await Promise.all(
+        batch.map(async (c) => {
+          if (!c.tags.includes(data.tag)) {
+            await db.client.update({
+              where: { id: c.id },
+              data: { tags: [...c.tags, data.tag] },
+            });
+            updated++;
+          }
+        })
+      );
+    }
+
+    await audit(user.id, "client.bulk.tag.add", undefined, {
+      tag: data.tag,
+      count: updated,
+    });
+    revalidatePath("/clients");
+
+    return { success: true, data: { updated } };
+  } catch (error) {
+    logger.error({ error }, "Failed to bulk add tag");
+    return { success: false, error: "Une erreur est survenue" };
+  }
+}
+
+// ── BULK : RETIRER TAG ────────────────────────────────────────────────────────
+export async function bulkRemoveTag(
+  input: BulkRemoveTagInput
+): Promise<Result<{ updated: number }>> {
+  try {
+    const user = await getUser();
+    if (!user) return { success: false, error: "Non authentifié" };
+
+    await checkPermission(PERMISSIONS.CLIENTS_UPDATE_ALL);
+
+    const data = bulkRemoveTagSchema.parse(input);
+
+    const clients = await db.client.findMany({
+      where: { id: { in: data.clientIds }, deletedAt: null },
+      select: { id: true, tags: true },
+    });
+
+    const BATCH = 50;
+    let updated = 0;
+    for (let i = 0; i < clients.length; i += BATCH) {
+      const batch = clients.slice(i, i + BATCH);
+      await Promise.all(
+        batch.map(async (c) => {
+          if (c.tags.includes(data.tag)) {
+            await db.client.update({
+              where: { id: c.id },
+              data: { tags: c.tags.filter((t) => t !== data.tag) },
+            });
+            updated++;
+          }
+        })
+      );
+    }
+
+    await audit(user.id, "client.bulk.tag.remove", undefined, {
+      tag: data.tag,
+      count: updated,
+    });
+    revalidatePath("/clients");
+
+    return { success: true, data: { updated } };
+  } catch (error) {
+    logger.error({ error }, "Failed to bulk remove tag");
+    return { success: false, error: "Une erreur est survenue" };
+  }
+}
+
+// ── BULK : ASSIGNER ───────────────────────────────────────────────────────────
+export async function bulkAssign(
+  input: BulkAssignInput
+): Promise<Result<{ updated: number }>> {
+  try {
+    const user = await getUser();
+    if (!user) return { success: false, error: "Non authentifié" };
+
+    await checkPermission(PERMISSIONS.CLIENTS_UPDATE_ALL);
+
+    const data = bulkAssignSchema.parse(input);
+
+    await db.client.updateMany({
+      where: { id: { in: data.clientIds }, deletedAt: null },
+      data: { assignedToId: data.assignedToId },
+    });
+
+    await audit(user.id, "client.bulk.assign", undefined, {
+      assignedToId: data.assignedToId,
+      count: data.clientIds.length,
+    });
+    revalidatePath("/clients");
+
+    return { success: true, data: { updated: data.clientIds.length } };
+  } catch (error) {
+    logger.error({ error }, "Failed to bulk assign");
+    return { success: false, error: "Une erreur est survenue" };
+  }
+}
+
+// ── BULK : SUPPRIMER (soft delete) ────────────────────────────────────────────
+export async function bulkDeleteClients(
+  input: BulkDeleteInput
+): Promise<Result<{ deleted: number }>> {
+  try {
+    const user = await getUser();
+    if (!user) return { success: false, error: "Non authentifié" };
+
+    await checkPermission(PERMISSIONS.CLIENTS_DELETE_ALL);
+
+    const data = bulkDeleteSchema.parse(input);
+
+    await db.client.updateMany({
+      where: { id: { in: data.clientIds }, deletedAt: null },
+      data: { deletedAt: new Date(), status: "DELETED" },
+    });
+
+    await audit(user.id, "client.bulk.delete", undefined, {
+      count: data.clientIds.length,
+    });
+    revalidatePath("/clients");
+
+    return { success: true, data: { deleted: data.clientIds.length } };
+  } catch (error) {
+    logger.error({ error }, "Failed to bulk delete clients");
     return { success: false, error: "Une erreur est survenue" };
   }
 }

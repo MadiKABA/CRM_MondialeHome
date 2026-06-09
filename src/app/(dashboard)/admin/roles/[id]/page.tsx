@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, Shield, Users, Lock, Copy, Trash2 } from "lucide-react";
+import { ChevronRight, Info, Lock, Shield, Users } from "lucide-react";
 import { requireAuth, checkPermission } from "@/lib/permissions/server";
 import { getRoleById } from "@/features/admin/server/queries/roles.queries";
+import { getRoles } from "@/features/admin/server/queries/roles.queries";
 import { PermissionsMatrix } from "@/features/admin/components/roles/permissions-matrix";
+import { RoleDetailActions } from "@/features/admin/components/roles/role-detail-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { db } from "@/lib/db";
 
 export const metadata = { title: "Configuration du profil — Administration" };
 
@@ -14,14 +17,23 @@ interface Props {
 }
 
 export default async function RoleDetailPage({ params }: Props) {
-  await requireAuth();
+  const session = await requireAuth();
   await checkPermission("admin.roles.read.all");
 
   const { id } = await params;
-  const role = await getRoleById(id);
+
+  const [role, allRoles, dbUser] = await Promise.all([
+    getRoleById(id),
+    getRoles(),
+    db.user.findUnique({
+      where: { id: session.user.id },
+      select: { isSuperAdmin: true },
+    }),
+  ]);
+
   if (!role) notFound();
 
-  const canManage = true; // TODO: vérifier permission admin.roles.manage.all côté client
+  const isSuperAdmin = dbUser?.isSuperAdmin ?? false;
 
   return (
     <div className="space-y-6">
@@ -72,36 +84,27 @@ export default async function RoleDetailPage({ params }: Props) {
             </div>
           </div>
 
-          {/* Actions */}
-          {canManage && (
-            <div className="flex shrink-0 gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-cream-darker text-text-secondary gap-1.5 text-xs"
-              >
-                <Copy className="size-3.5" />
-                Dupliquer
-              </Button>
-              {!role.isSystem && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5 border-red-200 text-xs text-red-600 hover:bg-red-50"
-                >
-                  <Trash2 className="size-3.5" />
-                  Supprimer
-                </Button>
-              )}
-            </div>
-          )}
+          {/* Actions super_admin */}
+          {isSuperAdmin && <RoleDetailActions role={role} allRoles={allRoles} />}
         </div>
       </div>
+
+      {/* Bandeau lecture seule pour admin non-superadmin */}
+      {!isSuperAdmin && (
+        <div className="border-cream-darker bg-cream/30 flex items-start gap-3 rounded-xl border px-5 py-4">
+          <Info className="text-text-secondary mt-0.5 size-4 shrink-0" />
+          <p className="text-text-secondary text-xs leading-relaxed">
+            Vous consultez ce profil en lecture seule. Seul le Super Administrateur peut
+            modifier les droits d&apos;accès.
+          </p>
+        </div>
+      )}
 
       {/* Matrice des permissions */}
       <PermissionsMatrix
         roleId={role.id}
         isSystem={role.isSystem}
+        canEdit={isSuperAdmin}
         grantedCodes={role.permissions.map((p) => p.code)}
       />
 

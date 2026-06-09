@@ -24,6 +24,8 @@ export interface ClientListItemDTO {
   lastPurchaseAt: Date | null;
   createdAt: Date;
   tags: string[];
+  assignedToId: string | null;
+  assignedTo: { id: string; name: string; image: string | null } | null;
 }
 
 // ── DTO détail ───────────────────────────────────────────────────────────────
@@ -41,6 +43,23 @@ export interface ClientDetailDTO extends ClientListItemDTO {
   rfmScore: string | null;
   acquisitionDate: Date;
   updatedAt: Date;
+}
+
+// ── DTO Vendeur ───────────────────────────────────────────────────────────────
+export interface SellerDTO {
+  id: string;
+  name: string;
+  image: string | null;
+}
+
+// ── DTO ConsentLog ────────────────────────────────────────────────────────────
+export interface ConsentLogDTO {
+  id: string;
+  channel: "sms" | "whatsapp" | "email";
+  consent: boolean;
+  reason: string | null;
+  source: string | null;
+  createdAt: Date;
 }
 
 // ── Résultat paginé ──────────────────────────────────────────────────────────
