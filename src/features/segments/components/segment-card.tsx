@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition, useState } from "react";
 import { toast } from "sonner";
-import { Eye, RefreshCw, Users2, Trash2, UserPlus } from "lucide-react";
+import { Eye, RefreshCw, Users2, Trash2, UserPlus, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { refreshSegment } from "@/features/segments/server/actions";
 import { DeleteSegmentDialog } from "./delete-segment-dialog";
 import { AddMembersDialog } from "./add-members-dialog";
+import { EditGroupDialog } from "./edit-group-dialog";
+import { EditSegmentDialog } from "./edit-segment-dialog";
 import type { SegmentDTO } from "../types";
 import { CRITERIA_DEFINITIONS } from "../types";
 import { cn } from "@/lib/utils";
@@ -81,6 +83,7 @@ export function SegmentCard({
   const [isRefreshing, startRefresh] = useTransition();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [addMembersOpen, setAddMembersOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const { label: refreshLabel, status: refreshStatus } = formatLastRefreshed(
     segment.lastRefreshedAt
@@ -174,6 +177,18 @@ export function SegmentCard({
             Voir
           </Button>
 
+          {canUpdate && !segment.isSystem && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-cream-darker text-text-secondary hover:bg-cream flex-1 gap-1.5 text-xs"
+              onClick={() => setEditOpen(true)}
+            >
+              <Pencil className="size-3.5" />
+              Modifier
+            </Button>
+          )}
+
           {segment.type === "STATIC" && canManageMembers && (
             <Button
               variant="outline"
@@ -227,6 +242,22 @@ export function SegmentCard({
           onOpenChange={setAddMembersOpen}
           groupId={segment.id}
           groupName={segment.name}
+        />
+      )}
+
+      {segment.type === "STATIC" ? (
+        <EditGroupDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          segment={segment}
+          onSuccess={() => router.refresh()}
+        />
+      ) : (
+        <EditSegmentDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          segment={segment}
+          onSuccess={() => router.refresh()}
         />
       )}
     </>

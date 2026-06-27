@@ -3,11 +3,13 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { RefreshCw, UserPlus, Trash2 } from "lucide-react";
+import { RefreshCw, UserPlus, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SegmentMembers } from "./segment-members";
 import { AddMembersDialog } from "./add-members-dialog";
 import { DeleteSegmentDialog } from "./delete-segment-dialog";
+import { EditGroupDialog } from "./edit-group-dialog";
+import { EditSegmentDialog } from "./edit-segment-dialog";
 import { usePermission } from "@/hooks/use-permission";
 import { PERMISSIONS } from "@/lib/permissions/constants";
 import { refreshSegment } from "@/features/segments/server/actions";
@@ -33,6 +35,7 @@ export function SegmentDetailClient({
   const [isRefreshing, startRefresh] = useTransition();
   const [addMembersOpen, setAddMembersOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const canUpdate = usePermission(PERMISSIONS.SEGMENTS_UPDATE_ALL);
   const canDelete = usePermission(PERMISSIONS.SEGMENTS_DELETE_ALL);
@@ -62,6 +65,18 @@ export function SegmentDetailClient({
     <div className="space-y-4">
       {/* Barre d'actions */}
       <div className="flex flex-wrap items-center gap-2">
+        {canUpdate && !segment.isSystem && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-cream-darker text-text-secondary hover:bg-cream gap-1.5"
+            onClick={() => setEditOpen(true)}
+          >
+            <Pencil className="size-4" />
+            Modifier
+          </Button>
+        )}
+
         {segment.type === "STATIC" && canManageMembers && (
           <Button
             variant="outline"
@@ -130,6 +145,22 @@ export function SegmentDetailClient({
         memberCount={segment.memberCount}
         onDeleted={() => router.push("/segments")}
       />
+
+      {segment.type === "STATIC" ? (
+        <EditGroupDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          segment={segment}
+          onSuccess={() => router.refresh()}
+        />
+      ) : (
+        <EditSegmentDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          segment={segment}
+          onSuccess={() => router.refresh()}
+        />
+      )}
     </div>
   );
 }
