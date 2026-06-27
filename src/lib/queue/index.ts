@@ -1,12 +1,11 @@
 import { Queue } from "bullmq";
 import { redis } from "@/lib/redis";
 
-const connection = redis;
+const connection = redis as NonNullable<typeof redis>;
 
 // ============================================================
 // QUEUES — une par domaine fonctionnel
 // ============================================================
-
 export const QUEUE_NAMES = {
   CAMPAIGNS: "campaigns",
   MESSAGES: "messages",
@@ -18,19 +17,20 @@ export const QUEUE_NAMES = {
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 
-export const queues = {
-  campaigns: new Queue(QUEUE_NAMES.CAMPAIGNS, { connection }),
-  messages: new Queue(QUEUE_NAMES.MESSAGES, { connection }),
-  automations: new Queue(QUEUE_NAMES.AUTOMATIONS, { connection }),
-  imports: new Queue(QUEUE_NAMES.IMPORTS, { connection }),
-  exports: new Queue(QUEUE_NAMES.EXPORTS, { connection }),
-  webhooks: new Queue(QUEUE_NAMES.WEBHOOKS, { connection }),
-} as const;
+export const queues = redis
+  ? ({
+      campaigns: new Queue(QUEUE_NAMES.CAMPAIGNS, { connection }),
+      messages: new Queue(QUEUE_NAMES.MESSAGES, { connection }),
+      automations: new Queue(QUEUE_NAMES.AUTOMATIONS, { connection }),
+      imports: new Queue(QUEUE_NAMES.IMPORTS, { connection }),
+      exports: new Queue(QUEUE_NAMES.EXPORTS, { connection }),
+      webhooks: new Queue(QUEUE_NAMES.WEBHOOKS, { connection }),
+    } as const)
+  : null;
 
 // ============================================================
 // JOB TYPE DEFINITIONS
 // ============================================================
-
 export interface CampaignJobData {
   campaignId: string;
   type: "sms" | "email" | "whatsapp";

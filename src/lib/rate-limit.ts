@@ -12,6 +12,11 @@ export async function checkRateLimit(
   config: RateLimitConfig
 ): Promise<{ allowed: boolean; remaining: number }> {
   try {
+    // Si Redis pas dispo, skip le rate limit
+    if (!redis) {
+      return { allowed: true, remaining: 0 };
+    }
+
     const redisKey = `rl:${config.key}`;
     const current = await redis.incr(redisKey);
     if (current === 1) {

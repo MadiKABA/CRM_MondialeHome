@@ -5,6 +5,11 @@ import { redis } from "@/lib/redis";
 
 logger.info("🚀 Starting CRM workers...");
 
+if (!redis) {
+  logger.warn("Redis not available — workers disabled (no REDIS_URL in dev)");
+  process.exit(0);
+}
+
 const connection = redis;
 
 // ============================================================

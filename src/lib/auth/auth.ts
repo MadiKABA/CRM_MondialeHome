@@ -34,6 +34,17 @@ export const auth = betterAuth({
       }
     : {}),
 
+  user: {
+    additionalFields: {
+      isSuperAdmin: {
+        type: "boolean",
+        defaultValue: false,
+        input: false,
+        fieldName: "isSuperAdmin",
+      },
+    },
+  },
+
   plugins: [
     twoFactor({
       issuer: "Mondial Home CRM",
