@@ -48,19 +48,23 @@ async function audit(
   entityId?: string,
   meta?: Record<string, unknown>
 ) {
-  const h = await headers();
-  await db.auditLog.create({
-    data: {
-      userId,
-      action,
-      entity: "Segment",
-      entityId: entityId ?? null,
-      newValue: (meta ?? Prisma.JsonNull) as Prisma.InputJsonValue,
-      ipAddress: h.get("x-forwarded-for"),
-      userAgent: h.get("user-agent"),
-      status: "success",
-    },
-  });
+  try {
+    const h = await headers();
+    await db.auditLog.create({
+      data: {
+        userId,
+        action,
+        entity: "Segment",
+        entityId: entityId ?? null,
+        newValue: (meta ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+        ipAddress: h.get("x-forwarded-for"),
+        userAgent: h.get("user-agent"),
+        status: "success",
+      },
+    });
+  } catch {
+    // L'audit ne doit jamais faire échouer l'action principale
+  }
 }
 
 // ── CRÉER UN GROUPE STATIQUE ──────────────────────────────────────────────────
@@ -170,6 +174,15 @@ export async function addMembersToGroup(
     const session = await requireAuth();
     const userId = session.user.id;
 
+    const rl = await checkRateLimit({
+      key: `segment_members:${userId}`,
+      limit: 30,
+      windowMs: 60_000,
+    });
+    if (!rl.allowed) {
+      return { success: false, error: "Trop de requêtes. Attendez une minute." };
+    }
+
     await checkPermission(PERMISSIONS.SEGMENTS_MANAGE_MEMBERS_ALL);
 
     const data = addMembersSchema.parse(input);
@@ -231,7 +244,18 @@ export async function addMembersToGroup(
 
 export async function removeMemberFromGroup(input: unknown): Promise<Result> {
   try {
-    await requireAuth();
+    const session = await requireAuth();
+    const userId = session.user.id;
+
+    const rl = await checkRateLimit({
+      key: `segment_members:${userId}`,
+      limit: 30,
+      windowMs: 60_000,
+    });
+    if (!rl.allowed) {
+      return { success: false, error: "Trop de requêtes. Attendez une minute." };
+    }
+
     await checkPermission(PERMISSIONS.SEGMENTS_MANAGE_MEMBERS_ALL);
 
     const data = removeMemberSchema.parse(input);
@@ -265,6 +289,10 @@ export async function removeMemberFromGroup(input: unknown): Promise<Result> {
       data: { memberCount: newCount },
     });
 
+    await audit(userId, "segment.members.remove", data.groupId, {
+      clientId: data.clientId,
+    });
+
     revalidatePath(`/segments/${data.groupId}`);
     return { success: true };
   } catch (error) {
@@ -279,7 +307,18 @@ export async function refreshSegment(
   segmentId: string
 ): Promise<Result<{ memberCount: number }>> {
   try {
-    await requireAuth();
+    const session = await requireAuth();
+    const userId = session.user.id;
+
+    const rl = await checkRateLimit({
+      key: `segment_refresh:${userId}`,
+      limit: 10,
+      windowMs: 60_000,
+    });
+    if (!rl.allowed) {
+      return { success: false, error: "Trop de rafraîchissements. Attendez une minute." };
+    }
+
     await checkPermission(PERMISSIONS.SEGMENTS_UPDATE_ALL);
 
     const segment = await db.segment.findUnique({

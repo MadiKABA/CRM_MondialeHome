@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { getSegmentById } from "@/features/segments/server/queries";
 import { SegmentDetailClient } from "@/features/segments/components/segment-detail-client";
 
+export const dynamic = "force-dynamic";
+
 interface SegmentDetailPageProps {
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string>>;
