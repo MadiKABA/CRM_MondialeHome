@@ -443,6 +443,8 @@ model Segment {
   members   SegmentMember[]
   campaigns Campaign[]
 
+  @@index([type])
+  @@index([isActive])
   @@map("segments")
 }
 

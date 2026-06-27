@@ -20,6 +20,7 @@ interface DeleteSegmentDialogProps {
   onOpenChange: (open: boolean) => void;
   segmentId: string;
   segmentName: string;
+  memberCount?: number;
   onDeleted?: () => void;
 }
 
@@ -28,6 +29,7 @@ export function DeleteSegmentDialog({
   onOpenChange,
   segmentId,
   segmentName,
+  memberCount,
   onDeleted,
 }: DeleteSegmentDialogProps) {
   const [confirmation, setConfirmation] = useState("");
@@ -70,6 +72,17 @@ export function DeleteSegmentDialog({
             Segment à supprimer :{" "}
             <span className="text-text-primary font-semibold">{segmentName}</span>
           </p>
+          {memberCount !== undefined && memberCount > 0 && (
+            <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-400">
+              ⚠️{" "}
+              <strong>
+                {memberCount.toLocaleString("fr-FR")} client
+                {memberCount > 1 ? "s" : ""}
+              </strong>{" "}
+              sera{memberCount > 1 ? "ont" : ""} retiré{memberCount > 1 ? "s" : ""} de ce
+              segment.
+            </p>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="confirm-delete" className="text-sm">
               Tapez{" "}

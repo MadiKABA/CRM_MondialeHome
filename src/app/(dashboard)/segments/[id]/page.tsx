@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getSegmentById } from "@/features/segments/server/queries";
 import { SegmentDetailClient } from "@/features/segments/components/segment-detail-client";
+import { CRITERIA_DEFINITIONS } from "@/features/segments/types";
 
 export const dynamic = "force-dynamic";
 
@@ -97,29 +98,39 @@ export default async function SegmentDetailPage({
               Critères de sélection
             </p>
             <div className="space-y-1.5">
-              {segment.criteria.criteria.map((c, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="text-sm text-emerald-600 dark:text-emerald-400">
-                    ✓
-                  </span>
-                  <span className="text-text-secondary text-sm">
-                    <span className="text-text-primary font-medium">{c.field}</span>{" "}
-                    {c.operator}{" "}
-                    <span className="text-text-primary font-medium">
-                      {String(c.value)}
-                    </span>
-                    {c.value2 != null && (
-                      <span>
-                        {" "}
-                        et{" "}
-                        <span className="text-text-primary font-medium">
-                          {String(c.value2)}
-                        </span>
+              {segment.criteria.criteria.map((c, i) => {
+                const def = CRITERIA_DEFINITIONS.find((d) => d.field === c.field);
+                const op = def?.operators.find((o) => o.value === c.operator);
+                return (
+                  <div key={i} className="flex items-center gap-2">
+                    {i > 0 && (
+                      <span className="text-text-muted text-xs font-medium">
+                        {segment.criteria!.operator === "AND" ? "ET" : "OU"}
                       </span>
                     )}
-                  </span>
-                </div>
-              ))}
+                    <span className="text-text-secondary text-sm">
+                      <span className="text-text-primary font-medium">
+                        {def?.label ?? c.field}
+                      </span>{" "}
+                      <span className="text-text-muted">{op?.label ?? c.operator}</span>{" "}
+                      <span className="text-text-primary font-medium">
+                        {String(c.value)}
+                        {def?.unit ? ` ${def.unit}` : ""}
+                      </span>
+                      {c.value2 != null && (
+                        <>
+                          {" "}
+                          et{" "}
+                          <span className="text-text-primary font-medium">
+                            {String(c.value2)}
+                            {def?.unit ? ` ${def.unit}` : ""}
+                          </span>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
             {segment.lastRefreshedAt && (
               <p className="text-text-muted mt-3 text-xs">

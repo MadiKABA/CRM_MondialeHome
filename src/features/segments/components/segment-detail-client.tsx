@@ -127,6 +127,7 @@ export function SegmentDetailClient({
         onOpenChange={setDeleteOpen}
         segmentId={segment.id}
         segmentName={segment.name}
+        memberCount={segment.memberCount}
         onDeleted={() => router.push("/segments")}
       />
     </div>

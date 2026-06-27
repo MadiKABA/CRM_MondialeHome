@@ -217,6 +217,7 @@ export function SegmentCard({
         onOpenChange={setDeleteOpen}
         segmentId={segment.id}
         segmentName={segment.name}
+        memberCount={segment.memberCount}
         onDeleted={() => router.refresh()}
       />
 

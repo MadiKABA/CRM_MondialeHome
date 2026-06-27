@@ -13,12 +13,25 @@ import type {
 
 // ── Mapper ────────────────────────────────────────────────────────────────────
 
-type SegmentRow = Prisma.SegmentGetPayload<{
-  include: {
-    createdBy: { select: { name: true } };
-    _count: { select: { members: true } };
-  };
-}>;
+type SegmentRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  color: string | null;
+  icon: string | null;
+  type: "STATIC" | "DYNAMIC";
+  isSystem: boolean;
+  isActive: boolean;
+  autoRefresh: boolean;
+  memberCount: number;
+  criteria: Prisma.JsonValue;
+  lastRefreshedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: { name: string | null } | null;
+  _count: { members: number };
+};
 
 function toSegmentDTO(s: SegmentRow): SegmentDTO {
   const criteria =
@@ -49,7 +62,22 @@ function toSegmentDTO(s: SegmentRow): SegmentDTO {
 export async function getAllSegments(): Promise<SegmentListDTO> {
   const all = await db.segment.findMany({
     orderBy: [{ type: "asc" }, { memberCount: "desc" }],
-    include: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      description: true,
+      color: true,
+      icon: true,
+      type: true,
+      isSystem: true,
+      isActive: true,
+      autoRefresh: true,
+      memberCount: true,
+      criteria: true,
+      lastRefreshedAt: true,
+      createdAt: true,
+      updatedAt: true,
       createdBy: { select: { name: true } },
       _count: { select: { members: true } },
     },
@@ -83,7 +111,22 @@ export async function getSegmentById(
 ): Promise<{ segment: SegmentDTO; members: SegmentMemberDTO[]; total: number } | null> {
   const segment = await db.segment.findUnique({
     where: { id },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      description: true,
+      color: true,
+      icon: true,
+      type: true,
+      isSystem: true,
+      isActive: true,
+      autoRefresh: true,
+      memberCount: true,
+      criteria: true,
+      lastRefreshedAt: true,
+      createdAt: true,
+      updatedAt: true,
       createdBy: { select: { name: true } },
       _count: { select: { members: true } },
     },
@@ -98,7 +141,9 @@ export async function getSegmentById(
       skip,
       take: limit,
       orderBy: { addedAt: "desc" },
-      include: {
+      select: {
+        clientId: true,
+        addedAt: true,
         client: {
           select: {
             firstName: true,
