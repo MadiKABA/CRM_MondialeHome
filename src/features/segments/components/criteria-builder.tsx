@@ -349,7 +349,7 @@ export function CriteriaBuilder({ value, onChange }: CriteriaBuilderProps) {
       });
     },
     800,
-     
+
     [JSON.stringify(value.criteria)]
   );
 
@@ -379,9 +379,19 @@ export function CriteriaBuilder({ value, onChange }: CriteriaBuilderProps) {
             {index > 0 && (
               <div className="my-2 flex items-center gap-2">
                 <div className="border-cream-darker flex-1 border-t" />
-                <span className="bg-cream border-cream-darker text-text-muted rounded-full border px-2 py-0.5 text-xs font-medium">
-                  ET
-                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onChange({
+                      ...value,
+                      operator: value.operator === "AND" ? "OR" : "AND",
+                    })
+                  }
+                  className="bg-cream border-cream-darker text-text-secondary hover:border-gold-deep hover:text-gold-deep rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors"
+                  title="Cliquer pour basculer ET / OU"
+                >
+                  {value.operator === "AND" ? "ET" : "OU"}
+                </button>
                 <div className="border-cream-darker flex-1 border-t" />
               </div>
             )}

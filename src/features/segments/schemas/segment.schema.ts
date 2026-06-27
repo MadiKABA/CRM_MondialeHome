@@ -38,7 +38,7 @@ export const criteriaGroupSchema = z.object({
   criteria: z.array(criterionSchema).min(1, "Au moins un critère requis"),
 });
 
-// ── Création groupe statique ──────────────────────────────────────────────────
+// ── Création / mise à jour groupe statique ────────────────────────────────────
 
 export const createGroupSchema = z.object({
   name: z.string().min(2, "Minimum 2 caractères").max(80, "Maximum 80 caractères").trim(),
@@ -93,7 +93,17 @@ export const deleteSegmentSchema = z.object({
   }),
 });
 
+// ── Update schemas (alias des schemas de création) ────────────────────────────
+
+export const updateGroupSchema = createGroupSchema;
+export const updateSegmentSchema = createSegmentSchema;
+
+// ── Types exportés ────────────────────────────────────────────────────────────
+
 export type CreateGroupInput = z.infer<typeof createGroupSchema>;
+export type UpdateGroupInput = z.infer<typeof updateGroupSchema>;
 export type CreateSegmentInput = z.infer<typeof createSegmentSchema>;
+export type UpdateSegmentInput = z.infer<typeof updateSegmentSchema>;
 export type AddMembersInput = z.infer<typeof addMembersSchema>;
+export type RemoveMemberInput = z.infer<typeof removeMemberSchema>;
 export type CriteriaGroup = z.infer<typeof criteriaGroupSchema>;

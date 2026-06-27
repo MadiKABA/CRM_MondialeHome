@@ -11,11 +11,15 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import {
   createGroupSchema,
   createSegmentSchema,
+  updateGroupSchema,
+  updateSegmentSchema,
   addMembersSchema,
   removeMemberSchema,
   deleteSegmentSchema,
   type CreateGroupInput,
+  type UpdateGroupInput,
   type CreateSegmentInput,
+  type UpdateSegmentInput,
   type AddMembersInput,
 } from "../schemas/segment.schema";
 import {
@@ -435,6 +439,153 @@ export async function deleteSegment(input: unknown): Promise<Result> {
     return { success: true };
   } catch (error) {
     logger.error({ error }, "Failed to delete segment");
+    return { success: false, error: "Une erreur est survenue" };
+  }
+}
+
+// ── MODIFIER UN GROUPE STATIQUE ───────────────────────────────────────────────
+
+export async function updateGroup(
+  segmentId: string,
+  input: UpdateGroupInput
+): Promise<Result> {
+  try {
+    const session = await requireAuth();
+    const userId = session.user.id;
+
+    await checkPermission(PERMISSIONS.SEGMENTS_UPDATE_ALL);
+
+    const data = updateGroupSchema.parse(input);
+
+    const existing = await db.segment.findUnique({
+      where: { id: segmentId },
+      select: { type: true },
+    });
+    if (!existing) return { success: false, error: "Groupe introuvable" };
+    if (existing.type !== "STATIC") {
+      return {
+        success: false,
+        error: "Utilisez l'éditeur de segment pour les segments dynamiques",
+      };
+    }
+
+    await db.segment.update({
+      where: { id: segmentId },
+      data: {
+        name: data.name,
+        description: data.description || null,
+        color: data.color,
+        icon: data.icon || null,
+      },
+    });
+
+    await audit(userId, "segment.group.update", segmentId, { name: data.name });
+
+    revalidatePath("/segments");
+    revalidatePath(`/segments/${segmentId}`);
+    return { success: true };
+  } catch (error) {
+    logger.error({ error }, "Failed to update group");
+    return { success: false, error: "Une erreur est survenue" };
+  }
+}
+
+// ── MODIFIER UN SEGMENT DYNAMIQUE ─────────────────────────────────────────────
+
+export async function updateDynamicSegment(
+  segmentId: string,
+  input: UpdateSegmentInput
+): Promise<Result<{ memberCount: number }>> {
+  try {
+    const session = await requireAuth();
+    const userId = session.user.id;
+
+    const rl = await checkRateLimit({
+      key: `create_segment:${userId}`,
+      limit: 20,
+      windowMs: 60_000,
+    });
+    if (!rl.allowed) {
+      return { success: false, error: "Trop de requêtes. Attendez une minute." };
+    }
+
+    await checkPermission(PERMISSIONS.SEGMENTS_UPDATE_ALL);
+
+    const data = updateSegmentSchema.parse(input);
+
+    const existing = await db.segment.findUnique({
+      where: { id: segmentId },
+      select: { type: true },
+    });
+    if (!existing) return { success: false, error: "Segment introuvable" };
+    if (existing.type !== "DYNAMIC") {
+      return { success: false, error: "Ce segment n'est pas dynamique" };
+    }
+
+    await db.segment.update({
+      where: { id: segmentId },
+      data: {
+        name: data.name,
+        description: data.description || null,
+        color: data.color,
+        icon: data.icon || null,
+        criteria: data.criteria as Prisma.InputJsonValue,
+        autoRefresh: data.autoRefresh,
+      },
+    });
+
+    const count = await refreshDynamicSegment(segmentId);
+
+    await audit(userId, "segment.dynamic.update", segmentId, {
+      name: data.name,
+      memberCount: count,
+    });
+
+    revalidatePath("/segments");
+    revalidatePath(`/segments/${segmentId}`);
+    return { success: true, data: { memberCount: count } };
+  } catch (error) {
+    logger.error({ error }, "Failed to update dynamic segment");
+    return { success: false, error: "Une erreur est survenue" };
+  }
+}
+
+// ── TOGGLE ACTIF / INACTIF ────────────────────────────────────────────────────
+
+export async function toggleSegmentActive(
+  segmentId: string,
+  isActive: boolean
+): Promise<Result> {
+  try {
+    const session = await requireAuth();
+    const userId = session.user.id;
+
+    await checkPermission(PERMISSIONS.SEGMENTS_UPDATE_ALL);
+
+    const existing = await db.segment.findUnique({
+      where: { id: segmentId },
+      select: { isSystem: true },
+    });
+    if (!existing) return { success: false, error: "Segment introuvable" };
+    if (existing.isSystem) {
+      return {
+        success: false,
+        error: "Les segments système ne peuvent pas être désactivés",
+      };
+    }
+
+    await db.segment.update({
+      where: { id: segmentId },
+      data: { isActive },
+    });
+
+    await audit(userId, "segment.toggle", segmentId, { isActive });
+
+    revalidatePath("/segments");
+    revalidatePath(`/segments/${segmentId}`);
+    return { success: true };
+  } catch (error) {
+    logger.error({ error }, "Failed to toggle segment");
     return { success: false, error: "Une erreur est survenue" };
   }
 }
