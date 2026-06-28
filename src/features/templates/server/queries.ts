@@ -2,17 +2,16 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { getHeaderConfig } from "../types";
-import type { TemplateDTO, PaginatedTemplates, TemplateProduct } from "../types";
+import type { TemplateDTO, PaginatedTemplates, CampaignArticle } from "../types";
 import type { TemplateFilters } from "../schemas/template.schema";
 
-// ── Select partagé ────────────────────────────────────────────────────────────
+// ── Select partagé (sans products, ctaText, ctaUrl) ──────────────────────────
 
 const TEMPLATE_SELECT = {
   id: true,
   name: true,
   description: true,
   channel: true,
-  category: true,
   campaignType: true,
   productCategory: true,
   language: true,
@@ -20,9 +19,6 @@ const TEMPLATE_SELECT = {
   preheader: true,
   content: true,
   conclusion: true,
-  products: true,
-  ctaText: true,
-  ctaUrl: true,
   variables: true,
   isActive: true,
   isSystem: true,
@@ -42,9 +38,6 @@ function toDTO(
 ): TemplateDTO {
   if (!t) throw new Error("Template is null");
 
-  const products = Array.isArray(t.products)
-    ? (t.products as unknown as TemplateProduct[])
-    : [];
   const campaignType = t.campaignType ?? "Promotion";
 
   return {
@@ -52,7 +45,6 @@ function toDTO(
     name: t.name,
     description: t.description,
     channel: t.channel as "EMAIL" | "SMS" | "WHATSAPP",
-    // campaignType (String) exposé comme "category" dans le DTO
     category: t.campaignType as TemplateDTO["category"],
     productCategory: t.productCategory as TemplateDTO["productCategory"],
     language: t.language,
@@ -60,9 +52,6 @@ function toDTO(
     preheader: t.preheader,
     content: t.content,
     conclusion: t.conclusion,
-    products,
-    ctaText: t.ctaText,
-    ctaUrl: t.ctaUrl,
     variables: t.variables ?? [],
     isActive: t.isActive,
     isSystem: t.isSystem,
@@ -130,7 +119,7 @@ export async function getTemplateById(id: string): Promise<TemplateDTO | null> {
   return t ? toDTO(t as Parameters<typeof toDTO>[0]) : null;
 }
 
-// ── Vérifier l'unicité du nom ─────────────────────────────────────────────────
+// ── Unicité du nom ────────────────────────────────────────────────────────────
 
 export async function isTemplateNameUnique(
   name: string,
@@ -147,7 +136,7 @@ export async function isTemplateNameUnique(
   return !existing;
 }
 
-// ── Templates actifs pour les campagnes (sans pagination) ─────────────────────
+// ── Templates actifs pour les campagnes ───────────────────────────────────────
 
 export async function getActiveEmailTemplates(): Promise<TemplateDTO[]> {
   const templates = await db.template.findMany({
@@ -156,4 +145,42 @@ export async function getActiveEmailTemplates(): Promise<TemplateDTO[]> {
     select: TEMPLATE_SELECT,
   });
   return templates.map((t) => toDTO(t as Parameters<typeof toDTO>[0]));
+}
+
+// ── Articles du catalogue pour un envoi/prévisualisation ─────────────────────
+// Charge les vrais articles depuis le catalogue M2
+
+export async function getArticlesForTemplate(
+  articleIds: string[]
+): Promise<CampaignArticle[]> {
+  if (articleIds.length === 0) return [];
+
+  const safeIds = articleIds.slice(0, 4);
+
+  const articles = await db.article.findMany({
+    where: {
+      id: { in: safeIds },
+      deletedAt: null,
+      NOT: { status: "ARCHIVED" },
+    },
+    select: {
+      id: true,
+      name: true,
+      reference: true,
+      price: true,
+      mainImage: true,
+    },
+  });
+
+  return safeIds
+    .map((id) => articles.find((a) => a.id === id))
+    .filter(Boolean)
+    .map((a) => ({
+      id: a!.id,
+      name: a!.name,
+      reference: a!.reference,
+      price: Number(a!.price),
+      mainImage: a!.mainImage ?? null,
+      linkUrl: null,
+    }));
 }
