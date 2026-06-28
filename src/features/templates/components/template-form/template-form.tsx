@@ -5,7 +5,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Send, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, Save, Loader2, Info } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { EmailPreview } from "../email-preview";
@@ -14,6 +14,10 @@ import { HeaderSelector } from "./header-selector";
 import { SubjectEditor } from "./subject-editor";
 import { ContentEditor } from "./content-editor";
 import { SendTestDialog } from "../send-test-dialog";
+import {
+  CampaignPreviewPanel,
+  type CampaignPreviewData,
+} from "../campaign-preview-panel";
 import {
   createEmailTemplateSchema,
   type CreateEmailTemplateInput,
@@ -24,6 +28,13 @@ import {
   generatePreviewHtml,
 } from "../../server/actions";
 import type { TemplateDTO } from "../../types";
+
+const INITIAL_CAMPAIGN_DATA: CampaignPreviewData = {
+  articles: [],
+  ctaText: "",
+  ctaUrl: "",
+  bannerImageUrl: "",
+};
 
 interface TemplateFormProps {
   mode: "create" | "edit";
@@ -42,6 +53,8 @@ export function TemplateForm({ mode, template }: TemplateFormProps) {
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [sendTestOpen, setSendTestOpen] = useState(false);
+  const [campaignData, setCampaignData] =
+    useState<CampaignPreviewData>(INITIAL_CAMPAIGN_DATA);
   const activeFieldRef = useRef<ActiveFieldRef | null>(null);
 
   const form = useForm<CreateEmailTemplateInput>({
@@ -68,13 +81,28 @@ export function TemplateForm({ mode, template }: TemplateFormProps) {
   const content = form.watch("content");
   const conclusion = form.watch("conclusion");
 
+  // Regénère la preview en temps réel avec les données du formulaire ET les données campagne simulées
   useEffect(() => {
     if (!subject?.trim()) return;
 
     const timer = setTimeout(async () => {
       setIsGenerating(true);
       try {
-        const result = await generatePreviewHtml({ templateData: form.getValues() });
+        const result = await generatePreviewHtml({
+          templateData: form.getValues(),
+          bannerImageUrl: campaignData.bannerImageUrl || null,
+          previewArticles: campaignData.articles.map((a) => ({
+            id: a.id,
+            name: a.name,
+            reference: a.reference,
+            price: a.price,
+            promoPrice: a.promoPrice ?? null,
+            mainImage: a.mainImage || null,
+            linkUrl: a.linkUrl || null,
+          })),
+          ctaText: campaignData.ctaText || null,
+          ctaUrl: campaignData.ctaUrl || null,
+        });
         if (result.success && result.data) {
           setPreviewHtml(result.data.html);
         }
@@ -85,7 +113,7 @@ export function TemplateForm({ mode, template }: TemplateFormProps) {
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject, category, productCategory, content, conclusion]);
+  }, [subject, category, productCategory, content, conclusion, campaignData]);
 
   const handleInsertVariable = (variable: string) => {
     if (!activeFieldRef.current) {
@@ -180,6 +208,20 @@ export function TemplateForm({ mode, template }: TemplateFormProps) {
         </div>
       </div>
 
+      {/* Bandeau informatif architecture */}
+      <div className="border-gold/30 bg-gold-light/20 flex items-start gap-3 rounded-xl border p-3">
+        <Info className="text-gold-deep mt-0.5 size-4 shrink-0" />
+        <div className="text-gold-darker text-sm">
+          <p className="font-medium">Structure réutilisable</p>
+          <p className="text-text-secondary mt-0.5 text-xs">
+            Le template définit la mise en page et les textes fixes. Les{" "}
+            <strong>articles, le bouton CTA et la bannière</strong> seront choisis lors de
+            chaque campagne. Utilisez le panneau &quot;Simuler une campagne&quot;
+            ci-dessous pour les voir dans la prévisualisation.
+          </p>
+        </div>
+      </div>
+
       {/* FormProvider wrap le formulaire pour donner accès au contexte */}
       <FormProvider {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -213,11 +255,7 @@ export function TemplateForm({ mode, template }: TemplateFormProps) {
               <div className="border-cream-darker rounded-xl border bg-white p-4">
                 <SubjectEditor
                   onFocus={(getValue, setValue, pos) => {
-                    activeFieldRef.current = {
-                      getValue,
-                      setValue,
-                      cursorPos: pos,
-                    };
+                    activeFieldRef.current = { getValue, setValue, cursorPos: pos };
                   }}
                 />
               </div>
@@ -249,6 +287,12 @@ export function TemplateForm({ mode, template }: TemplateFormProps) {
                   }}
                 />
               </div>
+
+              {/* Panel de simulation des données campagne (pour la preview uniquement) */}
+              <CampaignPreviewPanel
+                campaignData={campaignData}
+                onChange={setCampaignData}
+              />
             </div>
 
             {/* Colonne preview (2/5) */}
