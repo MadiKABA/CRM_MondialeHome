@@ -269,41 +269,6 @@ export function TemplateDetailPage({ template, permissions }: TemplateDetailPage
               </div>
             </div>
           )}
-
-          {/* Produits */}
-          {template.products.length > 0 && (
-            <div className="border-cream-darker rounded-xl border bg-white p-4">
-              <h2 className="text-text-primary mb-2 text-sm font-semibold">
-                Produits ({template.products.length})
-              </h2>
-              <div className="space-y-2">
-                {template.products.map((product, i) => (
-                  <div
-                    key={product.id ?? i}
-                    className="border-cream-darker rounded-lg border px-3 py-2 text-xs"
-                  >
-                    <p className="text-text-primary font-medium">{product.title}</p>
-                    {product.originalPrice != null && (
-                      <p className="text-text-muted mt-0.5">
-                        {product.promoPrice != null ? (
-                          <>
-                            <span className="text-red-500 line-through">
-                              {product.originalPrice.toLocaleString("fr-FR")} F
-                            </span>{" "}
-                            <span className="text-gold-darker font-semibold">
-                              {product.promoPrice.toLocaleString("fr-FR")} F
-                            </span>
-                          </>
-                        ) : (
-                          `${product.originalPrice.toLocaleString("fr-FR")} F`
-                        )}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Preview email */}

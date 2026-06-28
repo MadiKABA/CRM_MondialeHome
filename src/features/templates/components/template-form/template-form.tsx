@@ -13,8 +13,6 @@ import { VariablesPanel } from "../variables-panel";
 import { HeaderSelector } from "./header-selector";
 import { SubjectEditor } from "./subject-editor";
 import { ContentEditor } from "./content-editor";
-import { ProductsEditor } from "./products-editor";
-import { CtaEditor } from "./cta-editor";
 import { SendTestDialog } from "../send-test-dialog";
 import {
   createEmailTemplateSchema,
@@ -57,10 +55,7 @@ export function TemplateForm({ mode, template }: TemplateFormProps) {
       subject: template?.subject ?? "",
       preheader: template?.preheader ?? "",
       content: template?.content ?? "",
-      products: template?.products ?? [],
       conclusion: template?.conclusion ?? "",
-      ctaText: template?.ctaText ?? "",
-      ctaUrl: template?.ctaUrl ?? "",
     },
   });
 
@@ -72,9 +67,6 @@ export function TemplateForm({ mode, template }: TemplateFormProps) {
   const productCategory = form.watch("productCategory");
   const content = form.watch("content");
   const conclusion = form.watch("conclusion");
-  const ctaText = form.watch("ctaText");
-  const ctaUrl = form.watch("ctaUrl");
-  const products = form.watch("products");
 
   useEffect(() => {
     if (!subject?.trim()) return;
@@ -82,7 +74,7 @@ export function TemplateForm({ mode, template }: TemplateFormProps) {
     const timer = setTimeout(async () => {
       setIsGenerating(true);
       try {
-        const result = await generatePreviewHtml(form.getValues());
+        const result = await generatePreviewHtml({ templateData: form.getValues() });
         if (result.success && result.data) {
           setPreviewHtml(result.data.html);
         }
@@ -93,16 +85,7 @@ export function TemplateForm({ mode, template }: TemplateFormProps) {
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    subject,
-    category,
-    productCategory,
-    content,
-    conclusion,
-    ctaText,
-    ctaUrl,
-    products,
-  ]);
+  }, [subject, category, productCategory, content, conclusion]);
 
   const handleInsertVariable = (variable: string) => {
     if (!activeFieldRef.current) {
@@ -140,7 +123,7 @@ export function TemplateForm({ mode, template }: TemplateFormProps) {
     });
   };
 
-  const allTexts = [subject, content, conclusion, ctaText].filter(Boolean) as string[];
+  const allTexts = [subject, content, conclusion].filter(Boolean) as string[];
 
   return (
     <div className="space-y-4">
@@ -253,11 +236,6 @@ export function TemplateForm({ mode, template }: TemplateFormProps) {
                 />
               </div>
 
-              {/* Produits */}
-              <div className="border-cream-darker rounded-xl border bg-white p-4">
-                <ProductsEditor />
-              </div>
-
               {/* Conclusion */}
               <div className="border-cream-darker rounded-xl border bg-white p-4">
                 <ContentEditor
@@ -270,11 +248,6 @@ export function TemplateForm({ mode, template }: TemplateFormProps) {
                     activeFieldRef.current = { getValue, setValue, cursorPos: pos };
                   }}
                 />
-              </div>
-
-              {/* CTA */}
-              <div className="border-cream-darker rounded-xl border bg-white p-4">
-                <CtaEditor />
               </div>
             </div>
 

@@ -86,14 +86,6 @@ export function TemplateCard({
             {contentPreview}
           </p>
         )}
-
-        {template.products.length > 0 && (
-          <div className="flex items-center gap-1">
-            <span className="text-gold-darker border-gold/20 bg-gold-light/40 rounded-full border px-2 py-0.5 text-[10px] font-medium">
-              {template.products.length} produit(s)
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Méta */}
