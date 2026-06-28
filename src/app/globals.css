@@ -66,6 +66,7 @@
   /* Text semantic tokens */
   --color-text-primary: var(--foreground);
   --color-text-secondary: var(--muted-foreground);
+  --color-text-muted: oklch(0.62 0.02 55);
 
   /* Radius */
   --radius-sm: calc(var(--radius) * 0.6);
@@ -187,6 +188,7 @@
   /* Cream — dark mode */
   --cream: oklch(0.25 0.015 45);
   --cream-darker: oklch(0.32 0.02 45);
+  --color-text-muted: oklch(0.55 0.02 55);
 
   --sidebar: oklch(0.13 0.015 40);
   --sidebar-foreground: oklch(0.93 0.01 60);
