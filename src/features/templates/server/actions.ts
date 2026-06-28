@@ -26,6 +26,7 @@ import {
   type CreateEmailTemplateInput,
 } from "../schemas/template.schema";
 import { isTemplateNameUnique, getTemplateById, getArticlesForTemplate } from "./queries";
+import type { CampaignArticle } from "../types";
 
 type Result<T = void> = { success: true; data?: T } | { success: false; error: string };
 
@@ -495,6 +496,59 @@ export async function generatePreviewHtml(
   } catch (error) {
     logger.error({ error }, "generatePreviewHtml failed");
     return { success: false, error: "Erreur de prévisualisation" };
+  }
+}
+
+// ── RECHERCHE D'ARTICLES POUR LA PRÉVISUALISATION ────────────────────────────
+// Utilisée dans ArticlePicker du CampaignPreviewPanel (simulation côté formulaire).
+
+export async function searchArticlesForPreview(
+  search: string,
+  excludeIds: string[]
+): Promise<Result<CampaignArticle[]>> {
+  try {
+    const user = await getUser();
+    if (!user) return { success: false, error: "Non authentifié" };
+
+    await checkPermission("templates.create.all");
+
+    const articles = await db.article.findMany({
+      where: {
+        deletedAt: null,
+        status: { notIn: ["ARCHIVED", "DISCONTINUED"] },
+        ...(excludeIds.length > 0 && { id: { notIn: excludeIds } }),
+        ...(search.trim() && {
+          OR: [
+            { name: { contains: search, mode: "insensitive" } },
+            { reference: { contains: search, mode: "insensitive" } },
+          ],
+        }),
+      },
+      select: {
+        id: true,
+        name: true,
+        reference: true,
+        price: true,
+        mainImage: true,
+      },
+      take: 20,
+      orderBy: { name: "asc" },
+    });
+
+    return {
+      success: true,
+      data: articles.map((a) => ({
+        id: a.id,
+        name: a.name,
+        reference: a.reference,
+        price: Number(a.price),
+        mainImage: a.mainImage ?? null,
+        linkUrl: null,
+      })),
+    };
+  } catch (error) {
+    logger.error({ error }, "searchArticlesForPreview failed");
+    return { success: false, error: "Erreur de recherche" };
   }
 }
 
