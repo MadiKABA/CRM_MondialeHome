@@ -1,4 +1,4 @@
-// ── Types de campagne et catégories produit ──────────────────────────────────
+// ── Types de campagne ─────────────────────────────────────────────────────────
 
 export const CAMPAIGN_TYPES = [
   "Promotion",
@@ -34,7 +34,6 @@ export interface HeaderConfig {
 }
 
 export const HEADER_CONFIGS: Record<string, HeaderConfig> = {
-  // Promotion
   Promotion_default: {
     icon: "🎁",
     title: "OFFRE SPÉCIALE",
@@ -70,8 +69,6 @@ export const HEADER_CONFIGS: Record<string, HeaderConfig> = {
     bgColor: "#8B6914",
     textColor: "#FFFFFF",
   },
-
-  // Arrivage
   Arrivage_default: {
     icon: "🚚",
     title: "NOUVELLES ARRIVÉES",
@@ -121,8 +118,6 @@ export const HEADER_CONFIGS: Record<string, HeaderConfig> = {
     bgColor: "#3D5A3E",
     textColor: "#FFFFFF",
   },
-
-  // Fidélisation
   Fidélisation_default: {
     icon: "⭐",
     title: "OFFRE EXCLUSIVE",
@@ -130,8 +125,6 @@ export const HEADER_CONFIGS: Record<string, HeaderConfig> = {
     bgColor: "#5C4209",
     textColor: "#F5EFE6",
   },
-
-  // Relance
   Relance_default: {
     icon: "💛",
     title: "VOUS NOUS MANQUEZ",
@@ -139,8 +132,6 @@ export const HEADER_CONFIGS: Record<string, HeaderConfig> = {
     bgColor: "#7C5C2E",
     textColor: "#FFFFFF",
   },
-
-  // Événement
   Événement_default: {
     icon: "🎉",
     title: "ÉVÉNEMENT MONDIAL HOME",
@@ -148,8 +139,6 @@ export const HEADER_CONFIGS: Record<string, HeaderConfig> = {
     bgColor: "#4A2828",
     textColor: "#FFFFFF",
   },
-
-  // Transactionnel
   Transactionnel_default: {
     icon: "📋",
     title: "INFORMATION",
@@ -174,26 +163,26 @@ export function getHeaderConfig(
   );
 }
 
-// ── Produit dans un template ──────────────────────────────────────────────────
+// ── Article fourni par la campagne (depuis le catalogue M2) ───────────────────
+// Les données viennent directement de la table Article en DB
 
-export interface TemplateProduct {
+export interface CampaignArticle {
   id: string;
-  title: string;
-  imageUrl: string | null;
-  originalPrice: number | null;
-  promoPrice: number | null;
-  linkUrl: string | null;
-  discountPercent?: number | null;
+  name: string;
+  reference: string;
+  price: number;
+  promoPrice?: number | null;
+  mainImage?: string | null;
+  linkUrl?: string | null;
 }
 
-// ── DTO Template complet ──────────────────────────────────────────────────────
+// ── DTO Template (structure épurée, sans products/ctaText/ctaUrl) ─────────────
 
 export interface TemplateDTO {
   id: string;
   name: string;
   description: string | null;
   channel: "EMAIL" | "SMS" | "WHATSAPP";
-  // campaignType du DB exposé comme "category" dans le DTO
   category: CampaignType | null;
   productCategory: ProductCategory | null;
   language: string;
@@ -201,9 +190,6 @@ export interface TemplateDTO {
   preheader: string | null;
   content: string | null;
   conclusion: string | null;
-  products: TemplateProduct[];
-  ctaText: string | null;
-  ctaUrl: string | null;
   variables: string[];
   isActive: boolean;
   isSystem: boolean;
@@ -230,10 +216,34 @@ export interface PaginatedTemplates {
   };
 }
 
-// ── Résultat d'un envoi test ──────────────────────────────────────────────────
+// ── Options de construction HTML ──────────────────────────────────────────────
+// Utilisé dans buildEmailHtml() lors de la prévisualisation et de l'envoi
 
-export interface TestEmailResult {
-  success: boolean;
-  error?: string;
-  id?: string;
+export interface BuildEmailOptions {
+  // Depuis le template
+  campaignType: string;
+  productCategory: string | null;
+  subject: string;
+  content: string | null;
+  conclusion: string | null;
+
+  // Depuis la campagne (fournis à chaque utilisation)
+  bannerImageUrl?: string | null;
+  articles?: CampaignArticle[];
+  ctaText?: string | null;
+  ctaUrl?: string | null;
+
+  // Données pour remplacer les variables
+  clientData?: Record<string, string>;
+  campaignVars?: Record<string, string>;
+}
+
+// ── Variables de campagne standard ───────────────────────────────────────────
+
+export interface CampaignVariables {
+  reduction?: string;
+  dateExpiration?: string;
+  codePromo?: string;
+  lien?: string;
+  [key: string]: string | undefined;
 }
