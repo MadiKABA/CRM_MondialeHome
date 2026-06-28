@@ -34,7 +34,7 @@ export function DeleteTemplateDialog({
   const handleDelete = () => {
     if (!template) return;
     startTransition(async () => {
-      const result = await deleteTemplate(template.id);
+      const result = await deleteTemplate({ templateId: template.id });
       if (result.success) {
         toast.success(`Template "${template.name}" supprimé`);
         onSuccess();
