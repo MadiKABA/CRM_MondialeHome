@@ -966,13 +966,6 @@ model Template {
   preheader   String?
   conclusion  String?
 
-  // Produits mis en avant (tableau JSON, max 4)
-  products    Json    @default("[]")
-
-  // Bouton principal
-  ctaText String?
-  ctaUrl  String?
-
   // WhatsApp Meta
   whatsappTemplateName String?
   whatsappStatus       String?
