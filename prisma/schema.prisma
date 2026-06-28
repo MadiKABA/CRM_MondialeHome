@@ -68,6 +68,7 @@ model User {
   createdClients     Client[]   @relation("CreatedBy")
   invitationsSent    Invitation[] @relation("InvitedBy")
   createdSegments    Segment[]
+  createdTemplates   Template[] @relation("TemplateCreator")
 
   @@index([email])
   @@map("users")
@@ -953,11 +954,24 @@ model Template {
   channel     String
   category    TemplateCategory
 
-  // Contenu
+  // Classification email marketing
+  campaignType    String?   // "Promotion" | "Arrivage" | "Fidélisation" | "Relance" | "Événement" | "Transactionnel"
+  productCategory String?   // "Salon / Canapés" | "Chambre / Lits" | etc.
+  language        String    @default("fr")
+
+  // Contenu email
   subject     String?
-  content     String
+  content     String?
   contentHtml String?
   preheader   String?
+  conclusion  String?
+
+  // Produits mis en avant (tableau JSON, max 4)
+  products    Json    @default("[]")
+
+  // Bouton principal
+  ctaText String?
+  ctaUrl  String?
 
   // WhatsApp Meta
   whatsappTemplateName String?
@@ -985,6 +999,7 @@ model Template {
   tags String[]
 
   createdById String?
+  createdBy   User?   @relation("TemplateCreator", fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -992,6 +1007,7 @@ model Template {
 
   @@index([channel])
   @@index([category])
+  @@index([campaignType])
   @@map("templates")
 }
 

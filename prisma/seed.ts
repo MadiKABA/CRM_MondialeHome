@@ -1005,9 +1005,14 @@ interface TemplateDef {
   description: string;
   channel: string;
   category: TemplateCategory;
+  campaignType?: string;
+  productCategory?: string;
   subject?: string;
   content: string;
   contentHtml?: string;
+  conclusion?: string;
+  ctaText?: string;
+  ctaUrl?: string;
   variables: string[];
   isSystem?: boolean;
   fromName?: string;
@@ -1111,6 +1116,112 @@ const TEMPLATE_DEFS: TemplateDef[] = [
       "Bonjour {{prenom}}\n\n*OFFRE SPECIALE Mondial Home*\n\n{{description_offre}}\n\nValable jusqu'au *{{date_fin}}*\nEn magasin uniquement\n\nPour plus d'infos, répondez à ce message !",
     variables: ["prenom", "description_offre", "date_fin"],
     tags: ["promotion", "whatsapp"],
+  },
+  // ── Email marketing (5 templates avec mise en page produits) ───────────────
+  {
+    name: "Promo Soldes Salon",
+    slug: "promo-soldes-salon",
+    description: "Template pour les promotions sur les meubles de salon",
+    channel: "email",
+    category: "PROMOTION",
+    campaignType: "Promotion",
+    productCategory: "Salon / Canapés",
+    subject: "🎁 {{prenom}}, -{{reduction}} sur nos canapés ce weekend !",
+    content:
+      "Bonjour {{prenom}} 👋\n\nNous avons une offre exceptionnelle pour vous sur notre collection salon. Profitez de -{{reduction}} sur une sélection de canapés, tables basses et plus encore.",
+    conclusion:
+      "Offre valable jusqu'au {{date_expiration}}.\n\nÀ très bientôt chez Mondial Home,\nL'équipe {{nom_boutique}}",
+    ctaText: "Voir toute la collection",
+    ctaUrl: "https://mondialhome.sn/salon",
+    variables: ["{{prenom}}", "{{reduction}}", "{{date_expiration}}", "{{nom_boutique}}"],
+    isSystem: true,
+    tags: ["email", "promotion", "salon"],
+  },
+  {
+    name: "Arrivage Nouveaux Canapés",
+    slug: "arrivage-nouveaux-canapes",
+    description: "Annonce d'arrivage de nouveaux canapés",
+    channel: "email",
+    category: "NEW_ARRIVAL",
+    campaignType: "Arrivage",
+    productCategory: "Salon / Canapés",
+    subject: "🛋️ {{prenom}}, de nouveaux canapés viennent d'arriver !",
+    content:
+      "Bonjour {{prenom}} 👋\n\nBonne nouvelle ! Notre nouvelle collection de canapés vient d'arriver en boutique. Des styles modernes, du confort garanti, aux meilleurs prix de Dakar.",
+    conclusion:
+      "Venez nous rendre visite à {{adresse_boutique}}.\n\nL'équipe {{nom_boutique}}",
+    ctaText: "Découvrir la collection",
+    ctaUrl: "https://mondialhome.sn/canapes",
+    variables: ["{{prenom}}", "{{adresse_boutique}}", "{{nom_boutique}}"],
+    isSystem: true,
+    tags: ["email", "arrivage", "salon"],
+  },
+  {
+    name: "Relance Client Inactif",
+    slug: "relance-client-inactif-email",
+    description: "Email de relance pour les clients inactifs depuis 90 jours",
+    channel: "email",
+    category: "REACTIVATION",
+    campaignType: "Relance",
+    subject: "💛 {{prenom}}, vous nous manquez !",
+    content:
+      "Bonjour {{prenom}} 👋\n\nCela fait un moment qu'on ne vous a pas vu chez Mondial Home. Vous nous manquez !\n\nPour marquer vos retrouvailles, nous vous offrons -{{reduction}} sur votre prochain achat. Il vous suffit de mentionner le code {{code_promo}} en caisse.",
+    conclusion:
+      "Offre valable jusqu'au {{date_expiration}}.\n\nÀ très bientôt,\nL'équipe {{nom_boutique}}",
+    ctaText: "Profiter de l'offre",
+    ctaUrl: "https://mondialhome.sn",
+    variables: [
+      "{{prenom}}",
+      "{{reduction}}",
+      "{{code_promo}}",
+      "{{date_expiration}}",
+      "{{nom_boutique}}",
+    ],
+    isSystem: true,
+    tags: ["email", "relance", "reactivation"],
+  },
+  {
+    name: "Offre VIP Exclusive",
+    slug: "offre-vip-exclusive-email",
+    description: "Email réservé aux clients VIP et champions",
+    channel: "email",
+    category: "THANK_YOU",
+    campaignType: "Fidélisation",
+    subject: "⭐ {{prenom}}, votre offre VIP exclusive vous attend",
+    content:
+      "Bonjour {{prenom}} ⭐\n\nEn tant que client privilégié de Mondial Home, vous bénéficiez d'une offre exclusive : -{{reduction}} sur l'ensemble de notre catalogue.\n\nVotre fidélité mérite d'être récompensée. Merci pour votre confiance depuis le début.",
+    conclusion:
+      "Code exclusif : {{code_promo}}\nValable jusqu'au {{date_expiration}}\n\nAvec toute notre gratitude,\nL'équipe {{nom_boutique}}",
+    ctaText: "Profiter de mon avantage VIP",
+    ctaUrl: "https://mondialhome.sn/vip",
+    variables: [
+      "{{prenom}}",
+      "{{reduction}}",
+      "{{code_promo}}",
+      "{{date_expiration}}",
+      "{{nom_boutique}}",
+    ],
+    isSystem: true,
+    tags: ["email", "vip", "fidelisation"],
+  },
+  {
+    name: "Arrivage Collection Chambre",
+    slug: "arrivage-collection-chambre-email",
+    description: "Annonce d'arrivage de mobilier de chambre",
+    channel: "email",
+    category: "NEW_ARRIVAL",
+    campaignType: "Arrivage",
+    productCategory: "Chambre / Lits",
+    subject: "🛏️ {{prenom}}, notre collection chambre est arrivée !",
+    content:
+      "Bonjour {{prenom}} 👋\n\nNotre nouvelle collection chambre vient d'arriver chez Mondial Home ! Lits confortables, armoires spacieuses, tables de chevet élégantes... De quoi transformer votre chambre en havre de paix.",
+    conclusion:
+      "Venez découvrir toute la collection à {{adresse_boutique}}.\n\nÀ bientôt,\nL'équipe {{nom_boutique}}",
+    ctaText: "Voir la collection chambre",
+    ctaUrl: "https://mondialhome.sn/chambre",
+    variables: ["{{prenom}}", "{{adresse_boutique}}", "{{nom_boutique}}"],
+    isSystem: true,
+    tags: ["email", "arrivage", "chambre"],
   },
 ];
 
@@ -1320,9 +1431,15 @@ async function main() {
         description: tplDef.description,
         channel: tplDef.channel,
         category: tplDef.category,
+        campaignType: tplDef.campaignType ?? null,
+        productCategory: tplDef.productCategory ?? null,
+        language: "fr",
         subject: tplDef.subject ?? null,
         content: tplDef.content,
         contentHtml: tplDef.contentHtml ?? null,
+        conclusion: tplDef.conclusion ?? null,
+        ctaText: tplDef.ctaText ?? null,
+        ctaUrl: tplDef.ctaUrl ?? null,
         variables: tplDef.variables,
         isSystem: tplDef.isSystem ?? false,
         isActive: true,
