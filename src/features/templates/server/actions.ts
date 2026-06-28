@@ -11,17 +11,21 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { getResendClient } from "@/lib/email/client";
 import { EMAIL_CONFIG } from "@/lib/email/config";
 import { buildEmailHtml } from "../lib/html-builder";
-import { extractAllTemplateVariables, DEFAULT_TEST_DATA } from "../lib/renderer";
+import {
+  extractAllTemplateVariables,
+  DEFAULT_CLIENT_DATA,
+  DEFAULT_CAMPAIGN_VARS,
+} from "../lib/renderer";
 import { validateTemplateVariables } from "../lib/variables";
 import {
   createEmailTemplateSchema,
   duplicateTemplateSchema,
   deleteTemplateSchema,
   sendTestEmailSchema,
+  previewTemplateSchema,
   type CreateEmailTemplateInput,
 } from "../schemas/template.schema";
-import { isTemplateNameUnique, getTemplateById } from "./queries";
-import type { TemplateProduct } from "../types";
+import { isTemplateNameUnique, getTemplateById, getArticlesForTemplate } from "./queries";
 
 type Result<T = void> = { success: true; data?: T } | { success: false; error: string };
 
@@ -55,11 +59,10 @@ async function auditLog(
       },
     });
   } catch {
-    // Ne pas faire échouer l'action principale si l'audit plante
+    // audit ne doit jamais bloquer l'action principale
   }
 }
 
-// Mapping CampaignType → TemplateCategory enum Prisma
 function toPrismaCategory(campaignType: string | null | undefined): TemplateCategory {
   const map: Record<string, TemplateCategory> = {
     Promotion: "PROMOTION",
@@ -72,7 +75,6 @@ function toPrismaCategory(campaignType: string | null | undefined): TemplateCate
   return campaignType ? (map[campaignType] ?? "OTHER") : "OTHER";
 }
 
-// Génère un slug unique à partir du nom
 function generateSlug(name: string): string {
   return name
     .toLowerCase()
@@ -82,7 +84,7 @@ function generateSlug(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
-// ── CRÉER UN TEMPLATE EMAIL ───────────────────────────────────────────────────
+// ── CRÉER UN TEMPLATE ─────────────────────────────────────────────────────────
 
 export async function createEmailTemplate(
   input: CreateEmailTemplateInput
@@ -111,7 +113,6 @@ export async function createEmailTemplate(
       data.subject,
       data.content,
       data.conclusion,
-      data.ctaText,
     ]);
     if (!varValidation.valid) {
       return {
@@ -120,20 +121,10 @@ export async function createEmailTemplate(
       };
     }
 
-    for (const product of data.products) {
-      if (product.imageUrl && !product.imageUrl.startsWith("https://")) {
-        return {
-          success: false,
-          error: `Image du produit "${product.title}" : URL invalide (doit commencer par https://)`,
-        };
-      }
-    }
-
     const variables = extractAllTemplateVariables({
       subject: data.subject,
       content: data.content,
       conclusion: data.conclusion,
-      ctaText: data.ctaText,
     });
 
     let slug = generateSlug(data.name);
@@ -157,11 +148,6 @@ export async function createEmailTemplate(
         preheader: data.preheader || null,
         content: data.content || null,
         conclusion: data.conclusion || null,
-        products: data.products as TemplateProduct[] as unknown as Parameters<
-          typeof db.template.create
-        >[0]["data"]["products"],
-        ctaText: data.ctaText || null,
-        ctaUrl: data.ctaUrl || null,
         variables,
         isActive: true,
         isSystem: false,
@@ -182,7 +168,7 @@ export async function createEmailTemplate(
   }
 }
 
-// ── MODIFIER UN TEMPLATE EMAIL ────────────────────────────────────────────────
+// ── MODIFIER UN TEMPLATE ──────────────────────────────────────────────────────
 
 export async function updateEmailTemplate(
   templateId: string,
@@ -224,7 +210,6 @@ export async function updateEmailTemplate(
       data.subject,
       data.content,
       data.conclusion,
-      data.ctaText,
     ]);
     if (!varValidation.valid) {
       return {
@@ -237,7 +222,6 @@ export async function updateEmailTemplate(
       subject: data.subject,
       content: data.content,
       conclusion: data.conclusion,
-      ctaText: data.ctaText,
     });
 
     await db.template.update({
@@ -253,11 +237,6 @@ export async function updateEmailTemplate(
         preheader: data.preheader || null,
         content: data.content || null,
         conclusion: data.conclusion || null,
-        products: data.products as TemplateProduct[] as unknown as Parameters<
-          typeof db.template.update
-        >[0]["data"]["products"],
-        ctaText: data.ctaText || null,
-        ctaUrl: data.ctaUrl || null,
         variables,
       },
     });
@@ -311,11 +290,6 @@ export async function duplicateTemplate(input: unknown): Promise<Result<{ id: st
         preheader: source.preheader,
         content: source.content,
         conclusion: source.conclusion,
-        products: source.products as Parameters<
-          typeof db.template.create
-        >[0]["data"]["products"],
-        ctaText: source.ctaText,
-        ctaUrl: source.ctaUrl,
         variables: source.variables,
         isActive: true,
         isSystem: false,
@@ -399,6 +373,7 @@ export async function toggleTemplateActive(
 }
 
 // ── ENVOYER UN EMAIL DE TEST ──────────────────────────────────────────────────
+// Simule une vraie campagne : articles depuis le catalogue M2, CTA et vars de campagne.
 
 export async function sendTestEmail(input: unknown): Promise<Result<{ id: string }>> {
   try {
@@ -423,16 +398,25 @@ export async function sendTestEmail(input: unknown): Promise<Result<{ id: string
     if (!template.subject)
       return { success: false, error: "L'objet de l'email est manquant" };
 
+    const articleIds = data.articleIds ?? [];
+    const articles =
+      articleIds.length > 0 ? await getArticlesForTemplate(articleIds) : [];
+
     const html = buildEmailHtml({
       campaignType: template.category ?? "Promotion",
       productCategory: template.productCategory ?? null,
       subject: template.subject,
       content: template.content,
       conclusion: template.conclusion,
-      products: template.products,
-      ctaText: template.ctaText,
-      ctaUrl: template.ctaUrl,
-      testData: DEFAULT_TEST_DATA,
+      bannerImageUrl: data.bannerImageUrl || null,
+      articles,
+      ctaText: data.ctaText || null,
+      ctaUrl: data.ctaUrl || null,
+      clientData: DEFAULT_CLIENT_DATA,
+      campaignVars: {
+        ...DEFAULT_CAMPAIGN_VARS,
+        ...(data.campaignVars ?? {}),
+      },
     });
 
     const resend = getResendClient();
@@ -450,7 +434,12 @@ export async function sendTestEmail(input: unknown): Promise<Result<{ id: string
 
     logger.info({ id: resendData?.id, to: data.toEmail }, "Test email sent");
 
-    await auditLog(user.id, "template.test_sent", data.templateId, { to: data.toEmail });
+    await auditLog(user.id, "template.test_sent", data.templateId, {
+      to: data.toEmail,
+      articleIds: articleIds,
+      hasCtaUrl: !!data.ctaUrl,
+      hasBanner: !!data.bannerImageUrl,
+    });
 
     return { success: true, data: { id: resendData?.id ?? "" } };
   } catch (error) {
@@ -459,10 +448,11 @@ export async function sendTestEmail(input: unknown): Promise<Result<{ id: string
   }
 }
 
-// ── GÉNÈRER LE HTML D'APERÇU ──────────────────────────────────────────────────
+// ── GÉNÉRER LE HTML DE PRÉVISUALISATION ───────────────────────────────────────
+// Appelée en temps réel depuis le formulaire (debounce 800ms).
 
 export async function generatePreviewHtml(
-  input: CreateEmailTemplateInput
+  input: unknown
 ): Promise<Result<{ html: string }>> {
   try {
     const user = await getUser();
@@ -477,16 +467,28 @@ export async function generatePreviewHtml(
 
     await checkPermission("templates.create.all");
 
+    const data = previewTemplateSchema.parse(input);
+
     const html = buildEmailHtml({
-      campaignType: input.category ?? "Promotion",
-      productCategory: input.productCategory ?? null,
-      subject: input.subject ?? "",
-      content: input.content ?? null,
-      conclusion: input.conclusion ?? null,
-      products: (input.products ?? []) as TemplateProduct[],
-      ctaText: input.ctaText ?? null,
-      ctaUrl: input.ctaUrl ?? null,
-      testData: DEFAULT_TEST_DATA,
+      campaignType: data.templateData.category ?? "Promotion",
+      productCategory: data.templateData.productCategory ?? null,
+      subject: data.templateData.subject ?? "",
+      content: data.templateData.content ?? null,
+      conclusion: data.templateData.conclusion ?? null,
+      bannerImageUrl: data.bannerImageUrl || null,
+      articles: (data.previewArticles ?? []).map((a) => ({
+        id: a.id,
+        name: a.name,
+        reference: a.reference,
+        price: a.price,
+        promoPrice: a.promoPrice ?? null,
+        mainImage: a.mainImage || null,
+        linkUrl: a.linkUrl || null,
+      })),
+      ctaText: data.ctaText || null,
+      ctaUrl: data.ctaUrl || null,
+      clientData: DEFAULT_CLIENT_DATA,
+      campaignVars: DEFAULT_CAMPAIGN_VARS,
     });
 
     return { success: true, data: { html } };
@@ -502,17 +504,15 @@ export async function seedEmailTemplates(): Promise<void> {
   const templates = [
     {
       name: "Promo Soldes Salon",
-      description: "Template pour les promotions sur les meubles de salon",
+      description: "Template promotion pour les meubles de salon",
       campaignType: "Promotion" as const,
       productCategory: "Salon / Canapés",
       subject: "🎁 {{prenom}}, -{{reduction}} sur nos canapés ce weekend !",
       preheader: "Offre valable jusqu'au {{date_expiration}} seulement",
       content:
-        "Bonjour {{prenom}} 👋\n\nNous avons une offre exceptionnelle pour vous sur notre collection salon. Profitez de -{{reduction}} sur une sélection de canapés, tables basses et plus encore.",
+        "Bonjour {{prenom}} 👋\n\nNous avons une offre exceptionnelle sur notre collection salon. Profitez de -{{reduction}} sur une sélection de canapés et tables basses.",
       conclusion:
-        "Offre valable jusqu'au {{date_expiration}}.\n\nÀ très bientôt chez Mondial Home,\nL'équipe {{nom_boutique}}",
-      ctaText: "Voir toute la collection",
-      ctaUrl: "https://mondialhome.sn/salon",
+        "Offre valable jusqu'au {{date_expiration}}.\nCode promo : {{code_promo}}\n\nÀ très bientôt chez Mondial Home,\nL'équipe {{nom_boutique}}",
     },
     {
       name: "Arrivage Nouveaux Canapés",
@@ -522,11 +522,9 @@ export async function seedEmailTemplates(): Promise<void> {
       subject: "🛋️ {{prenom}}, de nouveaux canapés viennent d'arriver !",
       preheader: "Découvrez notre nouvelle collection salon",
       content:
-        "Bonjour {{prenom}} 👋\n\nBonne nouvelle ! Notre nouvelle collection de canapés vient d'arriver en boutique. Des styles modernes, du confort garanti, aux meilleurs prix de Dakar.",
+        "Bonjour {{prenom}} 👋\n\nBonne nouvelle ! Notre nouvelle collection de canapés vient d'arriver en boutique. Des styles modernes, du confort garanti.",
       conclusion:
         "Venez nous rendre visite à {{adresse_boutique}}.\n\nL'équipe {{nom_boutique}}",
-      ctaText: "Découvrir la collection",
-      ctaUrl: "https://mondialhome.sn/canapes",
     },
     {
       name: "Relance Client Inactif",
@@ -534,13 +532,11 @@ export async function seedEmailTemplates(): Promise<void> {
       campaignType: "Relance" as const,
       productCategory: null,
       subject: "💛 {{prenom}}, vous nous manquez !",
-      preheader: "Voici une offre spéciale pour votre retour",
+      preheader: "Une offre spéciale vous attend",
       content:
-        "Bonjour {{prenom}} 👋\n\nCela fait un moment qu'on ne vous a pas vu chez Mondial Home. Vous nous manquez !\n\nPour marquer vos retrouvailles, nous vous offrons -{{reduction}} sur votre prochain achat. Il vous suffit de mentionner le code {{code_promo}} en caisse.",
+        "Bonjour {{prenom}} 👋\n\nCela fait un moment qu'on ne vous a pas vu chez Mondial Home. Pour marquer votre retour, nous vous offrons -{{reduction}} sur votre prochain achat.\n\nCode : {{code_promo}}",
       conclusion:
         "Offre valable jusqu'au {{date_expiration}}.\n\nÀ très bientôt,\nL'équipe {{nom_boutique}}",
-      ctaText: "Profiter de l'offre",
-      ctaUrl: "https://mondialhome.sn",
     },
     {
       name: "Offre VIP Exclusive",
@@ -550,11 +546,9 @@ export async function seedEmailTemplates(): Promise<void> {
       subject: "⭐ {{prenom}}, votre offre VIP exclusive vous attend",
       preheader: "Réservée à nos meilleurs clients",
       content:
-        "Bonjour {{prenom}} ⭐\n\nEn tant que client privilégié de Mondial Home, vous bénéficiez d'une offre exclusive : -{{reduction}} sur l'ensemble de notre catalogue.\n\nVotre fidélité mérite d'être récompensée. Merci pour votre confiance depuis le début.",
+        "Bonjour {{prenom}} ⭐\n\nEn tant que client privilégié de Mondial Home, vous bénéficiez d'une offre exclusive : -{{reduction}} sur l'ensemble de notre catalogue.\n\nVotre fidélité mérite d'être récompensée.",
       conclusion:
         "Code exclusif : {{code_promo}}\nValable jusqu'au {{date_expiration}}\n\nAvec toute notre gratitude,\nL'équipe {{nom_boutique}}",
-      ctaText: "Profiter de mon avantage VIP",
-      ctaUrl: "https://mondialhome.sn/vip",
     },
     {
       name: "Arrivage Collection Chambre",
@@ -564,11 +558,9 @@ export async function seedEmailTemplates(): Promise<void> {
       subject: "🛏️ {{prenom}}, notre collection chambre est arrivée !",
       preheader: "Lits, armoires, tables de chevet...",
       content:
-        "Bonjour {{prenom}} 👋\n\nNotre nouvelle collection chambre vient d'arriver chez Mondial Home ! Lits confortables, armoires spacieuses, tables de chevet élégantes... De quoi transformer votre chambre en havre de paix.",
+        "Bonjour {{prenom}} 👋\n\nNotre nouvelle collection chambre vient d'arriver chez Mondial Home ! Lits confortables, armoires spacieuses... De quoi transformer votre chambre.",
       conclusion:
         "Venez découvrir toute la collection à {{adresse_boutique}}.\n\nÀ bientôt,\nL'équipe {{nom_boutique}}",
-      ctaText: "Voir la collection chambre",
-      ctaUrl: "https://mondialhome.sn/chambre",
     },
   ];
 
@@ -583,7 +575,6 @@ export async function seedEmailTemplates(): Promise<void> {
       subject: tmpl.subject,
       content: tmpl.content,
       conclusion: tmpl.conclusion,
-      ctaText: tmpl.ctaText,
     });
 
     let slug = generateSlug(tmpl.name);
@@ -607,12 +598,12 @@ export async function seedEmailTemplates(): Promise<void> {
         preheader: tmpl.preheader ?? null,
         content: tmpl.content,
         conclusion: tmpl.conclusion,
-        ctaText: tmpl.ctaText ?? null,
-        ctaUrl: tmpl.ctaUrl ?? null,
         variables,
         isActive: true,
         isSystem: true,
       },
     });
   }
+
+  console.log("✅ Templates email seedés (5 templates système)");
 }

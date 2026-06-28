@@ -1011,8 +1011,6 @@ interface TemplateDef {
   content: string;
   contentHtml?: string;
   conclusion?: string;
-  ctaText?: string;
-  ctaUrl?: string;
   variables: string[];
   isSystem?: boolean;
   fromName?: string;
@@ -1131,8 +1129,6 @@ const TEMPLATE_DEFS: TemplateDef[] = [
       "Bonjour {{prenom}} 👋\n\nNous avons une offre exceptionnelle pour vous sur notre collection salon. Profitez de -{{reduction}} sur une sélection de canapés, tables basses et plus encore.",
     conclusion:
       "Offre valable jusqu'au {{date_expiration}}.\n\nÀ très bientôt chez Mondial Home,\nL'équipe {{nom_boutique}}",
-    ctaText: "Voir toute la collection",
-    ctaUrl: "https://mondialhome.sn/salon",
     variables: ["{{prenom}}", "{{reduction}}", "{{date_expiration}}", "{{nom_boutique}}"],
     isSystem: true,
     tags: ["email", "promotion", "salon"],
@@ -1150,8 +1146,6 @@ const TEMPLATE_DEFS: TemplateDef[] = [
       "Bonjour {{prenom}} 👋\n\nBonne nouvelle ! Notre nouvelle collection de canapés vient d'arriver en boutique. Des styles modernes, du confort garanti, aux meilleurs prix de Dakar.",
     conclusion:
       "Venez nous rendre visite à {{adresse_boutique}}.\n\nL'équipe {{nom_boutique}}",
-    ctaText: "Découvrir la collection",
-    ctaUrl: "https://mondialhome.sn/canapes",
     variables: ["{{prenom}}", "{{adresse_boutique}}", "{{nom_boutique}}"],
     isSystem: true,
     tags: ["email", "arrivage", "salon"],
@@ -1168,8 +1162,6 @@ const TEMPLATE_DEFS: TemplateDef[] = [
       "Bonjour {{prenom}} 👋\n\nCela fait un moment qu'on ne vous a pas vu chez Mondial Home. Vous nous manquez !\n\nPour marquer vos retrouvailles, nous vous offrons -{{reduction}} sur votre prochain achat. Il vous suffit de mentionner le code {{code_promo}} en caisse.",
     conclusion:
       "Offre valable jusqu'au {{date_expiration}}.\n\nÀ très bientôt,\nL'équipe {{nom_boutique}}",
-    ctaText: "Profiter de l'offre",
-    ctaUrl: "https://mondialhome.sn",
     variables: [
       "{{prenom}}",
       "{{reduction}}",
@@ -1192,8 +1184,6 @@ const TEMPLATE_DEFS: TemplateDef[] = [
       "Bonjour {{prenom}} ⭐\n\nEn tant que client privilégié de Mondial Home, vous bénéficiez d'une offre exclusive : -{{reduction}} sur l'ensemble de notre catalogue.\n\nVotre fidélité mérite d'être récompensée. Merci pour votre confiance depuis le début.",
     conclusion:
       "Code exclusif : {{code_promo}}\nValable jusqu'au {{date_expiration}}\n\nAvec toute notre gratitude,\nL'équipe {{nom_boutique}}",
-    ctaText: "Profiter de mon avantage VIP",
-    ctaUrl: "https://mondialhome.sn/vip",
     variables: [
       "{{prenom}}",
       "{{reduction}}",
@@ -1217,8 +1207,6 @@ const TEMPLATE_DEFS: TemplateDef[] = [
       "Bonjour {{prenom}} 👋\n\nNotre nouvelle collection chambre vient d'arriver chez Mondial Home ! Lits confortables, armoires spacieuses, tables de chevet élégantes... De quoi transformer votre chambre en havre de paix.",
     conclusion:
       "Venez découvrir toute la collection à {{adresse_boutique}}.\n\nÀ bientôt,\nL'équipe {{nom_boutique}}",
-    ctaText: "Voir la collection chambre",
-    ctaUrl: "https://mondialhome.sn/chambre",
     variables: ["{{prenom}}", "{{adresse_boutique}}", "{{nom_boutique}}"],
     isSystem: true,
     tags: ["email", "arrivage", "chambre"],
@@ -1438,8 +1426,6 @@ async function main() {
         content: tplDef.content,
         contentHtml: tplDef.contentHtml ?? null,
         conclusion: tplDef.conclusion ?? null,
-        ctaText: tplDef.ctaText ?? null,
-        ctaUrl: tplDef.ctaUrl ?? null,
         variables: tplDef.variables,
         isSystem: tplDef.isSystem ?? false,
         isActive: true,
