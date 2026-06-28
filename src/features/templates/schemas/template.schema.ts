@@ -52,7 +52,7 @@ export const createEmailTemplateSchema = z
       .max(100, "Maximum 100 caractères")
       .trim(),
     description: z.string().max(300).optional().or(z.literal("")),
-    language: z.string().default("fr"),
+    language: z.string().min(1),
 
     // Type de campagne → détermine le header
     category: z.enum(CAMPAIGN_TYPES).optional().nullable(),
