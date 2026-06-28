@@ -1,48 +1,9 @@
 import { z } from "zod";
 import { CAMPAIGN_TYPES, PRODUCT_CATEGORIES } from "../types";
 
-// ── Produit dans le template ──────────────────────────────────────────────────
-
-export const templateProductSchema = z
-  .object({
-    id: z.string().min(1),
-    title: z
-      .string()
-      .min(1, "Le titre du produit est requis")
-      .max(100, "Titre trop long"),
-    imageUrl: z
-      .string()
-      .url("URL image invalide")
-      .optional()
-      .nullable()
-      .or(z.literal("")),
-    originalPrice: z.coerce
-      .number()
-      .min(0, "Prix ne peut pas être négatif")
-      .optional()
-      .nullable(),
-    promoPrice: z.coerce.number().min(0).optional().nullable(),
-    linkUrl: z.string().url("URL invalide").optional().nullable().or(z.literal("")),
-  })
-  .refine(
-    (data) => {
-      if (
-        data.promoPrice !== null &&
-        data.promoPrice !== undefined &&
-        data.originalPrice !== null &&
-        data.originalPrice !== undefined
-      ) {
-        return data.promoPrice < data.originalPrice;
-      }
-      return true;
-    },
-    {
-      message: "Le prix promotionnel doit être inférieur au prix normal",
-      path: ["promoPrice"],
-    }
-  );
-
-// ── Création / Modification d'un template email ───────────────────────────────
+// ── Création / Modification d'un template ────────────────────────────────────
+// Le template ne stocke QUE la structure réutilisable.
+// Pas de produits, pas de CTA → fournis par la campagne.
 
 export const createEmailTemplateSchema = z
   .object({
@@ -51,67 +12,72 @@ export const createEmailTemplateSchema = z
       .min(2, "Minimum 2 caractères")
       .max(100, "Maximum 100 caractères")
       .trim(),
-    description: z.string().max(300).optional().or(z.literal("")),
+    description: z
+      .string()
+      .max(300, "Maximum 300 caractères")
+      .optional()
+      .or(z.literal("")),
     language: z.string().min(1),
 
-    // Type de campagne → détermine le header
     category: z.enum(CAMPAIGN_TYPES).optional().nullable(),
     productCategory: z.enum(PRODUCT_CATEGORIES).optional().nullable(),
 
-    // Objet de l'email
     subject: z
       .string()
-      .min(1, "L'objet de l'email est requis")
-      .max(150, "Objet trop long (max 150 caractères)")
+      .min(1, "L'objet est requis")
+      .max(150, "Maximum 150 caractères")
       .trim(),
 
-    // Texte prévisualisation dans la boîte mail
     preheader: z.string().max(100, "Maximum 100 caractères").optional().or(z.literal("")),
 
-    // Corps du message
-    content: z.string().max(5000).optional().or(z.literal("")),
-
-    // Produits mis en avant (1 à 4)
-    products: z.array(templateProductSchema).max(4, "Maximum 4 produits par template"),
-
-    // Conclusion
-    conclusion: z.string().max(2000).optional().or(z.literal("")),
-
-    // Bouton principal
-    ctaText: z.string().max(60, "Texte bouton trop long").optional().or(z.literal("")),
-    ctaUrl: z
+    content: z
       .string()
-      .url("URL du bouton invalide")
+      .max(5000, "Introduction trop longue")
       .optional()
-      .nullable()
+      .or(z.literal("")),
+    conclusion: z
+      .string()
+      .max(2000, "Conclusion trop longue")
+      .optional()
       .or(z.literal("")),
   })
   .refine(
     (data) => {
-      const hasUrl = data.ctaUrl && data.ctaUrl.length > 0;
-      const hasText = data.ctaText && data.ctaText.length > 0;
-      if (hasUrl && !hasText) return false;
-      if (hasText && !hasUrl) return false;
-      return true;
+      const hasContent = !!data.content?.trim();
+      const hasConclusion = !!data.conclusion?.trim();
+      return hasContent || hasConclusion;
     },
     {
-      message: "Le texte et le lien du bouton doivent être renseignés ensemble",
-      path: ["ctaText"],
-    }
-  )
-  .refine(
-    (data) => {
-      const hasContent = data.content && data.content.trim().length > 0;
-      const hasProducts = data.products.length > 0;
-      const hasConclusion = data.conclusion && data.conclusion.trim().length > 0;
-      return hasContent || hasProducts || hasConclusion;
-    },
-    {
-      message:
-        "L'email doit contenir au moins une introduction, un produit ou une conclusion",
+      message: "Le template doit contenir au moins une introduction ou une conclusion",
       path: ["content"],
     }
   );
+
+// ── Prévisualisation (dans le formulaire) ─────────────────────────────────────
+// Accepte des articles et CTA simulés pour reproduire une vraie campagne.
+
+export const previewTemplateSchema = z.object({
+  templateData: createEmailTemplateSchema,
+
+  bannerImageUrl: z.string().url().optional().nullable().or(z.literal("")),
+  ctaText: z.string().max(60).optional().or(z.literal("")),
+  ctaUrl: z.string().url().optional().nullable().or(z.literal("")),
+
+  previewArticles: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        reference: z.string(),
+        price: z.number().min(0),
+        promoPrice: z.number().min(0).optional().nullable(),
+        mainImage: z.string().url().optional().nullable().or(z.literal("")),
+        linkUrl: z.string().url().optional().nullable().or(z.literal("")),
+      })
+    )
+    .max(4)
+    .default([]),
+});
 
 // ── Duplication ───────────────────────────────────────────────────────────────
 
@@ -126,14 +92,42 @@ export const deleteTemplateSchema = z.object({
   templateId: z.string().cuid(),
 });
 
-// ── Envoi d'un email test ─────────────────────────────────────────────────────
+// ── Envoi d'un email test (simule une vraie campagne) ─────────────────────────
 
-export const sendTestEmailSchema = z.object({
-  templateId: z.string().cuid(),
-  toEmail: z.string().min(1, "Email requis").email("Email invalide"),
-});
+export const sendTestEmailSchema = z
+  .object({
+    templateId: z.string().cuid(),
+    toEmail: z.string().email("Email invalide"),
 
-// ── Filtres de liste ──────────────────────────────────────────────────────────
+    bannerImageUrl: z
+      .string()
+      .url("URL bannière invalide")
+      .optional()
+      .nullable()
+      .or(z.literal("")),
+
+    articleIds: z.array(z.string().cuid()).max(4, "Maximum 4 articles").optional(),
+
+    ctaText: z.string().max(60).optional().or(z.literal("")),
+    ctaUrl: z.string().url("URL CTA invalide").optional().nullable().or(z.literal("")),
+
+    campaignVars: z.record(z.string()).optional(),
+  })
+  .refine(
+    (data) => {
+      const hasText = !!data.ctaText?.trim();
+      const hasUrl = !!data.ctaUrl?.trim();
+      if (hasText && !hasUrl) return false;
+      if (hasUrl && !hasText) return false;
+      return true;
+    },
+    {
+      message: "Texte et lien du bouton doivent être renseignés ensemble",
+      path: ["ctaText"],
+    }
+  );
+
+// ── Filtres ───────────────────────────────────────────────────────────────────
 
 export const templateFiltersSchema = z.object({
   search: z.string().optional(),
@@ -146,7 +140,8 @@ export const templateFiltersSchema = z.object({
 // ── Types exportés ────────────────────────────────────────────────────────────
 
 export type CreateEmailTemplateInput = z.infer<typeof createEmailTemplateSchema>;
+export type PreviewTemplateInput = z.infer<typeof previewTemplateSchema>;
+export type SendTestEmailInput = z.infer<typeof sendTestEmailSchema>;
 export type DuplicateTemplateInput = z.infer<typeof duplicateTemplateSchema>;
 export type DeleteTemplateInput = z.infer<typeof deleteTemplateSchema>;
-export type SendTestEmailInput = z.infer<typeof sendTestEmailSchema>;
 export type TemplateFilters = z.infer<typeof templateFiltersSchema>;
