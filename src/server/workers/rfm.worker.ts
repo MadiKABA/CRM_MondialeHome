@@ -5,6 +5,7 @@ import { redis } from "@/lib/redis";
 import { logger } from "@/lib/logger";
 import { calculateRFM } from "@/features/rfm/calculator";
 import { getAllClientsRFMData } from "@/features/rfm/server/queries";
+import { invalidateCache, CACHE_KEYS } from "@/features/dashboard/lib/cache";
 import type { RFMBatchResult } from "@/features/rfm/types";
 
 const QUEUE_NAME = "rfm-calculation";
@@ -116,6 +117,9 @@ export function createRFMWorker(): Worker | null {
           value: JSON.stringify({ ...result, runAt: new Date() }),
         },
       });
+
+      await invalidateCache(CACHE_KEYS.rfmStats());
+      await invalidateCache(CACHE_KEYS.segments());
 
       logger.info(
         { result },
