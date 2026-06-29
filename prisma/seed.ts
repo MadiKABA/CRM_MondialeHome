@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "better-auth/crypto";
+import { calculateRFM } from "../src/features/rfm/calculator";
 
 const db = new PrismaClient();
 
@@ -2274,6 +2275,70 @@ async function main() {
   } else {
     console.log(`  SKIP: ${existingSalesCount} vente(s) déjà présente(s)\n`);
   }
+
+  // Calcul RFM initial
+  console.log("Calcul RFM initial pour tous les clients...");
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+  let rfmCursor = 0;
+  let rfmTotal = 0;
+  while (true) {
+    const clients = await db.client.findMany({
+      where: { deletedAt: null, status: { not: "BLACKLISTED" } },
+      select: { id: true, lastPurchaseAt: true },
+      skip: rfmCursor,
+      take: 500,
+      orderBy: { id: "asc" },
+    });
+    if (clients.length === 0) break;
+
+    const ids = clients.map((c) => c.id);
+    const salesAgg = await db.sale.groupBy({
+      by: ["clientId"],
+      where: {
+        clientId: { in: ids },
+        deletedAt: null,
+        status: { notIn: ["CANCELLED", "REFUNDED"] },
+        soldAt: { gte: twelveMonthsAgo },
+      },
+      _count: { id: true },
+      _sum: { totalAmount: true },
+    });
+    const salesMap = new Map(
+      salesAgg.map((s) => [
+        s.clientId,
+        { orders: s._count.id, revenue: Number(s._sum.totalAmount ?? 0) },
+      ])
+    );
+
+    await db.$transaction(
+      clients.map((c) => {
+        const sales = salesMap.get(c.id);
+        const rfm = calculateRFM({
+          clientId: c.id,
+          lastPurchaseAt: c.lastPurchaseAt,
+          ordersLast12Months: sales?.orders ?? 0,
+          revenueLast12Months: sales?.revenue ?? 0,
+        });
+        return db.client.update({
+          where: { id: c.id },
+          data: {
+            rfmScore: rfm.profile,
+            rfmRecency: rfm.r,
+            rfmFrequency: rfm.f,
+            rfmMonetary: rfm.m,
+            rfmCalculatedAt: new Date(),
+          },
+        });
+      })
+    );
+
+    rfmTotal += clients.length;
+    if (clients.length < 500) break;
+    rfmCursor += 500;
+  }
+  console.log(`  OK: RFM calculé pour ${rfmTotal} clients\n`);
 
   // Résumé
   console.log("=".repeat(60));
