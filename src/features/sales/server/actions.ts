@@ -19,6 +19,7 @@ import {
 import { generateSaleReference } from "./queries";
 import { auditSale } from "./audit";
 import { recalculateClientRFM } from "@/features/rfm/server/actions";
+import { invalidateDashboardAfterSale } from "@/features/dashboard/server/actions";
 
 type Result<T = void> = { success: true; data?: T } | { success: false; error: string };
 
@@ -216,6 +217,7 @@ export async function createSale(
     // 10. REVALIDATION
     revalidatePath("/sales");
     if (data.clientId) revalidatePath(`/clients/${data.clientId}`);
+    void invalidateDashboardAfterSale();
 
     return { success: true, data: { id: sale.id, reference } };
   } catch (error) {
@@ -391,6 +393,7 @@ export async function cancelSale(input: CancelSaleInput): Promise<Result> {
 
     revalidatePath("/sales");
     if (sale.clientId) revalidatePath(`/clients/${sale.clientId}`);
+    void invalidateDashboardAfterSale();
 
     return { success: true };
   } catch (error) {

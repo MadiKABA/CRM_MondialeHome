@@ -11,6 +11,7 @@ import { PERMISSIONS } from "@/lib/permissions/constants";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { auditSale } from "./audit";
 import { recalculateClientRFM } from "@/features/rfm/server/actions";
+import { invalidateDashboardAfterSale } from "@/features/dashboard/server/actions";
 import type { MappedSaleGroup } from "../lib/sales-import-mapper";
 
 type Result<T = void> = { success: true; data?: T } | { success: false; error: string };
@@ -318,6 +319,9 @@ export async function importSales(sales: unknown): Promise<Result<ImportSalesRes
 
     revalidatePath("/sales");
     revalidatePath("/clients");
+    void invalidateDashboardAfterSale();
+    void invalidateDashboardAfterSale("year");
+    void invalidateDashboardAfterSale("quarter");
 
     return { success: true, data: result };
   } catch (error) {
