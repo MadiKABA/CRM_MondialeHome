@@ -18,6 +18,7 @@ import {
 } from "../schemas/sale.schema";
 import { generateSaleReference } from "./queries";
 import { auditSale } from "./audit";
+import { recalculateClientRFM } from "@/features/rfm/server/actions";
 
 type Result<T = void> = { success: true; data?: T } | { success: false; error: string };
 
@@ -201,6 +202,7 @@ export async function createSale(
     // 8. STATS CLIENT
     if (data.clientId) {
       await recalculateClientStats(data.clientId);
+      await recalculateClientRFM(data.clientId);
     }
 
     // 9. AUDIT
@@ -302,7 +304,10 @@ export async function addPayment(input: AddPaymentInput): Promise<Result> {
       }),
     ]);
 
-    if (sale.clientId) await recalculateClientStats(sale.clientId);
+    if (sale.clientId) {
+      await recalculateClientStats(sale.clientId);
+      await recalculateClientRFM(sale.clientId);
+    }
 
     await auditSale(user.id, "sale.payment.add", data.saleId, {
       method: data.method,
@@ -373,7 +378,10 @@ export async function cancelSale(input: CancelSaleInput): Promise<Result> {
       },
     });
 
-    if (sale.clientId) await recalculateClientStats(sale.clientId);
+    if (sale.clientId) {
+      await recalculateClientStats(sale.clientId);
+      await recalculateClientRFM(sale.clientId);
+    }
 
     await auditSale(user.id, "sale.cancel", data.saleId, {
       reference: sale.reference,

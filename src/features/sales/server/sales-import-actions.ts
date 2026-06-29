@@ -10,6 +10,7 @@ import { hasPermission } from "@/lib/permissions/server";
 import { PERMISSIONS } from "@/lib/permissions/constants";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { auditSale } from "./audit";
+import { recalculateClientRFM } from "@/features/rfm/server/actions";
 import type { MappedSaleGroup } from "../lib/sales-import-mapper";
 
 type Result<T = void> = { success: true; data?: T } | { success: false; error: string };
@@ -300,9 +301,10 @@ export async function importSales(sales: unknown): Promise<Result<ImportSalesRes
       }
     }
 
-    // Recalculer les stats de tous les clients affectés
+    // Recalculer les stats et le score RFM de tous les clients affectés
     for (const clientId of clientsToRecalc) {
       await recalculateClientStats(clientId);
+      await recalculateClientRFM(clientId);
     }
 
     // Audit avec IP/userAgent via le helper centralisé
