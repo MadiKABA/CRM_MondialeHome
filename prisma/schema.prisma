@@ -299,6 +299,10 @@ model Client {
   firstPurchaseAt DateTime?
   lastPurchaseAt  DateTime?
   rfmScore        String?
+  rfmRecency      Int?
+  rfmFrequency    Int?
+  rfmMonetary     Int?
+  rfmCalculatedAt DateTime?
 
   // Notes et métadonnées
   notes        String?
@@ -330,6 +334,7 @@ model Client {
   @@index([status])
   @@index([city])
   @@index([isVip])
+  @@index([rfmScore])
   @@map("clients")
 }
 
