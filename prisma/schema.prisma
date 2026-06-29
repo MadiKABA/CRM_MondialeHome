@@ -69,6 +69,7 @@ model User {
   invitationsSent    Invitation[] @relation("InvitedBy")
   createdSegments    Segment[]
   createdTemplates   Template[] @relation("TemplateCreator")
+  emailBatches       EmailBatch[] @relation("EmailBatchCreator")
 
   @@index([email])
   @@map("users")
@@ -327,6 +328,7 @@ model Client {
   consentLogs          ConsentLog[]
   automationExecutions AutomationExecution[]
   categoryPreferences  ClientCategoryPreference[]
+  messageLogs          MessageLog[]
 
   @@unique([phone])
   @@index([email])
@@ -446,8 +448,9 @@ model Segment {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  members   SegmentMember[]
-  campaigns Campaign[]
+  members      SegmentMember[]
+  campaigns    Campaign[]
+  emailBatches EmailBatch[]
 
   @@index([type])
   @@index([isActive])
@@ -925,6 +928,7 @@ enum MessageStatus {
   REJECTED
   UNSUBSCRIBED
   EXPIRED
+  SKIPPED
 }
 
 model MessageEvent {
@@ -1001,7 +1005,8 @@ model Template {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  variants CampaignVariant[]
+  variants     CampaignVariant[]
+  emailBatches EmailBatch[]
 
   @@index([channel])
   @@index([category])
@@ -1315,4 +1320,82 @@ model Webhook {
   updatedAt DateTime @updatedAt
 
   @@map("webhooks")
+}
+
+// ============================================================================
+// SECTION 15 — EMAIL MASSE
+// ============================================================================
+
+enum EmailBatchStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model EmailBatch {
+  id         String  @id @default(cuid())
+  templateId String
+  template   Template @relation(fields: [templateId], references: [id])
+  segmentId  String?
+  segment    Segment? @relation(fields: [segmentId], references: [id])
+
+  campaignData Json
+
+  status         EmailBatchStatus @default(PENDING)
+  totalCount     Int              @default(0)
+  sentCount      Int              @default(0)
+  deliveredCount Int              @default(0)
+  openedCount    Int              @default(0)
+  bouncedCount   Int              @default(0)
+  failedCount    Int              @default(0)
+  clickedCount   Int              @default(0)
+
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  createdById String?
+  createdBy   User?   @relation("EmailBatchCreator", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  messages MessageLog[]
+
+  @@index([status])
+  @@index([templateId])
+  @@index([createdAt])
+  @@map("email_batches")
+}
+
+model MessageLog {
+  id       String      @id @default(cuid())
+  batchId  String?
+  batch    EmailBatch? @relation(fields: [batchId], references: [id])
+  templateId String
+  clientId   String?
+  client     Client?  @relation(fields: [clientId], references: [id])
+
+  email    String
+  status   MessageStatus @default(PENDING)
+  resendId String?       @unique
+
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  openedAt    DateTime?
+  clickedAt   DateTime?
+  bouncedAt   DateTime?
+
+  errorMessage String?
+  metadata     Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([batchId])
+  @@index([clientId])
+  @@index([status])
+  @@index([resendId])
+  @@index([email])
+  @@map("message_logs")
 }
