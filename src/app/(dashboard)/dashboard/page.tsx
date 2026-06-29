@@ -1,31 +1,43 @@
+export const dynamic = "force-dynamic";
+
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { Suspense } from "react";
+import { auth } from "@/lib/auth/auth";
+import { getFullDashboardData } from "@/features/dashboard/server/queries";
+import { DashboardShell } from "@/features/dashboard/components/dashboard-shell";
+import { DashboardSkeleton } from "@/features/dashboard/components/dashboard-skeleton";
+import type { Period } from "@/features/dashboard/types";
 
 export const metadata: Metadata = {
   title: "Tableau de bord",
 };
 
-export default function DashboardPage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold tracking-tight">
-          Tableau de bord
-        </h1>
-        <p className="text-muted-foreground">Bienvenue sur votre CRM Mondial Home.</p>
-      </div>
+const VALID_PERIODS: Period[] = ["today", "week", "month", "quarter", "year"];
 
-      {/* TODO: KPI cards, graphiques, activité récente */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {["Clients", "Ventes", "Campagnes", "Messages"].map((label) => (
-          <div
-            key={label}
-            className="border-border bg-card rounded-xl border p-6 shadow-sm"
-          >
-            <p className="text-muted-foreground text-sm font-medium">{label}</p>
-            <p className="font-heading mt-2 text-3xl font-bold">—</p>
-          </div>
-        ))}
-      </div>
-    </div>
+interface Props {
+  searchParams: Promise<{ period?: string }>;
+}
+
+export default async function DashboardPage({ searchParams }: Props) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) redirect("/login");
+
+  const { period } = await searchParams;
+  const safePeriod: Period = VALID_PERIODS.includes(period as Period)
+    ? (period as Period)
+    : "month";
+
+  const data = await getFullDashboardData(safePeriod);
+
+  return (
+    <Suspense fallback={<DashboardSkeleton />}>
+      <DashboardShell
+        data={data}
+        period={safePeriod}
+        userName={session.user.name ?? session.user.email ?? ""}
+      />
+    </Suspense>
   );
 }
