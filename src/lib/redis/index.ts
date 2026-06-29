@@ -30,3 +30,21 @@ export const redis = (globalForRedis.redis ?? createRedisClient()) as Redis | nu
 if (process.env["NODE_ENV"] !== "production") {
   globalForRedis.redis = redis;
 }
+
+export function getRedisClient(): Redis | null {
+  return redis;
+}
+
+export function isRedisAvailable(): boolean {
+  return !!process.env["REDIS_URL"];
+}
+
+export async function testRedisConnection(): Promise<boolean> {
+  try {
+    if (!redis) return false;
+    await redis.ping();
+    return true;
+  } catch {
+    return false;
+  }
+}

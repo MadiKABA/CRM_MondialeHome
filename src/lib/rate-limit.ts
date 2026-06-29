@@ -55,6 +55,24 @@ export const RATE_LIMITS = {
   IMPORT_CLIENTS: { limit: 3, windowMs: 300_000 },
   EXPORT_CLIENTS: { limit: 5, windowMs: 60_000 },
 
+  // Segments
+  CREATE_SEGMENT: { limit: 20, windowMs: 60_000 },
+  PREVIEW_SEGMENT: { limit: 30, windowMs: 60_000 },
+  REFRESH_SEGMENT: { limit: 10, windowMs: 60_000 },
+
+  // Templates
+  CREATE_TEMPLATE: { limit: 20, windowMs: 60_000 },
+  UPDATE_TEMPLATE: { limit: 30, windowMs: 60_000 },
+  PREVIEW_TEMPLATE: { limit: 60, windowMs: 60_000 },
+  TEST_EMAIL: { limit: 5, windowMs: 60_000 },
+
+  // RFM
+  RFM_RECALC_ALL: { limit: 1, windowMs: 300_000 },
+  RFM_RECALC_ONE: { limit: 20, windowMs: 60_000 },
+
+  // Upload
+  UPLOAD_IMAGE: { limit: 20, windowMs: 60_000 },
+
   // Admin
   CREATE_USER: { limit: 20, windowMs: 60_000 },
   UPDATE_PERMS: { limit: 10, windowMs: 60_000 },
