@@ -2,6 +2,7 @@ import { logger } from "@/lib/logger";
 import { QUEUE_NAMES } from "@/lib/queue";
 import { Worker } from "bullmq";
 import { redis } from "@/lib/redis";
+import { createRFMWorker, scheduleNightlyRFM } from "./rfm.worker";
 
 logger.info("🚀 Starting CRM workers...");
 
@@ -84,7 +85,17 @@ const webhookWorker = new Worker(
   { connection }
 );
 
-const workers = [
+// ============================================================
+// RFM WORKER
+// ============================================================
+const rfmWorker = createRFMWorker();
+if (rfmWorker) {
+  scheduleNightlyRFM().then(() => {
+    logger.info("✅ RFM worker started — nightly at 02:00 UTC");
+  });
+}
+
+const baseWorkers = [
   campaignWorker,
   messageWorker,
   automationWorker,
@@ -93,7 +104,7 @@ const workers = [
   webhookWorker,
 ];
 
-workers.forEach((worker) => {
+baseWorkers.forEach((worker) => {
   worker.on("completed", (job) => {
     logger.info({ jobId: job.id, queue: worker.name }, "Job completed");
   });
@@ -107,7 +118,11 @@ logger.info({ queues: Object.values(QUEUE_NAMES) }, "✅ All workers started");
 // Graceful shutdown
 const shutdown = async () => {
   logger.info("Shutting down workers...");
-  await Promise.all(workers.map((w) => w.close()));
+  const closeAll = [
+    ...baseWorkers.map((w) => w.close()),
+    ...(rfmWorker ? [rfmWorker.close()] : []),
+  ];
+  await Promise.all(closeAll);
   process.exit(0);
 };
 
