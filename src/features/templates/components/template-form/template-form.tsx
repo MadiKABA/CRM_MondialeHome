@@ -105,6 +105,8 @@ export function TemplateForm({ mode, template }: TemplateFormProps) {
         });
         if (result.success && result.data) {
           setPreviewHtml(result.data.html);
+        } else if (!result.success) {
+          console.error("[Preview]", result.error);
         }
       } finally {
         setIsGenerating(false);

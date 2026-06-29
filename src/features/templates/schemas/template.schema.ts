@@ -56,8 +56,20 @@ export const createEmailTemplateSchema = z
 // ── Prévisualisation (dans le formulaire) ─────────────────────────────────────
 // Accepte des articles et CTA simulés pour reproduire une vraie campagne.
 
+// templateData utilise un schéma sans .refine() pour permettre la preview
+// en temps réel avant que l'utilisateur ait rempli content ET conclusion.
 export const previewTemplateSchema = z.object({
-  templateData: createEmailTemplateSchema,
+  templateData: z.object({
+    name: z.string().default("Aperçu"),
+    description: z.string().optional().or(z.literal("")),
+    language: z.string().default("fr"),
+    category: z.enum(CAMPAIGN_TYPES).optional().nullable(),
+    productCategory: z.enum(PRODUCT_CATEGORIES).optional().nullable(),
+    subject: z.string().optional().default(""),
+    preheader: z.string().optional().or(z.literal("")),
+    content: z.string().optional().or(z.literal("")).default(""),
+    conclusion: z.string().optional().or(z.literal("")).default(""),
+  }),
 
   bannerImageUrl: z.string().url().optional().nullable().or(z.literal("")),
   ctaText: z.string().max(60).optional().or(z.literal("")),

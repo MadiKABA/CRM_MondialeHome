@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -22,49 +22,27 @@ import { EmailPreview } from "./email-preview";
 import { SendTestDialog } from "./send-test-dialog";
 import { DeleteTemplateDialog } from "./delete-template-dialog";
 import { DuplicateTemplateDialog } from "./duplicate-template-dialog";
-import { toggleTemplateActive, generatePreviewHtml } from "../server/actions";
+import { toggleTemplateActive } from "../server/actions";
 import type { TemplateDTO } from "../types";
 
 interface TemplateDetailPageProps {
   template: TemplateDTO;
+  previewHtml: string | null;
   permissions: { canUpdate: boolean; canDelete: boolean };
 }
 
-export function TemplateDetailPage({ template, permissions }: TemplateDetailPageProps) {
+export function TemplateDetailPage({
+  template,
+  previewHtml,
+  permissions,
+}: TemplateDetailPageProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [sendTestOpen, setSendTestOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
-  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
 
   const header = template.headerConfig;
-
-  // Charge l'HTML de prévisualisation au montage
-  useEffect(() => {
-    if (!template.subject) return;
-    startTransition(async () => {
-      const result = await generatePreviewHtml({
-        templateData: {
-          name: template.name,
-          language: template.language,
-          subject: template.subject ?? "",
-          category: template.category ?? undefined,
-          productCategory: template.productCategory ?? undefined,
-          content: template.content ?? "",
-          conclusion: template.conclusion ?? "",
-        },
-        bannerImageUrl: null,
-        previewArticles: [],
-        ctaText: null,
-        ctaUrl: null,
-      });
-      if (result.success && result.data) {
-        setPreviewHtml(result.data.html);
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [template.id]);
 
   const handleToggleActive = () => {
     startTransition(async () => {

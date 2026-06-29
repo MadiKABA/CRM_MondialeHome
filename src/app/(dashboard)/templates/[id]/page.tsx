@@ -5,6 +5,11 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth/auth";
 import { hasPermission } from "@/lib/permissions/server";
 import { getTemplateById } from "@/features/templates/server/queries";
+import { buildEmailHtml } from "@/features/templates/lib/html-builder";
+import {
+  DEFAULT_CLIENT_DATA,
+  DEFAULT_CAMPAIGN_VARS,
+} from "@/features/templates/lib/renderer";
 import { TemplateDetailPage } from "@/features/templates/components/template-detail-page";
 
 interface Props {
@@ -24,7 +29,30 @@ export default async function TemplatePage({ params }: Props) {
     hasPermission("templates.delete.all"),
   ]);
 
+  let previewHtml: string | null = null;
+  try {
+    previewHtml = buildEmailHtml({
+      campaignType: template.category ?? "Promotion",
+      productCategory: template.productCategory ?? null,
+      subject: template.subject ?? "",
+      content: template.content ?? null,
+      conclusion: template.conclusion ?? null,
+      articles: [],
+      ctaText: null,
+      ctaUrl: null,
+      bannerImageUrl: null,
+      clientData: DEFAULT_CLIENT_DATA,
+      campaignVars: DEFAULT_CAMPAIGN_VARS,
+    });
+  } catch {
+    // preview non bloquante
+  }
+
   return (
-    <TemplateDetailPage template={template} permissions={{ canUpdate, canDelete }} />
+    <TemplateDetailPage
+      template={template}
+      previewHtml={previewHtml}
+      permissions={{ canUpdate, canDelete }}
+    />
   );
 }
