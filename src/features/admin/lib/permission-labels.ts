@@ -239,6 +239,13 @@ export const PERMISSION_LABELS: Record<PermissionCode, PermissionLabel> = {
     isDangerous: true,
     superAdminOnly: false,
   },
+  "campaigns.cancel.all": {
+    code: "campaigns.cancel.all",
+    label: "Annuler des campagnes",
+    description: "⚠️ Permet d'annuler ou stopper une campagne en cours d'envoi",
+    isDangerous: true,
+    superAdminOnly: false,
+  },
   "campaigns.validate.all": {
     code: "campaigns.validate.all",
     label: "Valider les campagnes",
