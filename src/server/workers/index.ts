@@ -3,6 +3,7 @@ import { QUEUE_NAMES } from "@/lib/queue";
 import { Worker } from "bullmq";
 import { redis } from "@/lib/redis";
 import { createRFMWorker, scheduleNightlyRFM } from "./rfm.worker";
+import { createEmailWorker } from "./email.worker";
 
 logger.info("🚀 Starting CRM workers...");
 
@@ -95,6 +96,14 @@ if (rfmWorker) {
   });
 }
 
+// ============================================================
+// EMAIL WORKER
+// ============================================================
+const emailWorker = createEmailWorker();
+if (emailWorker) {
+  logger.info("✅ Email worker started");
+}
+
 const baseWorkers = [
   campaignWorker,
   messageWorker,
@@ -121,6 +130,7 @@ const shutdown = async () => {
   const closeAll = [
     ...baseWorkers.map((w) => w.close()),
     ...(rfmWorker ? [rfmWorker.close()] : []),
+    ...(emailWorker ? [emailWorker.close()] : []),
   ];
   await Promise.all(closeAll);
   process.exit(0);
