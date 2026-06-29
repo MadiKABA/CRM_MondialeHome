@@ -261,6 +261,14 @@ const PERMISSION_DEFS = [
     category: "Campagnes",
   },
   {
+    code: "campaigns.cancel.all",
+    module: "campaigns",
+    action: "cancel",
+    scope: "all",
+    description: "Annuler des campagnes",
+    category: "Campagnes",
+  },
+  {
     code: "campaigns.validate.all",
     module: "campaigns",
     action: "validate",
@@ -583,6 +591,7 @@ const ROLE_DEFS = [
       "campaigns.update.all",
       "campaigns.delete.all",
       "campaigns.send.all",
+      "campaigns.cancel.all",
       "campaigns.validate.all",
       "segments.read.all",
       "segments.create.all",

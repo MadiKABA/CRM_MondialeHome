@@ -36,12 +36,13 @@ export const PERMISSIONS = {
   SALES_EXPORT_ALL: "sales.export.all",
   SALES_DELETE_ALL: "sales.delete.all",
 
-  // ── CAMPAGNES (6) ───────────────────────────────────────
+  // ── CAMPAGNES (7) ───────────────────────────────────────
   CAMPAIGNS_READ_ALL: "campaigns.read.all",
   CAMPAIGNS_CREATE_ALL: "campaigns.create.all",
   CAMPAIGNS_UPDATE_ALL: "campaigns.update.all",
   CAMPAIGNS_DELETE_ALL: "campaigns.delete.all",
   CAMPAIGNS_SEND_ALL: "campaigns.send.all",
+  CAMPAIGNS_CANCEL_ALL: "campaigns.cancel.all",
   CAMPAIGNS_VALIDATE_ALL: "campaigns.validate.all",
 
   // ── SEGMENTS (6) ────────────────────────────────────────
@@ -131,6 +132,7 @@ export const PERMISSIONS_BY_MODULE: Record<string, PermissionCode[]> = {
     PERMISSIONS.CAMPAIGNS_UPDATE_ALL,
     PERMISSIONS.CAMPAIGNS_DELETE_ALL,
     PERMISSIONS.CAMPAIGNS_SEND_ALL,
+    PERMISSIONS.CAMPAIGNS_CANCEL_ALL,
     PERMISSIONS.CAMPAIGNS_VALIDATE_ALL,
   ],
   segments: [
@@ -186,6 +188,7 @@ export const DANGEROUS_PERMISSIONS = new Set<PermissionCode>([
   PERMISSIONS.SALES_DELETE_ALL,
   PERMISSIONS.CAMPAIGNS_DELETE_ALL,
   PERMISSIONS.CAMPAIGNS_SEND_ALL,
+  PERMISSIONS.CAMPAIGNS_CANCEL_ALL,
   PERMISSIONS.SEGMENTS_DELETE_ALL,
   PERMISSIONS.SEGMENTS_MANAGE_MEMBERS_ALL,
   PERMISSIONS.AUTOMATIONS_DELETE_ALL,
