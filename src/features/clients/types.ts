@@ -41,6 +41,10 @@ export interface ClientDetailDTO extends ClientListItemDTO {
   averageBasket: number;
   firstPurchaseAt: Date | null;
   rfmScore: string | null;
+  rfmRecency: number | null;
+  rfmFrequency: number | null;
+  rfmMonetary: number | null;
+  rfmCalculatedAt: Date | null;
   acquisitionDate: Date;
   updatedAt: Date;
 }

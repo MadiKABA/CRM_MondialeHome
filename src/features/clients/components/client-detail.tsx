@@ -26,6 +26,7 @@ import { StatusChangeDropdown } from "./status-change-dropdown";
 import { ConsentSection } from "./consent-section";
 import { SellerAssignment } from "./seller-assignment";
 import { DeleteClientDialog } from "./delete-client-dialog";
+import { RFMBadge, RFMScoreDetail, RecalculateRFMButton } from "./rfm-badge";
 import { toggleClientVip } from "../server/actions";
 import type {
   ClientDetailDTO,
@@ -199,6 +200,28 @@ export function ClientDetail({ client, consentLogs, sellers }: ClientDetailProps
                 </span>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Score RFM */}
+        <Card className="border-border">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center justify-between text-sm font-semibold">
+              <span className="flex items-center gap-2">
+                <Shield className="text-gold-deep size-4" />
+                Score RFM
+              </span>
+              <RFMBadge profile={client.rfmScore} />
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <RFMScoreDetail
+              r={client.rfmRecency}
+              f={client.rfmFrequency}
+              m={client.rfmMonetary}
+              calculatedAt={client.rfmCalculatedAt}
+            />
+            <RecalculateRFMButton clientId={client.id} />
           </CardContent>
         </Card>
 

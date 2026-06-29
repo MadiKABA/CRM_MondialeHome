@@ -191,6 +191,10 @@ export async function getClientById(id: string): Promise<ClientDetailDTO | null>
     averageBasket: Number(c.averageBasket),
     firstPurchaseAt: c.firstPurchaseAt,
     rfmScore: c.rfmScore,
+    rfmRecency: c.rfmRecency,
+    rfmFrequency: c.rfmFrequency,
+    rfmMonetary: c.rfmMonetary,
+    rfmCalculatedAt: c.rfmCalculatedAt,
     acquisitionDate: c.acquisitionDate,
     updatedAt: c.updatedAt,
   };
