@@ -749,6 +749,25 @@ model Campaign {
   notes String?
   tags  String[]
 
+  // M8 Email Integration
+  templateId   String?
+  template     Template?  @relation("CampaignEmailTemplate", fields: [templateId], references: [id])
+  campaignData Json?
+
+  emailBatchId String?    @unique
+  emailBatch   EmailBatch? @relation(fields: [emailBatchId], references: [id])
+
+  // Taux calculés (mis à jour par le worker)
+  deliveryRate Float?
+  openRate     Float?
+  clickRate    Float?
+  bounceRate   Float?
+
+  // Soft delete
+  deletedAt DateTime?
+
+  updatedById String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -759,6 +778,8 @@ model Campaign {
   @@index([status])
   @@index([scheduledAt])
   @@index([createdById])
+  @@index([templateId])
+  @@index([deletedAt])
   @@map("campaigns")
 }
 
@@ -1005,8 +1026,9 @@ model Template {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  variants     CampaignVariant[]
-  emailBatches EmailBatch[]
+  variants       CampaignVariant[]
+  emailBatches   EmailBatch[]
+  emailCampaigns Campaign[] @relation("CampaignEmailTemplate")
 
   @@index([channel])
   @@index([category])
@@ -1361,6 +1383,7 @@ model EmailBatch {
   updatedAt   DateTime @updatedAt
 
   messages MessageLog[]
+  campaign Campaign?
 
   @@index([status])
   @@index([templateId])
