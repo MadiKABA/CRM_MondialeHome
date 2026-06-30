@@ -27,6 +27,19 @@ import { isTransitionAllowed, DELETABLE_STATUSES } from "../types";
 
 type Result<T = void> = { success: true; data?: T } | { success: false; error: string };
 
+// Normalise un scheduledAt vers ISO complet avec "Z" — défense contre les
+// datetime-local bruts ("2026-07-01T14:30") qui passeraient le client sans conversion.
+function normalizeScheduledAt(value: unknown): string | null | undefined {
+  if (value === null || value === undefined) return value as null | undefined;
+  if (typeof value !== "string") return null;
+  if (/Z$|[+-]\d{2}:\d{2}$/.test(value)) return value;
+  try {
+    return new Date(value).toISOString();
+  } catch {
+    return null;
+  }
+}
+
 async function getUser() {
   const session = await auth.api.getSession({ headers: await headers() });
   return session?.user ?? null;
@@ -75,7 +88,10 @@ export async function createCampaign(
 
     await checkPermission("campaigns.create.all");
 
-    const data = createCampaignSchema.parse(input);
+    const data = createCampaignSchema.parse({
+      ...input,
+      scheduledAt: normalizeScheduledAt(input.scheduledAt),
+    });
 
     const isUnique = await isCampaignNameUnique(data.name);
     if (!isUnique) {
@@ -323,7 +339,11 @@ export async function scheduleCampaign(
 
     await checkPermission("campaigns.send.all");
 
-    const data = scheduleCampaignSchema.parse(input);
+    const raw = input as { campaignId: string; scheduledAt?: unknown };
+    const data = scheduleCampaignSchema.parse({
+      ...raw,
+      scheduledAt: normalizeScheduledAt(raw.scheduledAt),
+    });
 
     const campaign = await getCampaignById(data.campaignId);
     if (!campaign) return { success: false, error: "Campagne introuvable" };
