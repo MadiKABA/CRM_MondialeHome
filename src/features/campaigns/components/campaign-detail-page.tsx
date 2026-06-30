@@ -1,0 +1,161 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft, Pencil, Ban, Send } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CampaignStatusBadge } from "./campaign-status-badge";
+import { CampaignStatsCards } from "./campaign-stats-cards";
+import { CampaignProgressBar } from "./campaign-progress-bar";
+import { CampaignRecipientsTable } from "./campaign-recipients-table";
+import { SendNowDialog } from "./send-now-dialog";
+import { CancelCampaignDialog } from "./cancel-campaign-dialog";
+import type { CampaignDTO } from "../types";
+import type { MessageLogDTO } from "@/features/email-mass/types";
+
+interface Props {
+  campaign: CampaignDTO;
+  recipients: { messages: MessageLogDTO[]; total: number };
+  permissions: {
+    canUpdate: boolean;
+    canSend: boolean;
+    canCancel: boolean;
+    canDelete: boolean;
+  };
+}
+
+export function CampaignDetailPage({ campaign, recipients, permissions }: Props) {
+  const router = useRouter();
+  const [sendOpen, setSendOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+
+  const canSendNow = permissions.canSend && campaign.status === "DRAFT";
+  const canCancel =
+    permissions.canCancel && ["SCHEDULED", "SENDING", "PAUSED"].includes(campaign.status);
+
+  const dateToShow = campaign.scheduledAt ?? campaign.sentAt ?? campaign.createdAt;
+  const dateLabel = campaign.scheduledAt
+    ? "Planifiée pour"
+    : campaign.sentAt
+      ? "Envoyée le"
+      : "Créée le";
+
+  return (
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-3">
+          <Link href="/campagnes">
+            <Button variant="ghost" size="sm" className="text-text-secondary gap-1.5">
+              <ArrowLeft className="size-4" />
+              Campagnes
+            </Button>
+          </Link>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-text-primary font-serif text-xl font-bold">
+                {campaign.name}
+              </h1>
+              <CampaignStatusBadge status={campaign.status} />
+            </div>
+            {campaign.description && (
+              <p className="text-text-muted mt-0.5 text-sm">{campaign.description}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          {canSendNow && (
+            <Button
+              size="sm"
+              onClick={() => setSendOpen(true)}
+              className="bg-gold-deep hover:bg-gold-darker gap-1.5 text-white"
+            >
+              <Send className="size-4" />
+              Envoyer maintenant
+            </Button>
+          )}
+          {canCancel && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCancelOpen(true)}
+              className="gap-1.5 text-red-500 hover:bg-red-50 hover:text-red-700"
+            >
+              <Ban className="size-4" />
+              Annuler
+            </Button>
+          )}
+          {permissions.canUpdate && campaign.status === "DRAFT" && (
+            <Link href={`/campagnes/${campaign.id}/modifier`}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-cream-darker hover:bg-cream gap-1.5"
+              >
+                <Pencil className="size-4" />
+                Modifier
+              </Button>
+            </Link>
+          )}
+        </div>
+      </div>
+
+      <CampaignProgressBar
+        sentCount={campaign.sentCount}
+        totalCount={campaign.totalCount}
+        status={campaign.status}
+      />
+
+      <CampaignStatsCards campaign={campaign} />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="border-cream-darker space-y-2 rounded-xl border bg-white p-4">
+          <p className="text-text-muted text-xs">Segment</p>
+          <p className="text-text-primary text-sm font-medium">
+            {campaign.segmentName} ({campaign.segmentCount} clients)
+          </p>
+        </div>
+        <div className="border-cream-darker space-y-2 rounded-xl border bg-white p-4">
+          <p className="text-text-muted text-xs">Template</p>
+          <p className="text-text-primary text-sm font-medium">
+            {campaign.templateName ?? "—"}
+          </p>
+        </div>
+        <div className="border-cream-darker space-y-2 rounded-xl border bg-white p-4">
+          <p className="text-text-muted text-xs">{dateLabel}</p>
+          <p className="text-text-primary text-sm font-medium">
+            {dateToShow
+              ? new Date(dateToShow).toLocaleString("fr-FR", {
+                  dateStyle: "long",
+                  timeStyle: "short",
+                })
+              : "—"}
+          </p>
+        </div>
+      </div>
+
+      <CampaignRecipientsTable messages={recipients.messages} total={recipients.total} />
+
+      <SendNowDialog
+        open={sendOpen}
+        onOpenChange={setSendOpen}
+        campaign={campaign}
+        onSuccess={() => {
+          setSendOpen(false);
+          router.refresh();
+        }}
+      />
+      <CancelCampaignDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        campaign={campaign}
+        onSuccess={() => {
+          setCancelOpen(false);
+          router.refresh();
+        }}
+      />
+    </div>
+  );
+}
