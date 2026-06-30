@@ -4,6 +4,10 @@ import { Worker } from "bullmq";
 import { redis } from "@/lib/redis";
 import { createRFMWorker, scheduleNightlyRFM } from "./rfm.worker";
 import { createEmailWorker } from "./email.worker";
+import {
+  createCampaignSchedulerWorker,
+  createCampaignStatsSyncWorker,
+} from "./campaign.worker";
 
 logger.info("🚀 Starting CRM workers...");
 
@@ -104,6 +108,22 @@ if (emailWorker) {
   logger.info("✅ Email worker started");
 }
 
+// ============================================================
+// CAMPAIGN SCHEDULER WORKER
+// ============================================================
+const campaignSchedulerWorker = createCampaignSchedulerWorker();
+if (campaignSchedulerWorker) {
+  logger.info("✅ Campaign scheduler started — checking every minute");
+}
+
+// ============================================================
+// CAMPAIGN STATS SYNC WORKER
+// ============================================================
+const campaignStatsSyncWorker = createCampaignStatsSyncWorker();
+if (campaignStatsSyncWorker) {
+  logger.info("✅ Campaign stats sync started — syncing every 5 minutes");
+}
+
 const baseWorkers = [
   campaignWorker,
   messageWorker,
@@ -131,6 +151,8 @@ const shutdown = async () => {
     ...baseWorkers.map((w) => w.close()),
     ...(rfmWorker ? [rfmWorker.close()] : []),
     ...(emailWorker ? [emailWorker.close()] : []),
+    ...(campaignSchedulerWorker ? [campaignSchedulerWorker.close()] : []),
+    ...(campaignStatsSyncWorker ? [campaignStatsSyncWorker.close()] : []),
   ];
   await Promise.all(closeAll);
   process.exit(0);

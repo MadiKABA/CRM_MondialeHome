@@ -29,7 +29,7 @@ export function createCampaignSchedulerWorker(): Worker | null {
 
   // Job répétitif toutes les minutes
   schedulerQueue
-    .add("check-due-campaigns", {}, { repeat: { cron: "* * * * *" } })
+    .add("check-due-campaigns", {}, { repeat: { pattern: "* * * * *" } })
     .catch((err) => logger.warn({ err }, "Failed to register campaign scheduler cron"));
 
   const worker = new Worker(
@@ -91,7 +91,7 @@ export function createCampaignStatsSyncWorker(): Worker | null {
     .add(
       "sync-campaign-stats",
       {},
-      { repeat: { cron: "*/5 * * * *" }, removeOnComplete: 5 }
+      { repeat: { pattern: "*/5 * * * *" }, removeOnComplete: 5 }
     )
     .catch((err) => logger.warn({ err }, "Failed to register stats sync cron"));
 
