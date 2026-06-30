@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { Webhook } from "svix";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { syncCampaignStatsFromBatch } from "@/features/campaigns/server/queries";
 
 export async function POST(request: NextRequest) {
   try {
@@ -124,6 +125,13 @@ export async function POST(request: NextRequest) {
 
       default:
         logger.info({ type }, "Unhandled Resend webhook event");
+    }
+
+    // Sync stats de la campagne liée au batch — non bloquant
+    if (messageLog.batchId) {
+      syncCampaignStatsFromBatch(messageLog.batchId).catch((err) => {
+        logger.warn({ err, batchId: messageLog.batchId }, "Campaign stats sync failed");
+      });
     }
 
     return NextResponse.json({ received: true });
