@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Clock, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CampaignFormState } from "./campaign-form";
@@ -10,11 +9,43 @@ interface Props {
   onChange: (patch: Partial<CampaignFormState>) => void;
 }
 
+// Convertit un ISO string (UTC) → valeur affichable dans <input type="datetime-local">
+function isoToLocalInputValue(isoString: string): string {
+  const date = new Date(isoString);
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+// Convertit la valeur datetime-local (heure locale, sans timezone) → ISO 8601 avec "Z"
+function localInputValueToIso(localValue: string): string {
+  // new Date() interprète la chaîne comme heure locale du navigateur
+  return new Date(localValue).toISOString();
+}
+
+function getMinLocalValue(): string {
+  return isoToLocalInputValue(new Date(Date.now() + 5 * 60_000).toISOString());
+}
+
 export function StepSchedule({ state, onChange }: Props) {
   const isScheduled = !!state.scheduledAt;
-  const [minDate] = useState(() =>
-    new Date(Date.now() + 5 * 60_000).toISOString().slice(0, 16)
-  );
+  const minLocal = getMinLocalValue();
+
+  const handleSelectNow = () => {
+    onChange({ scheduledAt: null });
+  };
+
+  const handleSelectSchedule = () => {
+    // Valeur par défaut : maintenant + 5 min, stockée en ISO complet
+    onChange({ scheduledAt: new Date(Date.now() + 5 * 60_000).toISOString() });
+  };
+
+  const handleDateChange = (localValue: string) => {
+    if (!localValue) {
+      onChange({ scheduledAt: null });
+      return;
+    }
+    onChange({ scheduledAt: localInputValueToIso(localValue) });
+  };
 
   return (
     <div className="space-y-5">
@@ -28,7 +59,7 @@ export function StepSchedule({ state, onChange }: Props) {
       <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
-          onClick={() => onChange({ scheduledAt: null })}
+          onClick={handleSelectNow}
           className={cn(
             "flex flex-col items-center gap-2 rounded-xl border p-5 transition-all",
             !isScheduled
@@ -45,7 +76,7 @@ export function StepSchedule({ state, onChange }: Props) {
 
         <button
           type="button"
-          onClick={() => onChange({ scheduledAt: minDate })}
+          onClick={handleSelectSchedule}
           className={cn(
             "flex flex-col items-center gap-2 rounded-xl border p-5 transition-all",
             isScheduled
@@ -68,12 +99,14 @@ export function StepSchedule({ state, onChange }: Props) {
           </label>
           <input
             type="datetime-local"
-            min={minDate}
-            value={state.scheduledAt ?? minDate}
-            onChange={(e) => onChange({ scheduledAt: e.target.value })}
+            min={minLocal}
+            value={state.scheduledAt ? isoToLocalInputValue(state.scheduledAt) : minLocal}
+            onChange={(e) => handleDateChange(e.target.value)}
             className="border-cream-darker focus:border-gold w-full rounded-lg border bg-white px-3 py-2.5 text-sm focus:outline-none"
           />
-          <p className="text-text-muted text-xs">Heure de Dakar (UTC+0)</p>
+          <p className="text-text-muted text-xs">
+            Heure locale de votre navigateur — convertie automatiquement
+          </p>
         </div>
       )}
     </div>
