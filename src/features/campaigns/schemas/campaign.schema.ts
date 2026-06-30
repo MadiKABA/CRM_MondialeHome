@@ -37,7 +37,7 @@ export const createCampaignSchema = z
     campaignData: campaignDataSchema.optional().nullable(),
     scheduledAt: z
       .string()
-      .datetime()
+      .datetime({ offset: true })
       .optional()
       .nullable()
       .refine(
@@ -74,7 +74,7 @@ export const updateCampaignSchema = z
     campaignData: campaignDataSchema.optional().nullable(),
     scheduledAt: z
       .string()
-      .datetime()
+      .datetime({ offset: true })
       .optional()
       .nullable()
       .refine(
@@ -105,7 +105,7 @@ export const scheduleCampaignSchema = z.object({
   campaignId: z.string().cuid(),
   scheduledAt: z
     .string()
-    .datetime()
+    .datetime({ offset: true })
     .nullable()
     .refine(
       (val) => {
