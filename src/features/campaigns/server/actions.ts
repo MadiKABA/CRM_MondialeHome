@@ -24,7 +24,6 @@ import {
   type UpdateCampaignInput,
 } from "../schemas/campaign.schema";
 import { isTransitionAllowed, DELETABLE_STATUSES } from "../types";
-import type { EmailCampaignData } from "@/features/email-mass/types";
 
 type Result<T = void> = { success: true; data?: T } | { success: false; error: string };
 
@@ -516,8 +515,3 @@ export async function syncCampaignStats(campaignId: string): Promise<void> {
     logger.error({ error, campaignId }, "syncCampaignStats failed");
   }
 }
-
-// ── RE-EXPORTER LES TYPES POUR LA COUCHE UI ───────────────────────────────────
-// Évite que la UI importe directement depuis email-mass
-
-export type { EmailCampaignData };

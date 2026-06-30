@@ -111,7 +111,7 @@ export function CampaignForm({ templates, segments }: Props) {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className={cn("mx-auto space-y-6", step === 2 ? "max-w-5xl" : "max-w-3xl")}>
       {/* Stepper */}
       <div className="flex items-center justify-between">
         {STEPS.map((s, i) => (
@@ -151,14 +151,21 @@ export function CampaignForm({ templates, segments }: Props) {
       </div>
 
       {/* Contenu de l'étape */}
-      <div className="border-cream-darker min-h-[400px] rounded-xl border bg-white p-6">
+      <div
+        className={cn(
+          "border-cream-darker rounded-xl border bg-white",
+          step === 2 ? "h-[640px] overflow-hidden" : "min-h-[400px] p-6"
+        )}
+      >
         {step === 0 && (
           <StepInfo state={formState} segments={segments} onChange={update} />
         )}
         {step === 1 && (
           <StepTemplate state={formState} templates={templates} onChange={update} />
         )}
-        {step === 2 && <StepContent state={formState} onChange={update} />}
+        {step === 2 && (
+          <StepContent state={formState} templates={templates} onChange={update} />
+        )}
         {step === 3 && <StepSchedule state={formState} onChange={update} />}
         {step === 4 && (
           <StepReview state={formState} templates={templates} segments={segments} />
