@@ -66,7 +66,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       {
         title: "Campagnes",
-        href: "/campaigns",
+        href: "/campagnes",
         icon: Megaphone,
         permission: "campaigns.read.all",
       },
