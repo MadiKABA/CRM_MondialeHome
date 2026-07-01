@@ -27,6 +27,12 @@ export interface CriterionDTO {
   operator: string;
   value: string | number | boolean | string[] | number[];
   value2?: string | number | null;
+  // Critères produit / catégorie
+  articleId?: string | null;
+  articleName?: string | null;
+  categoryId?: string | null;
+  categoryName?: string | null;
+  periodDays?: number | null;
 }
 
 // ── DTO liste ─────────────────────────────────────────────────────────────────
@@ -78,7 +84,16 @@ export interface CriterionDefinition {
   field: string;
   label: string;
   category: string;
-  type: "number" | "string" | "date" | "boolean" | "select";
+  type:
+    | "number"
+    | "string"
+    | "date"
+    | "boolean"
+    | "select"
+    | "article"
+    | "category"
+    | "article_period"
+    | "category_period";
   operators: OperatorDefinition[];
   unit?: string;
   options?: Array<{ value: string; label: string }>;
@@ -271,5 +286,48 @@ export const CRITERIA_DEFINITIONS: CriterionDefinition[] = [
       { value: "new_customers", label: "Nouveaux" },
       { value: "potential", label: "Potentiels" },
     ],
+  },
+  // Produits
+  {
+    field: "hasOrderedArticle",
+    label: "A acheté l'article",
+    category: "Produits",
+    type: "article",
+    operators: [{ value: "eq", label: "a acheté" }],
+  },
+  {
+    field: "hasNotOrderedArticle",
+    label: "N'a pas acheté l'article",
+    category: "Produits",
+    type: "article",
+    operators: [{ value: "eq", label: "n'a pas acheté" }],
+  },
+  {
+    field: "hasOrderedCategory",
+    label: "A acheté dans la catégorie",
+    category: "Produits",
+    type: "category",
+    operators: [{ value: "eq", label: "a acheté" }],
+  },
+  {
+    field: "hasNotOrderedCategory",
+    label: "N'a pas acheté dans la catégorie",
+    category: "Produits",
+    type: "category",
+    operators: [{ value: "eq", label: "n'a pas acheté" }],
+  },
+  {
+    field: "hasOrderedArticleInPeriod",
+    label: "A acheté l'article (période)",
+    category: "Produits",
+    type: "article_period",
+    operators: [{ value: "eq", label: "a acheté" }],
+  },
+  {
+    field: "hasOrderedCategoryInPeriod",
+    label: "A acheté dans la catégorie (période)",
+    category: "Produits",
+    type: "category_period",
+    operators: [{ value: "eq", label: "a acheté" }],
   },
 ];
