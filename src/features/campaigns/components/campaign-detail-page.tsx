@@ -3,16 +3,25 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Pencil, Ban, Send } from "lucide-react";
+import { ArrowLeft, Pencil, Ban, Send, Mail, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { CampaignStatusBadge } from "./campaign-status-badge";
 import { CampaignStatsCards } from "./campaign-stats-cards";
 import { CampaignProgressBar } from "./campaign-progress-bar";
 import { CampaignRecipientsTable } from "./campaign-recipients-table";
+import { CampaignEmailPreview } from "./campaign-email-preview";
 import { SendNowDialog } from "./send-now-dialog";
 import { CancelCampaignDialog } from "./cancel-campaign-dialog";
 import type { CampaignDTO } from "../types";
 import type { MessageLogDTO } from "@/features/email-mass/types";
+
+const TABS = [
+  { id: "preview", label: "Email envoyé", icon: Mail },
+  { id: "recipients", label: "Destinataires", icon: Users },
+] as const;
+
+type TabId = (typeof TABS)[number]["id"];
 
 interface Props {
   campaign: CampaignDTO;
@@ -29,6 +38,7 @@ export function CampaignDetailPage({ campaign, recipients, permissions }: Props)
   const router = useRouter();
   const [sendOpen, setSendOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>("preview");
 
   const canSendNow = permissions.canSend && campaign.status === "DRAFT";
   const canCancel =
@@ -136,7 +146,51 @@ export function CampaignDetailPage({ campaign, recipients, permissions }: Props)
         </div>
       </div>
 
-      <CampaignRecipientsTable messages={recipients.messages} total={recipients.total} />
+      {/* Onglets — chaque contenu d'onglet gère déjà sa propre carte (bordure/bg) */}
+      <div>
+        <div className="border-cream-darker mb-4 flex border-b">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-medium transition-colors",
+                activeTab === tab.id
+                  ? "border-gold-deep text-gold-deep"
+                  : "text-text-secondary hover:text-text-primary border-transparent"
+              )}
+            >
+              <tab.icon className="size-4" />
+              {tab.label}
+              {tab.id === "recipients" && recipients.total > 0 && (
+                <span className="bg-cream-darker text-text-muted rounded-full px-1.5 py-0.5 text-[10px]">
+                  {recipients.total}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === "preview" &&
+          (campaign.templateId ? (
+            <CampaignEmailPreview campaign={campaign} />
+          ) : (
+            <div className="border-cream-darker flex flex-col items-center justify-center gap-3 rounded-xl border bg-white py-16 text-center">
+              <Mail className="text-text-muted size-10" />
+              <p className="text-text-muted text-sm">
+                Aucun template associé à cette campagne
+              </p>
+            </div>
+          ))}
+
+        {activeTab === "recipients" && (
+          <CampaignRecipientsTable
+            messages={recipients.messages}
+            total={recipients.total}
+          />
+        )}
+      </div>
 
       <SendNowDialog
         open={sendOpen}

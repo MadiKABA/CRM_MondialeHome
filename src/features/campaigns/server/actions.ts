@@ -7,6 +7,12 @@ import { logger } from "@/lib/logger";
 import { checkPermission } from "@/lib/permissions/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { auth } from "@/lib/auth/auth";
+import { buildEmailHtml } from "@/features/templates/lib/html-builder";
+import {
+  DEFAULT_TEST_DATA,
+  DEFAULT_CAMPAIGN_VARS,
+} from "@/features/templates/lib/renderer";
+import { getTemplateById } from "@/features/templates/server/queries";
 import { sendCampaignCore } from "./service";
 import {
   getCampaignById,
@@ -455,6 +461,65 @@ export async function deleteCampaign(campaignId: string): Promise<Result> {
   } catch (error) {
     logger.error({ error }, "deleteCampaign failed");
     return { success: false, error: "Une erreur est survenue" };
+  }
+}
+
+// ── APERÇU EMAIL D'UNE CAMPAGNE ───────────────────────────────────────────────
+// Régénère le HTML depuis le template + campaignData persistés en DB (pas de
+// données libres venant du client). Utilisé par l'onglet "Email envoyé" de la
+// page détail. Génère le HTML via buildEmailHtml() directement (comme le fait
+// déjà step-content.tsx dans le wizard) plutôt que via generatePreviewHtml(),
+// qui exige en interne "templates.create.all" — un gate non pertinent ici où
+// seule la permission "campaigns.read.all" doit être requise.
+
+export async function getEmailPreviewForCampaign(
+  campaignId: string
+): Promise<Result<{ html: string; subject: string }>> {
+  try {
+    const user = await getUser();
+    if (!user) return { success: false, error: "Non authentifié" };
+
+    const rl = await checkRateLimit({
+      key: `campaign:preview:${user.id}`,
+      limit: 30,
+      windowMs: 60_000,
+    });
+    if (!rl.allowed) return { success: false, error: "Trop de requêtes." };
+
+    await checkPermission("campaigns.read.all");
+
+    const campaign = await getCampaignById(campaignId);
+    if (!campaign) return { success: false, error: "Campagne introuvable" };
+    if (!campaign.templateId) {
+      return { success: false, error: "Aucun template associé à cette campagne" };
+    }
+
+    const template = await getTemplateById(campaign.templateId);
+    if (!template) return { success: false, error: "Template introuvable" };
+
+    const campaignData = campaign.campaignData;
+
+    const html = buildEmailHtml({
+      campaignType: template.category ?? "Promotion",
+      productCategory: template.productCategory ?? null,
+      subject: template.subject ?? "",
+      content: template.content ?? null,
+      conclusion: template.conclusion ?? null,
+      bannerImageUrl: campaignData?.bannerImageUrl ?? null,
+      articles: campaignData?.articles ?? [],
+      ctaText: campaignData?.ctaText ?? null,
+      ctaUrl: campaignData?.ctaUrl ?? null,
+      clientData: DEFAULT_TEST_DATA,
+      campaignVars: { ...DEFAULT_CAMPAIGN_VARS, ...campaignData?.campaignVars },
+    });
+
+    return {
+      success: true,
+      data: { html, subject: template.subject ?? "Email sans objet" },
+    };
+  } catch (error) {
+    logger.error({ error, campaignId }, "getEmailPreviewForCampaign failed");
+    return { success: false, error: "Erreur lors de la génération de l'aperçu" };
   }
 }
 
