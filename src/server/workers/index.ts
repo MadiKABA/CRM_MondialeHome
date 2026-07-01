@@ -3,6 +3,7 @@ import { QUEUE_NAMES } from "@/lib/queue";
 import { Worker } from "bullmq";
 import { redis } from "@/lib/redis";
 import { createRFMWorker, scheduleNightlyRFM } from "./rfm.worker";
+import { createSegmentWorker } from "./segment.worker";
 import { createEmailWorker } from "./email.worker";
 import {
   createCampaignSchedulerWorker,
@@ -101,6 +102,14 @@ if (rfmWorker) {
 }
 
 // ============================================================
+// SEGMENT REFRESH WORKER
+// ============================================================
+const segmentWorker = createSegmentWorker();
+if (segmentWorker) {
+  logger.info("✅ Segment refresh worker started");
+}
+
+// ============================================================
 // EMAIL WORKER
 // ============================================================
 const emailWorker = createEmailWorker();
@@ -150,6 +159,7 @@ const shutdown = async () => {
   const closeAll = [
     ...baseWorkers.map((w) => w.close()),
     ...(rfmWorker ? [rfmWorker.close()] : []),
+    ...(segmentWorker ? [segmentWorker.close()] : []),
     ...(emailWorker ? [emailWorker.close()] : []),
     ...(campaignSchedulerWorker ? [campaignSchedulerWorker.close()] : []),
     ...(campaignStatsSyncWorker ? [campaignStatsSyncWorker.close()] : []),

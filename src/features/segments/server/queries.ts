@@ -2,6 +2,7 @@ import "server-only";
 
 import { type Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { logger } from "@/lib/logger";
 import type {
   SegmentDTO,
   SegmentListDTO,
@@ -10,6 +11,15 @@ import type {
   CriteriaGroupDTO,
   CriterionDTO,
 } from "../types";
+
+const PRODUCT_CRITERIA_FIELDS = new Set([
+  "hasOrderedArticle",
+  "hasNotOrderedArticle",
+  "hasOrderedCategory",
+  "hasNotOrderedCategory",
+  "hasOrderedArticleInPeriod",
+  "hasOrderedCategoryInPeriod",
+]);
 
 // ── Mapper ────────────────────────────────────────────────────────────────────
 
@@ -481,6 +491,44 @@ export async function refreshDynamicSegment(segmentId: string): Promise<number> 
   ]);
 
   return clientIds.length;
+}
+
+// ── Rafraîchir les segments dynamiques à critères produit/catégorie ──────────
+// Appelé en tâche de fond après une vente (voir segment.worker.ts). On ne
+// rafraîchit que les segments concernés par un achat, pas tous les segments,
+// pour limiter la charge DB déclenchée par chaque vente.
+
+export async function refreshProductBasedSegments(): Promise<number> {
+  const segments = await db.segment.findMany({
+    where: { type: "DYNAMIC", isActive: true, autoRefresh: true },
+    select: { id: true, name: true, criteria: true },
+  });
+
+  const productSegments = segments.filter((s) => {
+    const criteria = s.criteria as unknown as CriteriaGroupDTO | null;
+    return criteria?.criteria?.some((c) => PRODUCT_CRITERIA_FIELDS.has(c.field));
+  });
+
+  let refreshed = 0;
+  const chunkSize = 5;
+  for (let i = 0; i < productSegments.length; i += chunkSize) {
+    const chunk = productSegments.slice(i, i + chunkSize);
+    await Promise.all(
+      chunk.map(async (segment) => {
+        try {
+          await refreshDynamicSegment(segment.id);
+          refreshed++;
+        } catch (error) {
+          logger.error(
+            { error, segmentId: segment.id },
+            `Failed to refresh product-based segment "${segment.name}"`
+          );
+        }
+      })
+    );
+  }
+
+  return refreshed;
 }
 
 // ── Articles pour le picker de critères produit ──────────────────────────────

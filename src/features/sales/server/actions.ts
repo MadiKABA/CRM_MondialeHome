@@ -20,6 +20,7 @@ import { generateSaleReference } from "./queries";
 import { auditSale } from "./audit";
 import { recalculateClientRFM } from "@/features/rfm/server/actions";
 import { invalidateDashboardAfterSale } from "@/features/dashboard/server/actions";
+import { triggerProductSegmentsRefresh } from "@/server/workers/segment.worker";
 
 type Result<T = void> = { success: true; data?: T } | { success: false; error: string };
 
@@ -205,6 +206,9 @@ export async function createSale(
       await recalculateClientStats(data.clientId);
       await recalculateClientRFM(data.clientId);
     }
+
+    // 8bis. SEGMENTS PRODUIT (tâche de fond, ne bloque pas la réponse)
+    await triggerProductSegmentsRefresh("sale.create");
 
     // 9. AUDIT
     await auditSale(user.id, "sale.create", sale.id, {

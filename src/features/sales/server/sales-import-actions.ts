@@ -12,6 +12,7 @@ import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { auditSale } from "./audit";
 import { recalculateClientRFM } from "@/features/rfm/server/actions";
 import { invalidateDashboardAfterSale } from "@/features/dashboard/server/actions";
+import { triggerProductSegmentsRefresh } from "@/server/workers/segment.worker";
 import type { MappedSaleGroup } from "../lib/sales-import-mapper";
 
 type Result<T = void> = { success: true; data?: T } | { success: false; error: string };
@@ -306,6 +307,11 @@ export async function importSales(sales: unknown): Promise<Result<ImportSalesRes
     for (const clientId of clientsToRecalc) {
       await recalculateClientStats(clientId);
       await recalculateClientRFM(clientId);
+    }
+
+    // Segments produit : un seul rafraîchissement pour tout l'import (tâche de fond)
+    if (result.created > 0) {
+      await triggerProductSegmentsRefresh("sales.import");
     }
 
     // Audit avec IP/userAgent via le helper centralisé
