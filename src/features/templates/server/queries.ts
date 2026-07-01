@@ -1,5 +1,3 @@
-import "server-only";
-
 import { db } from "@/lib/db";
 import { getHeaderConfig } from "../types";
 import type { TemplateDTO, PaginatedTemplates, CampaignArticle } from "../types";

@@ -6,7 +6,7 @@ import {
   getDueCampaigns,
   syncCampaignStatsFromBatch,
 } from "@/features/campaigns/server/queries";
-import { sendCampaign } from "@/features/campaigns/server/actions";
+import { sendCampaignCore } from "@/features/campaigns/server/service";
 
 const SCHEDULER_QUEUE = "campaign-scheduler";
 const STATS_QUEUE = "campaign-stats-sync";
@@ -42,9 +42,28 @@ export function createCampaignSchedulerWorker(): Worker | null {
 
       for (const campaign of due) {
         try {
-          const result = await sendCampaign({ campaignId: campaign.id });
+          const result = await sendCampaignCore(campaign.id, campaign.createdById);
 
           if (result.success) {
+            if (result.data) {
+              await db.auditLog
+                .create({
+                  data: {
+                    userId: campaign.createdById,
+                    action: "campaign.send",
+                    entity: "Campaign",
+                    entityId: campaign.id,
+                    newValue: {
+                      batchId: result.data.batchId,
+                      queued: result.data.queued,
+                      estimatedTime: result.data.estimatedTime,
+                      trigger: "scheduler",
+                    },
+                    status: "success",
+                  },
+                })
+                .catch(() => {});
+            }
             logger.info(
               { campaignId: campaign.id, name: campaign.name },
               "scheduled campaign sent"

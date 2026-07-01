@@ -1,4 +1,3 @@
-import "server-only";
 import { buildEmailHtml } from "@/features/templates/lib/html-builder";
 import { buildClientData } from "@/features/templates/lib/renderer";
 import type { TemplateDTO } from "@/features/templates/types";

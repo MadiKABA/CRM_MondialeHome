@@ -11,9 +11,10 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { getResendClient } from "@/lib/email/client";
 import { EMAIL_CONFIG } from "@/lib/email/config";
 import { getTemplateById } from "@/features/templates/server/queries";
-import { getEligibleClientsForEmail, getEmailBatchById } from "./queries";
-import { queueEmailBatch, emailQueue } from "@/server/workers/email.worker";
+import { getEmailBatchById } from "./queries";
+import { emailQueue } from "@/server/workers/email.worker";
 import { personalizeEmail, checkClientEligibility } from "../lib/personalizer";
+import { sendEmailToSegmentCore } from "./service";
 import type {
   SendEmailBatchInput,
   SendEmailToClientInput,
@@ -103,79 +104,14 @@ export async function sendEmailToSegment(
 
     const data = sendEmailBatchSchema.parse(input);
 
-    const template = await getTemplateById(data.templateId);
-    if (!template) return { success: false, error: "Template introuvable" };
-    if (!template.isActive) return { success: false, error: "Ce template est désactivé" };
-    if (!template.subject)
-      return { success: false, error: "Le template n'a pas d'objet email" };
-
-    const segment = await db.segment.findUnique({
-      where: { id: data.segmentId },
-      select: { id: true, name: true, memberCount: true },
-    });
-    if (!segment) return { success: false, error: "Segment introuvable" };
-
-    const clients = await getEligibleClientsForEmail(data.segmentId);
-
-    if (clients.length === 0) {
-      return {
-        success: false,
-        error: "Aucun client éligible dans ce segment (vérifiez les consentements email)",
-      };
-    }
-
-    const skipped = segment.memberCount - clients.length;
-
-    const campaignData = normalizeCampaignData(data.campaignData);
-
-    const batch = await db.emailBatch.create({
-      data: {
+    return sendEmailToSegmentCore(
+      {
         templateId: data.templateId,
         segmentId: data.segmentId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        campaignData: campaignData as any,
-        status: "PENDING",
-        totalCount: clients.length,
-        createdById: user.id,
+        campaignData: normalizeCampaignData(data.campaignData),
       },
-    });
-
-    const jobId = await queueEmailBatch({
-      batchId: batch.id,
-      templateId: data.templateId,
-      clientIds: clients.map((c) => c.id),
-      campaignData,
-      triggeredBy: user.id,
-    });
-
-    await db.auditLog.create({
-      data: {
-        userId: user.id,
-        action: "email.batch.created",
-        entity: "EmailBatch",
-        entityId: batch.id,
-        newValue: {
-          templateId: data.templateId,
-          segmentId: data.segmentId,
-          totalClients: clients.length,
-          skipped,
-          jobId,
-        },
-        status: "success",
-      },
-    });
-
-    logger.info(
-      { batchId: batch.id, jobId, total: clients.length },
-      "Email batch queued"
+      user.id
     );
-
-    const estimatedTime = Math.ceil((clients.length / 50) * 2);
-
-    return {
-      success: true,
-      data: { batchId: batch.id, queued: clients.length, skipped, estimatedTime },
-    };
   } catch (error) {
     logger.error({ error }, "sendEmailToSegment failed");
     return { success: false, error: "Une erreur est survenue" };

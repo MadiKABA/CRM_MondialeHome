@@ -7,7 +7,7 @@ import { logger } from "@/lib/logger";
 import { checkPermission } from "@/lib/permissions/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { auth } from "@/lib/auth/auth";
-import { sendEmailToSegment } from "@/features/email-mass/server/actions";
+import { sendCampaignCore } from "./service";
 import {
   getCampaignById,
   isCampaignNameUnique,
@@ -243,85 +243,19 @@ export async function sendCampaign(
 
     const data = sendCampaignSchema.parse(input);
 
-    const campaign = await getCampaignById(data.campaignId);
-    if (!campaign) return { success: false, error: "Campagne introuvable" };
+    const result = await sendCampaignCore(data.campaignId, user.id);
 
-    if (!isTransitionAllowed(campaign.status, "SENDING")) {
-      return {
-        success: false,
-        error: `Impossible d'envoyer une campagne en statut "${campaign.status}"`,
-      };
-    }
-
-    if (!campaign.templateId) {
-      return { success: false, error: "Template email manquant" };
-    }
-    if (!campaign.segmentId) {
-      return { success: false, error: "Segment manquant" };
-    }
-
-    // Marquer en SENDING
-    await db.campaign.update({
-      where: { id: campaign.id },
-      data: { status: "SENDING" },
-    });
-
-    const sendResult = await sendEmailToSegment({
-      templateId: campaign.templateId,
-      segmentId: campaign.segmentId,
-      campaignData: campaign.campaignData ?? {
-        articles: [],
-        ctaText: null,
-        ctaUrl: null,
-        bannerImageUrl: null,
-        campaignVars: {},
-      },
-    });
-
-    if (!sendResult.success || !sendResult.data) {
-      // Rollback statut
-      await db.campaign.update({
-        where: { id: campaign.id },
-        data: { status: "FAILED" },
+    if (result.success && result.data) {
+      await createAuditLog(user.id, "campaign.send", data.campaignId, {
+        batchId: result.data.batchId,
+        queued: result.data.queued,
+        estimatedTime: result.data.estimatedTime,
       });
-      const errorMsg = !sendResult.success ? sendResult.error : "Erreur d'envoi";
-      return { success: false, error: errorMsg };
+      revalidatePath("/campagnes");
+      revalidatePath(`/campagnes/${data.campaignId}`);
     }
 
-    await db.campaign.update({
-      where: { id: campaign.id },
-      data: {
-        emailBatchId: sendResult.data.batchId,
-        totalRecipients: sendResult.data.queued,
-      },
-    });
-
-    await createAuditLog(user.id, "campaign.send", campaign.id, {
-      batchId: sendResult.data.batchId,
-      queued: sendResult.data.queued,
-      estimatedTime: sendResult.data.estimatedTime,
-    });
-
-    logger.info(
-      {
-        campaignId: campaign.id,
-        batchId: sendResult.data.batchId,
-        queued: sendResult.data.queued,
-      },
-      "campaign send triggered"
-    );
-
-    revalidatePath("/campagnes");
-    revalidatePath(`/campagnes/${campaign.id}`);
-
-    return {
-      success: true,
-      data: {
-        batchId: sendResult.data.batchId,
-        queued: sendResult.data.queued,
-        estimatedTime: sendResult.data.estimatedTime,
-      },
-    };
+    return result;
   } catch (error) {
     logger.error({ error }, "sendCampaign failed");
     return { success: false, error: "Une erreur est survenue lors de l'envoi" };
