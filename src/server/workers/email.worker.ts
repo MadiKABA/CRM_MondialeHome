@@ -161,8 +161,8 @@ export function createEmailWorker(): Worker | null {
               subject: personalizedEmail.subject,
               html: personalizedEmail.html,
               tags: [
-                { name: "batch_id", value: batchId },
-                { name: "client_id", value: client.id },
+                { name: "batch_id", value: sanitizeTagValue(batchId) },
+                { name: "client_id", value: sanitizeTagValue(client.id) },
                 { name: "template", value: sanitizeTagValue(template.name) },
               ],
             });
@@ -250,7 +250,15 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Resend n'accepte que [a-zA-Z0-9_-] dans les valeurs de tags
+// Resend n'accepte que [a-zA-Z0-9_-] dans les valeurs de tags, tronquées à 50 caractères
 function sanitizeTagValue(value: string): string {
-  return value.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const sanitized = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 50);
+
+  return sanitized || "unknown";
 }
