@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Eye, Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ArticlePicker } from "./article-picker";
+import { BannerUpload } from "./banner-upload";
 import type { CampaignArticle } from "../types";
 
 export interface CampaignPreviewData {
@@ -92,24 +93,10 @@ export function CampaignPreviewPanel({
           </p>
 
           {/* Bannière */}
-          <div className="space-y-1.5">
-            <label className="text-text-primary text-xs font-medium">
-              Image bannière (URL https://)
-            </label>
-            <input
-              type="url"
-              value={campaignData.bannerImageUrl}
-              onChange={(e) => updateField("bannerImageUrl", e.target.value)}
-              placeholder="https://res.cloudinary.com/.../banniere.webp"
-              className="border-cream-darker focus:border-gold w-full rounded-lg border bg-white px-3 py-2 text-xs focus:outline-none"
-            />
-            {campaignData.bannerImageUrl &&
-              !campaignData.bannerImageUrl.startsWith("https://") && (
-                <p className="text-xs text-red-500">
-                  L&apos;URL doit commencer par https://
-                </p>
-              )}
-          </div>
+          <BannerUpload
+            value={campaignData.bannerImageUrl}
+            onChange={(url) => updateField("bannerImageUrl", url)}
+          />
 
           {/* Articles */}
           <div className="space-y-2">

@@ -32,6 +32,13 @@ export function ContentEditor({ label, name, placeholder, onFocus }: ContentEdit
   const form = useFormContext<CreateEmailTemplateInput>();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const trackCursor = (setValue: (val: string) => void) => {
+    const el = textareaRef.current;
+    if (el) {
+      onFocus(() => el.value, setValue, el.selectionStart ?? el.value.length);
+    }
+  };
+
   return (
     <div className="space-y-3">
       <h2 className="text-text-primary text-sm font-semibold">{label}</h2>
@@ -53,26 +60,10 @@ export function ContentEditor({ label, name, placeholder, onFocus }: ContentEdit
                 placeholder={placeholder}
                 rows={5}
                 className="border-cream-darker focus:border-gold resize-none font-mono text-sm leading-relaxed"
-                onFocus={() => {
-                  const el = textareaRef.current;
-                  if (el) {
-                    onFocus(
-                      () => el.value,
-                      (val) => field.onChange(val),
-                      el.selectionStart ?? el.value.length
-                    );
-                  }
-                }}
-                onClick={() => {
-                  const el = textareaRef.current;
-                  if (el) {
-                    onFocus(
-                      () => el.value,
-                      (val) => field.onChange(val),
-                      el.selectionStart ?? el.value.length
-                    );
-                  }
-                }}
+                onFocus={() => trackCursor(field.onChange)}
+                onClick={() => trackCursor(field.onChange)}
+                onKeyUp={() => trackCursor(field.onChange)}
+                onSelect={() => trackCursor(field.onChange)}
               />
             </FormControl>
             <FormMessage />

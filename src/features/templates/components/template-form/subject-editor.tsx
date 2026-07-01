@@ -24,6 +24,13 @@ export function SubjectEditor({ onFocus }: SubjectEditorProps) {
   const form = useFormContext<CreateEmailTemplateInput>();
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  const trackCursor = (setValue: (val: string) => void) => {
+    const el = inputRef.current;
+    if (el) {
+      onFocus(() => el.value, setValue, el.selectionStart ?? el.value.length);
+    }
+  };
+
   return (
     <div className="space-y-3">
       <h2 className="text-text-primary text-sm font-semibold">Objet de l&apos;email</h2>
@@ -43,26 +50,10 @@ export function SubjectEditor({ onFocus }: SubjectEditorProps) {
                 }}
                 placeholder="Ex : 🎁 Offre exclusive — -30% sur les canapés ce week-end"
                 className="border-cream-darker focus:border-gold text-sm"
-                onFocus={() => {
-                  const el = inputRef.current;
-                  if (el) {
-                    onFocus(
-                      () => el.value,
-                      (val) => field.onChange(val),
-                      el.selectionStart ?? el.value.length
-                    );
-                  }
-                }}
-                onClick={() => {
-                  const el = inputRef.current;
-                  if (el) {
-                    onFocus(
-                      () => el.value,
-                      (val) => field.onChange(val),
-                      el.selectionStart ?? el.value.length
-                    );
-                  }
-                }}
+                onFocus={() => trackCursor(field.onChange)}
+                onClick={() => trackCursor(field.onChange)}
+                onKeyUp={() => trackCursor(field.onChange)}
+                onSelect={() => trackCursor(field.onChange)}
               />
             </FormControl>
             <FormMessage />

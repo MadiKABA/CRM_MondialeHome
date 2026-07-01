@@ -68,7 +68,13 @@ export function VariablesPanel({ usedIn, onInsert }: VariablesPanelProps) {
                     <button
                       key={v.code}
                       type="button"
-                      onClick={() => onInsert(v.code)}
+                      onMouseDown={(e) => {
+                        // preventDefault empêche le champ actif de perdre le
+                        // focus/la sélection avant que la position du curseur
+                        // ne soit lue par l'insertion
+                        e.preventDefault();
+                        onInsert(v.code);
+                      }}
                       title={v.description}
                       className={cn(
                         "w-full rounded-lg border px-2.5 py-2 text-left text-xs transition-all hover:shadow-sm",
