@@ -13,8 +13,26 @@ import {
 } from "@/components/ui/select";
 import { useDebounce } from "@/hooks/use-debounce";
 import { previewCriteria } from "@/features/segments/server/actions";
+import { ArticleCriteriaPicker } from "./article-criteria-picker";
+import { CategoryCriteriaPicker } from "./category-criteria-picker";
 import { CRITERIA_DEFINITIONS } from "../types";
 import type { CriteriaGroupDTO, CriterionDTO, CriterionDefinition } from "../types";
+
+const PRODUCT_TYPES = [
+  "article",
+  "category",
+  "article_period",
+  "category_period",
+] as const;
+const PERIOD_TYPES = ["article_period", "category_period"] as const;
+
+function isProductType(type: CriterionDefinition["type"] | undefined): boolean {
+  return !!type && (PRODUCT_TYPES as readonly string[]).includes(type);
+}
+
+function isPeriodType(type: CriterionDefinition["type"] | undefined): boolean {
+  return !!type && (PERIOD_TYPES as readonly string[]).includes(type);
+}
 
 interface CriteriaBuilderProps {
   value: CriteriaGroupDTO;
@@ -59,7 +77,12 @@ function CriterionRow({ criterion, onUpdate, onRemove }: CriterionRowProps) {
     const firstOp = newDef?.operators[0]?.value ?? "eq";
     const defaultVal =
       newDef?.type === "boolean" ? true : newDef?.type === "number" ? 0 : "";
-    onUpdate({ field, operator: firstOp, value: defaultVal });
+    onUpdate({
+      field,
+      operator: firstOp,
+      value: defaultVal,
+      ...(isPeriodType(newDef?.type) && { periodDays: 30 }),
+    });
   }
 
   function handleOperatorChange(operator: string) {
@@ -110,7 +133,7 @@ function CriterionRow({ criterion, onUpdate, onRemove }: CriterionRowProps) {
       </div>
 
       {/* Opérateur */}
-      {def && def.type !== "boolean" && (
+      {def && def.type !== "boolean" && !isProductType(def.type) && (
         <div className="min-w-[160px] flex-1">
           <Label className="text-text-secondary mb-1 text-[11px]">Condition</Label>
           <Select
@@ -133,8 +156,52 @@ function CriterionRow({ criterion, onUpdate, onRemove }: CriterionRowProps) {
         </div>
       )}
 
+      {/* Valeur : article / catégorie */}
+      {def && isProductType(def.type) && (
+        <div className="min-w-[220px] flex-1">
+          <Label className="text-text-secondary mb-1 text-[11px]">
+            {def.type === "article" || def.type === "article_period"
+              ? "Article"
+              : "Catégorie"}
+          </Label>
+          {def.type === "article" || def.type === "article_period" ? (
+            <ArticleCriteriaPicker
+              value={criterion.articleId ?? null}
+              label={criterion.articleName ?? null}
+              onChange={(id, name) =>
+                onUpdate({ ...criterion, articleId: id, articleName: name, value: id })
+              }
+            />
+          ) : (
+            <CategoryCriteriaPicker
+              value={criterion.categoryId ?? null}
+              onChange={(id, name) =>
+                onUpdate({ ...criterion, categoryId: id, categoryName: name, value: id })
+              }
+            />
+          )}
+        </div>
+      )}
+
+      {/* Fenêtre temporelle (en jours) */}
+      {def && isPeriodType(def.type) && (
+        <div className="w-24">
+          <Label className="text-text-secondary mb-1 text-[11px]">Jours</Label>
+          <Input
+            type="number"
+            min={1}
+            max={365}
+            value={criterion.periodDays ?? 30}
+            onChange={(e) =>
+              onUpdate({ ...criterion, periodDays: Number(e.target.value) })
+            }
+            className="h-8 text-xs"
+          />
+        </div>
+      )}
+
       {/* Valeur */}
-      {def && def.type !== "boolean" && (
+      {def && def.type !== "boolean" && !isProductType(def.type) && (
         <div className="min-w-[120px] flex-1">
           <Label className="text-text-secondary mb-1 text-[11px]">
             {def.unit ? `Valeur (${def.unit})` : "Valeur"}
