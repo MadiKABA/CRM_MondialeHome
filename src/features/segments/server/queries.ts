@@ -176,59 +176,165 @@ export async function getSegmentById(
 
 // ── Constructeur de clause WHERE Prisma ───────────────────────────────────────
 
-export function buildWhereFromCriteria(
+export async function buildWhereFromCriteria(
   criteria: CriteriaGroupDTO
-): Prisma.ClientWhereInput {
-  const conditions = criteria.criteria.map((c: CriterionDTO) => {
-    switch (c.field) {
-      case "totalSpent":
-      case "averageBasket":
-        return buildNumberCondition(
-          c.field,
-          c.operator,
-          Number(c.value),
-          c.value2 != null ? Number(c.value2) : undefined
-        );
-
-      case "totalOrders":
-        return buildNumberCondition(
-          c.field,
-          c.operator,
-          Number(c.value),
-          c.value2 != null ? Number(c.value2) : undefined
-        );
-
-      case "lastPurchaseAt":
-      case "firstPurchaseAt":
-      case "createdAt":
-        return buildDateCondition(c.field, c.operator, c.value, c.value2);
-
-      case "city":
-      case "district":
-      case "source":
-        return buildStringCondition(c.field, c.operator, String(c.value));
-
-      case "status":
-        return { status: c.value as Prisma.EnumClientStatusFilter };
-
-      case "rfmScore":
-        return { rfmScore: String(c.value) };
-
-      case "isVip":
-      case "smsConsent":
-      case "whatsappConsent":
-      case "emailConsent":
-        return { [c.field]: c.operator === "is_true" };
-
-      default:
-        return {} as Prisma.ClientWhereInput;
-    }
-  });
+): Promise<Prisma.ClientWhereInput> {
+  const conditions = await Promise.all(
+    criteria.criteria.map((c: CriterionDTO) => buildSingleCondition(c))
+  );
 
   const valid = conditions.filter((c) => Object.keys(c).length > 0);
   if (valid.length === 0) return {};
 
   return criteria.operator === "AND" ? { AND: valid } : { OR: valid };
+}
+
+async function buildSingleCondition(c: CriterionDTO): Promise<Prisma.ClientWhereInput> {
+  switch (c.field) {
+    case "totalSpent":
+    case "averageBasket":
+    case "totalOrders":
+      return buildNumberCondition(
+        c.field,
+        c.operator,
+        Number(c.value),
+        c.value2 != null ? Number(c.value2) : undefined
+      );
+
+    case "lastPurchaseAt":
+    case "firstPurchaseAt":
+    case "createdAt":
+      return buildDateCondition(c.field, c.operator, c.value, c.value2);
+
+    case "city":
+    case "district":
+    case "source":
+      return buildStringCondition(c.field, c.operator, String(c.value));
+
+    case "status":
+      return { status: c.value as Prisma.EnumClientStatusFilter };
+
+    case "rfmScore":
+      return { rfmScore: String(c.value) };
+
+    case "isVip":
+    case "smsConsent":
+    case "whatsappConsent":
+    case "emailConsent":
+      return { [c.field]: c.operator === "is_true" };
+
+    case "hasOrderedArticle":
+      return buildArticleCondition(c, true);
+
+    case "hasNotOrderedArticle":
+      return buildArticleCondition(c, false);
+
+    case "hasOrderedCategory":
+      return buildCategoryCondition(c, true);
+
+    case "hasNotOrderedCategory":
+      return buildCategoryCondition(c, false);
+
+    case "hasOrderedArticleInPeriod":
+      return buildArticleCondition(c, true, c.periodDays ?? undefined);
+
+    case "hasOrderedCategoryInPeriod":
+      return buildCategoryCondition(c, true, c.periodDays ?? undefined);
+
+    default:
+      return {};
+  }
+}
+
+// ── Critères produit : a acheté / n'a pas acheté un article ──────────────────
+// (ou un article dans une fenêtre de N derniers jours)
+
+const IMPOSSIBLE_MATCH: Prisma.ClientWhereInput = { id: "__no_match__" };
+
+async function buildArticleCondition(
+  c: CriterionDTO,
+  hasOrdered: boolean,
+  periodDays?: number
+): Promise<Prisma.ClientWhereInput> {
+  if (!c.articleId) return {};
+
+  const clientIds = await getClientIdsWhoOrdered({ articleId: c.articleId, periodDays });
+
+  if (hasOrdered) {
+    return clientIds.length > 0 ? { id: { in: clientIds } } : IMPOSSIBLE_MATCH;
+  }
+  return clientIds.length > 0 ? { id: { notIn: clientIds } } : {};
+}
+
+// ── Critères produit : a acheté / n'a pas acheté dans une catégorie ──────────
+// (inclut les sous-catégories, jusqu'à 2 niveaux de profondeur)
+
+async function buildCategoryCondition(
+  c: CriterionDTO,
+  hasOrdered: boolean,
+  periodDays?: number
+): Promise<Prisma.ClientWhereInput> {
+  if (!c.categoryId) return {};
+
+  const categoryIds = await getAllChildCategoryIds(c.categoryId);
+  const clientIds = await getClientIdsWhoOrdered({ categoryIds, periodDays });
+
+  if (hasOrdered) {
+    return clientIds.length > 0 ? { id: { in: clientIds } } : IMPOSSIBLE_MATCH;
+  }
+  return clientIds.length > 0 ? { id: { notIn: clientIds } } : {};
+}
+
+// ── Résout les clientIds ayant acheté un article / une catégorie donnée ──────
+
+async function getClientIdsWhoOrdered(opts: {
+  articleId?: string;
+  categoryIds?: string[];
+  periodDays?: number;
+}): Promise<string[]> {
+  const from = opts.periodDays
+    ? new Date(Date.now() - opts.periodDays * 86_400_000)
+    : undefined;
+
+  const sales = await db.sale.findMany({
+    where: {
+      deletedAt: null,
+      status: { notIn: ["CANCELLED", "REFUNDED"] },
+      clientId: { not: null },
+      ...(from && { soldAt: { gte: from } }),
+      items: {
+        some: opts.articleId
+          ? { articleId: opts.articleId }
+          : { article: { categoryId: { in: opts.categoryIds } } },
+      },
+    },
+    select: { clientId: true },
+    distinct: ["clientId"],
+  });
+
+  return sales.map((s) => s.clientId).filter((id): id is string => id !== null);
+}
+
+// ── Charge les IDs d'une catégorie et de ses sous-catégories (2 niveaux) ──────
+
+async function getAllChildCategoryIds(categoryId: string): Promise<string[]> {
+  const result = new Set<string>([categoryId]);
+
+  const children = await db.category.findMany({
+    where: { parentId: categoryId },
+    select: { id: true },
+  });
+
+  for (const child of children) {
+    result.add(child.id);
+    const grandChildren = await db.category.findMany({
+      where: { parentId: child.id },
+      select: { id: true },
+    });
+    grandChildren.forEach((gc) => result.add(gc.id));
+  }
+
+  return [...result];
 }
 
 function buildNumberCondition(
@@ -307,7 +413,7 @@ export async function previewSegmentCriteria(
   const where: Prisma.ClientWhereInput = {
     deletedAt: null,
     status: { not: "DELETED" },
-    ...buildWhereFromCriteria(criteria),
+    ...(await buildWhereFromCriteria(criteria)),
   };
 
   const [count, sample] = await Promise.all([
@@ -344,7 +450,7 @@ export async function refreshDynamicSegment(segmentId: string): Promise<number> 
   const where: Prisma.ClientWhereInput = {
     deletedAt: null,
     status: { not: "DELETED" },
-    ...buildWhereFromCriteria(criteria),
+    ...(await buildWhereFromCriteria(criteria)),
   };
 
   const matchingClients = await db.client.findMany({
