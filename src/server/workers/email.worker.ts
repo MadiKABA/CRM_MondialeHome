@@ -14,6 +14,7 @@ import type { EmailJobPayload } from "@/features/email-mass/types";
 const QUEUE_NAME = "email-send";
 const BATCH_SIZE = 50;
 const BATCH_DELAY = 1000;
+const SEND_INTERVAL = 120; // Resend limite à 10 req/s, on reste en dessous
 
 export const emailQueue = redis
   ? new Queue<EmailJobPayload>(QUEUE_NAME, {
@@ -162,7 +163,7 @@ export function createEmailWorker(): Worker | null {
               tags: [
                 { name: "batch_id", value: batchId },
                 { name: "client_id", value: client.id },
-                { name: "template", value: template.name },
+                { name: "template", value: sanitizeTagValue(template.name) },
               ],
             });
 
@@ -186,8 +187,10 @@ export function createEmailWorker(): Worker | null {
               data: { status: "FAILED", errorMessage: msg },
             });
             failedCount++;
-            logger.error({ sendErr, clientId: client.id }, "Email send failed");
+            logger.error({ err: sendErr, clientId: client.id }, "Email send failed");
           }
+
+          await sleep(SEND_INTERVAL);
         }
 
         await db.emailBatch.update({
@@ -245,4 +248,9 @@ export function createEmailWorker(): Worker | null {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Resend n'accepte que [a-zA-Z0-9_-] dans les valeurs de tags
+function sanitizeTagValue(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, "-");
 }
