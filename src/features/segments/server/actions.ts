@@ -26,6 +26,8 @@ import {
   refreshDynamicSegment,
   previewSegmentCriteria,
   getClientsNotInGroup,
+  getArticlesForCriteriaPicker,
+  getCategoriesForCriteriaPicker,
 } from "./queries";
 import type { CriteriaGroupDTO, SegmentPreviewResult } from "../types";
 
@@ -401,6 +403,44 @@ export async function searchClientsForGroup(
   } catch (error) {
     logger.error({ error }, "Failed to search clients for group");
     return { success: false, error: "Erreur lors de la recherche" };
+  }
+}
+
+// ── RECHERCHER DES ARTICLES POUR LE CRITÈRE PICKER ───────────────────────────
+
+export async function searchArticlesForCriteria(
+  search?: string
+): Promise<
+  Result<
+    Array<{ id: string; name: string; reference: string; categoryName: string | null }>
+  >
+> {
+  try {
+    await requireAuth();
+    await checkPermission(PERMISSIONS.SEGMENTS_CREATE_ALL);
+
+    const articles = await getArticlesForCriteriaPicker(search);
+    return { success: true, data: articles };
+  } catch (error) {
+    logger.error({ error }, "Failed to search articles for criteria");
+    return { success: false, error: "Erreur lors de la recherche" };
+  }
+}
+
+// ── CHARGER LES CATÉGORIES POUR LE CRITÈRE PICKER ────────────────────────────
+
+export async function loadCategoriesForCriteria(): Promise<
+  Result<Array<{ id: string; name: string; parentName: string | null }>>
+> {
+  try {
+    await requireAuth();
+    await checkPermission(PERMISSIONS.SEGMENTS_CREATE_ALL);
+
+    const categories = await getCategoriesForCriteriaPicker();
+    return { success: true, data: categories };
+  } catch (error) {
+    logger.error({ error }, "Failed to load categories for criteria");
+    return { success: false, error: "Erreur lors du chargement" };
   }
 }
 

@@ -483,6 +483,63 @@ export async function refreshDynamicSegment(segmentId: string): Promise<number> 
   return clientIds.length;
 }
 
+// ── Articles pour le picker de critères produit ──────────────────────────────
+
+export async function getArticlesForCriteriaPicker(
+  search?: string
+): Promise<
+  Array<{ id: string; name: string; reference: string; categoryName: string | null }>
+> {
+  const articles = await db.article.findMany({
+    where: {
+      deletedAt: null,
+      status: { notIn: ["ARCHIVED", "DISCONTINUED"] },
+      ...(search?.trim() && {
+        OR: [
+          { name: { contains: search, mode: "insensitive" as const } },
+          { reference: { contains: search, mode: "insensitive" as const } },
+        ],
+      }),
+    },
+    select: {
+      id: true,
+      name: true,
+      reference: true,
+      category: { select: { name: true } },
+    },
+    take: 20,
+    orderBy: { name: "asc" },
+  });
+
+  return articles.map((a) => ({
+    id: a.id,
+    name: a.name,
+    reference: a.reference,
+    categoryName: a.category?.name ?? null,
+  }));
+}
+
+// ── Catégories pour le picker de critères produit ────────────────────────────
+
+export async function getCategoriesForCriteriaPicker(): Promise<
+  Array<{ id: string; name: string; parentName: string | null }>
+> {
+  const categories = await db.category.findMany({
+    select: {
+      id: true,
+      name: true,
+      parent: { select: { name: true } },
+    },
+    orderBy: [{ name: "asc" }],
+  });
+
+  return categories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    parentName: c.parent?.name ?? null,
+  }));
+}
+
 // ── Clients non membres d'un groupe (pour l'ajout) ───────────────────────────
 
 export async function getClientsNotInGroup(
