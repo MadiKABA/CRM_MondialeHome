@@ -4,7 +4,7 @@
 
 import { renderText, calcDiscountPercent, formatPrice } from "./renderer";
 import { getHeaderConfig } from "../types";
-import type { BuildEmailOptions, CampaignArticle } from "../types";
+import type { BuildEmailOptions, CampaignArticle, FreeImage } from "../types";
 
 export function buildEmailHtml(opts: BuildEmailOptions): string {
   const {
@@ -14,7 +14,9 @@ export function buildEmailHtml(opts: BuildEmailOptions): string {
     content,
     conclusion,
     bannerImageUrl,
+    bannerLinkUrl = null,
     articles = [],
+    freeImages = [],
     ctaText = null,
     ctaUrl = null,
     clientData,
@@ -28,6 +30,7 @@ export function buildEmailHtml(opts: BuildEmailOptions): string {
     text ? renderText(text, clientData, campaignVars) : "";
 
   const articlesHtml = articles.length > 0 ? buildArticlesGrid(articles) : "";
+  const freeImagesHtml = freeImages.length > 0 ? buildFreeImagesGrid(freeImages) : "";
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -92,12 +95,14 @@ export function buildEmailHtml(opts: BuildEmailOptions): string {
               ? `
           <tr>
             <td style="padding: 0;">
+              ${bannerLinkUrl ? `<a href="${sanitizeUrl(bannerLinkUrl)}" style="display: block;">` : ""}
               <img
                 src="${sanitizeUrl(bannerImageUrl)}"
                 alt="Bannière Mondial Home"
                 width="560"
                 style="width: 100%; max-height: 220px; object-fit: cover; display: block;"
               />
+              ${bannerLinkUrl ? `</a>` : ""}
             </td>
           </tr>`
               : ""
@@ -124,6 +129,18 @@ export function buildEmailHtml(opts: BuildEmailOptions): string {
           <tr>
             <td style="padding: 0 24px 24px;">
               ${articlesHtml}
+            </td>
+          </tr>`
+              : ""
+          }
+
+          <!-- ═══ IMAGES LIBRES (depuis la campagne) ═══ -->
+          ${
+            freeImagesHtml
+              ? `
+          <tr>
+            <td style="padding: 0 24px 24px;">
+              ${freeImagesHtml}
             </td>
           </tr>`
               : ""
@@ -301,6 +318,54 @@ function buildArticleCard(article: CampaignArticle): string {
       </tr>
 
     </table>
+  </div>
+  <!--[if mso]></td><![endif]-->`;
+}
+
+// ── Grille d'images libres (flyers, photos, affiches...) ──────────────────────
+
+function buildFreeImagesGrid(images: FreeImage[]): string {
+  if (images.length === 0) return "";
+
+  const blocks = images.map(buildFreeImageBlock).join("");
+
+  return `
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td>
+        <!--[if mso]><table width="100%" cellpadding="0" cellspacing="0"><tr><![endif]-->
+        ${blocks}
+        <!--[if mso]></tr></table><![endif]-->
+      </td>
+    </tr>
+  </table>`;
+}
+
+function buildFreeImageBlock(image: FreeImage): string {
+  const safeImageUrl = sanitizeUrl(image.url);
+  const safeLinkUrl = image.linkUrl ? sanitizeUrl(image.linkUrl) : null;
+  const isFull = image.layout === "full";
+
+  const linkOpen = safeLinkUrl
+    ? `<a href="${safeLinkUrl}" style="text-decoration: none; color: inherit;">`
+    : "";
+  const linkClose = safeLinkUrl ? "</a>" : "";
+
+  return `
+  <!--[if mso]><td width="${isFull ? "560" : "270"}" valign="top"><![endif]-->
+  <div style="width: ${isFull ? "100%" : "48%"}; display: ${isFull ? "block" : "inline-block"};
+              vertical-align: top; margin: 0 ${isFull ? "0" : "1%"}; margin-bottom: 16px;">
+    ${linkOpen}
+    <img src="${safeImageUrl}" alt="${escapeHtml(image.alt)}" width="100%"
+         style="width: 100%; border-radius: 10px; display: block; object-fit: cover;" />
+    ${linkClose}
+    ${
+      image.caption
+        ? `<p style="margin: 8px 0 0; font-size: 12px; color: #666666; line-height: 1.4; text-align: center;">
+             ${escapeHtml(image.caption)}
+           </p>`
+        : ""
+    }
   </div>
   <!--[if mso]></td><![endif]-->`;
 }

@@ -176,6 +176,37 @@ export interface CampaignArticle {
   linkUrl?: string | null;
 }
 
+// ── Image libre (flyer, photo, affiche...) fournie par la campagne ────────────
+// Avant upload : url = blob locale (preview), cloudinaryId = null, isUploaded = false
+// Après upload : url = URL Cloudinary permanente, cloudinaryId = public_id
+// `file` ne vit que côté client (jamais persisté ni envoyé au server action) —
+// il est mis à null dès que l'upload Cloudinary a réussi.
+
+export interface FreeImage {
+  id: string;
+  cloudinaryId: string | null;
+  url: string;
+  file: File | null;
+  alt: string;
+  caption: string | null;
+  linkUrl: string | null;
+  width: number;
+  height: number;
+  layout: "full" | "half";
+  isUploaded: boolean;
+}
+
+// ── Bannière de campagne (même logique d'upload différé que FreeImage) ────────
+
+export interface BannerData {
+  url: string | null;
+  file: File | null;
+  linkUrl: string | null;
+  isUploaded: boolean;
+}
+
+export type CampaignContentMode = "articles" | "images" | "both";
+
 // ── DTO Template (structure épurée, sans products/ctaText/ctaUrl) ─────────────
 
 export interface TemplateDTO {
@@ -229,7 +260,10 @@ export interface BuildEmailOptions {
 
   // Depuis la campagne (fournis à chaque utilisation)
   bannerImageUrl?: string | null;
+  bannerLinkUrl?: string | null;
   articles?: CampaignArticle[];
+  freeImages?: FreeImage[];
+  contentMode?: CampaignContentMode;
   ctaText?: string | null;
   ctaUrl?: string | null;
 

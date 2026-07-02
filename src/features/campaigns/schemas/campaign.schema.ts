@@ -1,5 +1,24 @@
 import { z } from "zod";
 
+// Toute image de campagne passe par notre route d'upload Cloudinary signée
+// (voir /api/upload/campaign-image) — on rejette donc toute URL qui ne vient
+// pas de ce domaine pour éviter qu'un client envoie une URL arbitraire.
+function isCloudinaryUrl(url: string): boolean {
+  try {
+    return new URL(url).hostname.endsWith("res.cloudinary.com");
+  } catch {
+    return false;
+  }
+}
+
+const cloudinaryUrlSchema = z
+  .string()
+  .url()
+  .refine(isCloudinaryUrl, { message: "L'image doit provenir de Cloudinary" })
+  .optional()
+  .nullable()
+  .or(z.literal(""));
+
 // ── Article de campagne ───────────────────────────────────────────────────────
 
 const campaignArticleSchema = z.object({
@@ -12,13 +31,32 @@ const campaignArticleSchema = z.object({
   linkUrl: z.string().url().optional().nullable().or(z.literal("")),
 });
 
+// ── Image libre (flyer, photo, affiche...) ────────────────────────────────────
+
+const freeImageSchema = z.object({
+  id: z.string().min(1),
+  cloudinaryId: z.string().min(1),
+  url: z.string().url().refine(isCloudinaryUrl, {
+    message: "L'image doit provenir de Cloudinary",
+  }),
+  alt: z.string().min(1, "La description est obligatoire").max(200),
+  caption: z.string().max(200).optional().nullable(),
+  linkUrl: z.string().url().optional().nullable().or(z.literal("")),
+  width: z.number().nonnegative(),
+  height: z.number().nonnegative(),
+  layout: z.enum(["full", "half"]),
+});
+
 // ── Données de campagne email ─────────────────────────────────────────────────
 
 const campaignDataSchema = z.object({
+  contentMode: z.enum(["articles", "images", "both"]).default("articles"),
   articles: z.array(campaignArticleSchema).max(4).default([]),
+  freeImages: z.array(freeImageSchema).max(4).default([]),
   ctaText: z.string().max(60).optional().nullable(),
   ctaUrl: z.string().url().optional().nullable().or(z.literal("")),
-  bannerImageUrl: z.string().url().optional().nullable().or(z.literal("")),
+  bannerImageUrl: cloudinaryUrlSchema,
+  bannerLinkUrl: z.string().url().optional().nullable().or(z.literal("")),
   campaignVars: z.record(z.string()).default({}),
 });
 

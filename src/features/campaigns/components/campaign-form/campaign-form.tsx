@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Check } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createCampaign } from "../../server/actions";
+import { uploadCampaignImages } from "../../lib/cloudinary-upload";
 import { StepInfo } from "./step-info";
 import { StepTemplate } from "./step-template";
 import { StepContent } from "./step-content";
@@ -13,7 +14,12 @@ import { StepSchedule } from "./step-schedule";
 import { StepReview } from "./step-review";
 import type { TemplateDTO } from "@/features/templates/types";
 import type { SegmentDTO } from "@/features/segments/types";
-import type { CampaignArticle } from "@/features/templates/types";
+import type {
+  CampaignArticle,
+  BannerData,
+  FreeImage,
+  CampaignContentMode,
+} from "@/features/templates/types";
 
 const STEPS = [
   { id: "info", label: "Informations" },
@@ -23,15 +29,24 @@ const STEPS = [
   { id: "review", label: "Récapitulatif" },
 ];
 
+const INITIAL_BANNER: BannerData = {
+  url: null,
+  file: null,
+  linkUrl: null,
+  isUploaded: false,
+};
+
 export interface CampaignFormState {
   name: string;
   description: string;
   segmentId: string;
   templateId: string;
+  contentMode: CampaignContentMode;
   articles: CampaignArticle[];
+  freeImages: FreeImage[];
   ctaText: string;
   ctaUrl: string;
-  bannerImageUrl: string;
+  banner: BannerData;
   campaignVars: Record<string, string>;
   scheduledAt: string | null;
 }
@@ -45,19 +60,38 @@ export function CampaignForm({ templates, segments }: Props) {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
   const [formState, setFormState] = useState<CampaignFormState>({
     name: "",
     description: "",
     segmentId: "",
     templateId: "",
+    contentMode: "articles",
     articles: [],
+    freeImages: [],
     ctaText: "",
     ctaUrl: "",
-    bannerImageUrl: "",
+    banner: INITIAL_BANNER,
     campaignVars: {},
     scheduledAt: null,
   });
+
+  // Révoque les blob URLs restantes si l'utilisateur quitte le wizard sans
+  // créer la campagne — évite de garder des fichiers en mémoire indéfiniment.
+  const formStateRef = useRef(formState);
+  useEffect(() => {
+    formStateRef.current = formState;
+  });
+  useEffect(() => {
+    return () => {
+      const state = formStateRef.current;
+      if (state.banner.url?.startsWith("blob:")) URL.revokeObjectURL(state.banner.url);
+      for (const img of state.freeImages) {
+        if (img.url.startsWith("blob:")) URL.revokeObjectURL(img.url);
+      }
+    };
+  }, []);
 
   const update = (patch: Partial<CampaignFormState>) =>
     setFormState((prev) => ({ ...prev, ...patch }));
@@ -76,16 +110,46 @@ export function CampaignForm({ templates, segments }: Props) {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
+      setUploadStatus("Envoi des images vers Cloudinary...");
+      const { banner, freeImages, errors } = await uploadCampaignImages(
+        formState.banner,
+        formState.freeImages
+      );
+
+      if (errors.length > 0) {
+        toast.error(`Erreur lors de l'upload des images : ${errors.join(" · ")}`);
+        return;
+      }
+
+      setUploadStatus("Création de la campagne...");
       const result = await createCampaign({
         name: formState.name,
         description: formState.description || undefined,
         segmentId: formState.segmentId,
         templateId: formState.templateId,
         campaignData: {
+          contentMode: formState.contentMode,
           articles: formState.articles,
+          freeImages: freeImages
+            .filter(
+              (img): img is FreeImage & { cloudinaryId: string } =>
+                img.isUploaded && !!img.cloudinaryId
+            )
+            .map((img) => ({
+              id: img.id,
+              cloudinaryId: img.cloudinaryId,
+              url: img.url,
+              alt: img.alt,
+              caption: img.caption,
+              linkUrl: img.linkUrl,
+              width: img.width,
+              height: img.height,
+              layout: img.layout,
+            })),
           ctaText: formState.ctaText || null,
           ctaUrl: formState.ctaUrl || null,
-          bannerImageUrl: formState.bannerImageUrl || null,
+          bannerImageUrl: banner.url || null,
+          bannerLinkUrl: banner.linkUrl || null,
           campaignVars: formState.campaignVars,
         },
         scheduledAt: formState.scheduledAt ?? undefined,
@@ -107,6 +171,7 @@ export function CampaignForm({ templates, segments }: Props) {
       toast.error("Une erreur est survenue");
     } finally {
       setIsSubmitting(false);
+      setUploadStatus(null);
     }
   };
 
@@ -206,13 +271,32 @@ export function CampaignForm({ templates, segments }: Props) {
               type="button"
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="bg-gold-deep hover:bg-gold-darker rounded-lg px-6 py-2.5 text-sm font-medium text-white transition-colors"
+              className="bg-gold-deep hover:bg-gold-darker flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-medium text-white transition-colors disabled:opacity-70"
             >
-              {isSubmitting ? "Création..." : "Créer la campagne →"}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  {uploadStatus ?? "Création..."}
+                </>
+              ) : (
+                "Créer la campagne →"
+              )}
             </button>
           </div>
         )}
       </div>
+
+      {isSubmitting && uploadStatus && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
+          <div className="mx-4 w-full max-w-sm space-y-4 rounded-xl bg-white p-6 text-center shadow-xl">
+            <Loader2 className="text-gold-deep mx-auto size-8 animate-spin" />
+            <div>
+              <p className="text-text-primary text-sm font-semibold">{uploadStatus}</p>
+              <p className="text-text-muted mt-1 text-xs">Ne fermez pas cette fenêtre</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

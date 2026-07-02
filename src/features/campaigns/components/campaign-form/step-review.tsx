@@ -33,8 +33,16 @@ export function StepReview({ state, templates, segments }: Props) {
     },
     {
       Icon: ImageIcon,
-      label: "Articles",
-      value: `${state.articles.length} article(s) sélectionné(s)`,
+      label: "Contenu",
+      value:
+        [
+          state.contentMode !== "images" && `${state.articles.length} article(s)`,
+          state.contentMode !== "articles" &&
+            `${state.freeImages.length} image(s) libre(s)`,
+          state.banner.url && "1 bannière",
+        ]
+          .filter(Boolean)
+          .join(" · ") || "Aucun",
     },
     {
       Icon: MousePointerClick,
