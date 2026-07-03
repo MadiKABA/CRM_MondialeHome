@@ -7,14 +7,18 @@ import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { checkPermission } from "@/lib/permissions/server";
 import { validateUploadedFile } from "@/lib/upload/sanitize";
-import { compressArticleImage } from "@/lib/upload/compress";
-import { saveFile, deleteFile, deleteDirectory } from "@/lib/upload/storage";
 import { UPLOAD_CONFIG } from "@/lib/upload/config";
 import { checkRateLimit } from "@/lib/rate-limit";
+import {
+  uploadImageBuffer,
+  deleteImageByPublicId,
+  extractCloudinaryPublicId,
+} from "@/lib/cloudinary/upload";
 
 type Result<T = void> = { success: true; data?: T } | { success: false; error: string };
 
 const MAX_SECONDARY = UPLOAD_CONFIG.ARTICLE_SECONDARY.MAX_COUNT;
+const ARTICLE_TAGS = ["article", "mondial-home"];
 
 async function getSession() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -24,6 +28,25 @@ async function getSession() {
 function revalidateArticle(articleId: string) {
   revalidatePath("/catalogue/articles");
   revalidatePath(`/catalogue/articles/${articleId}`);
+}
+
+function isCloudinaryUrl(url: string): boolean {
+  try {
+    return new URL(url).hostname.endsWith("res.cloudinary.com");
+  } catch {
+    return false;
+  }
+}
+
+// Best-effort : ne bloque jamais le flux principal si la suppression Cloudinary échoue.
+async function tryDeleteCloudinaryImage(url: string): Promise<void> {
+  const publicId = extractCloudinaryPublicId(url);
+  if (!publicId) return;
+  try {
+    await deleteImageByPublicId(publicId);
+  } catch (error) {
+    logger.warn({ error, publicId }, "Failed to delete Cloudinary asset");
+  }
 }
 
 // ── Upload image principale ───────────────────────────────────────────────────
@@ -40,7 +63,7 @@ export async function uploadArticleMainImage(
 
     const article = await db.article.findUnique({
       where: { id: articleId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, mainImage: true },
     });
     if (!article) return { success: false, error: "Article introuvable" };
 
@@ -63,21 +86,19 @@ export async function uploadArticleMainImage(
     const validation = validateUploadedFile(buffer, file.name, file.type, buffer.length);
     if (!validation.valid) return { success: false, error: validation.error! };
 
-    const compressed = await compressArticleImage(buffer);
-
-    const url = await saveFile(
-      `articles/${articleId}`,
-      UPLOAD_CONFIG.ARTICLE_MAIN.FILENAME,
-      compressed.buffer
-    );
+    const uploaded = await uploadImageBuffer(buffer, "articles/main", ARTICLE_TAGS);
 
     await db.article.update({
       where: { id: articleId },
-      data: { mainImage: url },
+      data: { mainImage: uploaded.url },
     });
 
+    if (article.mainImage) {
+      await tryDeleteCloudinaryImage(article.mainImage);
+    }
+
     revalidateArticle(articleId);
-    return { success: true, data: { url } };
+    return { success: true, data: { url: uploaded.url } };
   } catch (error) {
     logger.error({ error }, "Failed to upload article main image");
     return { success: false, error: "Erreur lors de l'upload" };
@@ -100,7 +121,7 @@ export async function deleteArticleMainImage(articleId: string): Promise<Result>
     if (!article) return { success: false, error: "Article introuvable" };
     if (!article.mainImage) return { success: false, error: "Aucune image principale" };
 
-    await deleteFile(`articles/${articleId}`, UPLOAD_CONFIG.ARTICLE_MAIN.FILENAME);
+    await tryDeleteCloudinaryImage(article.mainImage);
 
     await db.article.update({
       where: { id: articleId },
@@ -130,7 +151,7 @@ export async function deleteArticleMainImage(articleId: string): Promise<Result>
 export async function uploadArticleSecondaryImage(
   articleId: string,
   formData: FormData
-): Promise<Result<{ url: string; index: number }>> {
+): Promise<Result<{ url: string }>> {
   try {
     const user = await getSession();
     if (!user) return { success: false, error: "Non authentifié" };
@@ -169,37 +190,15 @@ export async function uploadArticleSecondaryImage(
     const validation = validateUploadedFile(buffer, file.name, file.type, buffer.length);
     if (!validation.valid) return { success: false, error: validation.error! };
 
-    const compressed = await compressArticleImage(buffer);
-
-    // Find next available slot (1 to MAX_SECONDARY)
-    const usedIndices = article.images
-      .map((url) => {
-        const match = /\/(\d+)\.webp$/.exec(url);
-        return match ? parseInt(match[1]!, 10) : null;
-      })
-      .filter((n): n is number => n !== null);
-
-    let nextIndex = 1;
-    while (usedIndices.includes(nextIndex) && nextIndex <= MAX_SECONDARY) {
-      nextIndex++;
-    }
-    if (nextIndex > MAX_SECONDARY) {
-      return { success: false, error: `Maximum ${MAX_SECONDARY} images atteint` };
-    }
-
-    const url = await saveFile(
-      `articles/${articleId}`,
-      `${nextIndex}.webp`,
-      compressed.buffer
-    );
+    const uploaded = await uploadImageBuffer(buffer, "articles/secondary", ARTICLE_TAGS);
 
     await db.article.update({
       where: { id: articleId },
-      data: { images: [...article.images, url] },
+      data: { images: [...article.images, uploaded.url] },
     });
 
     revalidateArticle(articleId);
-    return { success: true, data: { url, index: nextIndex } };
+    return { success: true, data: { url: uploaded.url } };
   } catch (error) {
     logger.error({ error }, "Failed to upload secondary image");
     return { success: false, error: "Erreur lors de l'upload" };
@@ -224,22 +223,11 @@ export async function deleteArticleSecondaryImage(
     });
     if (!article) return { success: false, error: "Article introuvable" };
 
-    // Validate the URL belongs to this article
-    const expectedPrefix = `/uploads/articles/${articleId}/`;
-    if (!imageUrl.startsWith(expectedPrefix)) {
-      return { success: false, error: "Image invalide" };
-    }
-
-    const filename = imageUrl.slice(expectedPrefix.length);
-    if (!/^\d+\.webp$/.test(filename)) {
-      return { success: false, error: "Nom de fichier invalide" };
-    }
-
-    if (!article.images.includes(imageUrl)) {
+    if (!isCloudinaryUrl(imageUrl) || !article.images.includes(imageUrl)) {
       return { success: false, error: "Image non trouvée sur cet article" };
     }
 
-    await deleteFile(`articles/${articleId}`, filename);
+    await tryDeleteCloudinaryImage(imageUrl);
 
     await db.article.update({
       where: { id: articleId },
@@ -272,12 +260,7 @@ export async function setArticleMainImage(
     });
     if (!article) return { success: false, error: "Article introuvable" };
 
-    const expectedPrefix = `/uploads/articles/${articleId}/`;
-    if (!newMainUrl.startsWith(expectedPrefix)) {
-      return { success: false, error: "Image invalide" };
-    }
-
-    if (!article.images.includes(newMainUrl)) {
+    if (!isCloudinaryUrl(newMainUrl) || !article.images.includes(newMainUrl)) {
       return { success: false, error: "Image non trouvée sur cet article" };
     }
 
@@ -307,7 +290,16 @@ export async function deleteAllArticleImages(articleId: string): Promise<Result>
 
     await checkPermission("articles.delete.all");
 
-    await deleteDirectory(`articles/${articleId}`);
+    const article = await db.article.findUnique({
+      where: { id: articleId },
+      select: { mainImage: true, images: true },
+    });
+
+    const urls = [
+      ...(article?.images ?? []),
+      ...(article?.mainImage ? [article.mainImage] : []),
+    ];
+    await Promise.allSettled(urls.map((url) => tryDeleteCloudinaryImage(url)));
 
     await db.article.update({
       where: { id: articleId },

@@ -64,7 +64,10 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const result = await uploadImageBuffer(buffer, folder as AllowedFolder);
+    const result = await uploadImageBuffer(buffer, folder as AllowedFolder, [
+      "campaign",
+      "mondial-home",
+    ]);
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {

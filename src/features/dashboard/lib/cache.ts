@@ -18,14 +18,14 @@ export const CACHE_KEYS = {
 // ── TTL en secondes ───────────────────────────────────────────────────────────
 
 export const CACHE_TTL = {
-  kpis: 2 * 60,
-  revenueChart: 10 * 60,
-  topClients: 5 * 60,
-  topArticles: 5 * 60,
-  paymentMethods: 5 * 60,
-  cities: 30 * 60,
-  rfmStats: 30 * 60,
-  segments: 10 * 60,
+  kpis: 10 * 60, // 10min
+  revenueChart: 60 * 60, // était 10min → 1h
+  topClients: 30 * 60, // était 5min  → 30min
+  topArticles: 30 * 60, // était 5min  → 30min
+  paymentMethods: 30 * 60, // était 5min  → 30min
+  cities: 24 * 60 * 60, // était 30min → 24h
+  rfmStats: 60 * 60, // était 30min → 1h
+  segments: 30 * 60, // était 10min → 30min
 } as const;
 
 // ── Getter générique avec fallback ────────────────────────────────────────────

@@ -43,9 +43,12 @@ export async function sendCampaignCore(
         segmentId: campaign.segmentId,
         campaignData: campaign.campaignData ?? {
           articles: [],
+          freeImages: [],
+          contentMode: "articles",
           ctaText: null,
           ctaUrl: null,
           bannerImageUrl: null,
+          bannerLinkUrl: null,
           campaignVars: {},
         },
       },

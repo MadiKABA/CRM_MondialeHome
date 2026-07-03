@@ -1,12 +1,19 @@
-import type { CampaignArticle } from "@/features/templates/types";
+import type {
+  CampaignArticle,
+  FreeImage,
+  CampaignContentMode,
+} from "@/features/templates/types";
 
 // ── Données de campagne passées à chaque envoi ────────────────────────────────
 
 export interface EmailCampaignData {
   articles: CampaignArticle[];
+  freeImages: FreeImage[];
+  contentMode: CampaignContentMode;
   ctaText: string | null;
   ctaUrl: string | null;
   bannerImageUrl: string | null;
+  bannerLinkUrl: string | null;
   campaignVars: Record<string, string>;
 }
 

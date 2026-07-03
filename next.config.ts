@@ -17,7 +17,7 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.sentry-cdn.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob:",
+      "img-src 'self' data: blob: https://res.cloudinary.com",
       "connect-src 'self' https://*.sentry.io wss://localhost:*",
       "frame-ancestors 'none'",
     ].join("; "),

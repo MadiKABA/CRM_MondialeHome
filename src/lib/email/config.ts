@@ -1,7 +1,7 @@
 export const EMAIL_CONFIG = {
   from: {
-    email: process.env["RESEND_FROM_EMAIL"] ?? "onboarding@resend.dev",
-    name: process.env["RESEND_FROM_NAME"] ?? "Mondial Home CRM",
+    email: process.env["RESEND_FROM_EMAIL"] ?? "contact@groupeadaconsulting.com",
+    name: process.env["RESEND_FROM_NAME"] ?? "Mondial Home",
     get formatted() {
       return `${this.name} <${this.email}>`;
     },

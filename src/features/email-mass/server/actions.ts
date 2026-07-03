@@ -41,11 +41,26 @@ const campaignArticleSchema = z.object({
   linkUrl: z.string().url().optional().nullable().or(z.literal("")),
 });
 
+const freeImageSchema = z.object({
+  id: z.string().min(1),
+  cloudinaryId: z.string().min(1),
+  url: z.string().url(),
+  alt: z.string().min(1).max(200),
+  caption: z.string().max(200).optional().nullable(),
+  linkUrl: z.string().url().optional().nullable().or(z.literal("")),
+  width: z.number().nonnegative(),
+  height: z.number().nonnegative(),
+  layout: z.enum(["full", "half"]),
+});
+
 const campaignDataSchema = z.object({
   articles: z.array(campaignArticleSchema).max(4),
+  freeImages: z.array(freeImageSchema).max(4).default([]),
+  contentMode: z.enum(["articles", "images", "both"]).default("articles"),
   ctaText: z.string().max(60).optional().nullable(),
   ctaUrl: z.string().url().optional().nullable().or(z.literal("")),
   bannerImageUrl: z.string().url().optional().nullable().or(z.literal("")),
+  bannerLinkUrl: z.string().url().optional().nullable().or(z.literal("")),
   campaignVars: z.record(z.string()).default({}),
 });
 
@@ -72,9 +87,18 @@ function normalizeCampaignData(
       mainImage: a.mainImage || null,
       linkUrl: a.linkUrl || null,
     })),
+    freeImages: raw.freeImages.map((img) => ({
+      ...img,
+      caption: img.caption ?? null,
+      linkUrl: img.linkUrl || null,
+      file: null,
+      isUploaded: true,
+    })),
+    contentMode: raw.contentMode,
     ctaText: raw.ctaText ?? null,
     ctaUrl: raw.ctaUrl || null,
     bannerImageUrl: raw.bannerImageUrl || null,
+    bannerLinkUrl: raw.bannerLinkUrl || null,
     campaignVars: raw.campaignVars,
   };
 }
