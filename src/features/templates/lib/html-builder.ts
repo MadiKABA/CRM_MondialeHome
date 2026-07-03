@@ -4,7 +4,12 @@
 
 import { renderText, calcDiscountPercent, formatPrice } from "./renderer";
 import { getHeaderConfig } from "../types";
-import type { BuildEmailOptions, CampaignArticle, FreeImage } from "../types";
+import type {
+  BuildEmailOptions,
+  CampaignArticle,
+  FreeImage,
+  HeaderConfig,
+} from "../types";
 
 export function buildEmailHtml(opts: BuildEmailOptions): string {
   const {
@@ -31,6 +36,7 @@ export function buildEmailHtml(opts: BuildEmailOptions): string {
 
   const articlesHtml = articles.length > 0 ? buildArticlesGrid(articles) : "";
   const freeImagesHtml = freeImages.length > 0 ? buildFreeImagesGrid(freeImages) : "";
+  const hasBannerImage = !!bannerImageUrl?.trim();
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -69,43 +75,14 @@ export function buildEmailHtml(opts: BuildEmailOptions): string {
                style="max-width: 560px; background-color: #FFFFFF; border-radius: 12px;
                       overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.08);">
 
-          <!-- ═══ HEADER (depuis le template) ═══ -->
-          <tr>
-            <td style="background-color: ${header.bgColor}; padding: 32px 40px; text-align: center;">
-              <p style="margin: 0 0 16px; font-size: 13px; font-weight: 700;
-                        letter-spacing: 3px; color: rgba(255,255,255,0.7); text-transform: uppercase;">
-                MONDIAL HOME
-              </p>
-              <p style="margin: 0 0 8px; font-size: 32px; line-height: 1;">
-                ${header.icon}
-              </p>
-              <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 800;
-                         color: ${header.textColor}; letter-spacing: 1px; text-transform: uppercase;">
-                ${render(header.title)}
-              </h1>
-              <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.85); line-height: 1.5;">
-                ${render(header.subtitle)}
-              </p>
-            </td>
-          </tr>
+          <!-- ═══ LOGO HEADER (toujours visible) ═══ -->
+          ${buildLogoHeader()}
 
-          <!-- ═══ BANNIÈRE (depuis la campagne) ═══ -->
+          <!-- ═══ HEADER (colore, fallback) OU BANNIERE IMAGE (si uploadee) ═══ -->
           ${
-            bannerImageUrl
-              ? `
-          <tr>
-            <td style="padding: 0;">
-              ${bannerLinkUrl ? `<a href="${sanitizeUrl(bannerLinkUrl)}" style="display: block;">` : ""}
-              <img
-                src="${sanitizeUrl(bannerImageUrl)}"
-                alt="Bannière Mondial Home"
-                width="560"
-                style="width: 100%; max-height: 220px; object-fit: cover; display: block;"
-              />
-              ${bannerLinkUrl ? `</a>` : ""}
-            </td>
-          </tr>`
-              : ""
+            hasBannerImage
+              ? buildBannerImage(bannerImageUrl!, bannerLinkUrl)
+              : buildCampaignHeader(header, render)
           }
 
           <!-- ═══ INTRODUCTION (depuis le template) ═══ -->
@@ -209,6 +186,68 @@ export function buildEmailHtml(opts: BuildEmailOptions): string {
 
 </body>
 </html>`;
+}
+
+// ── Logo header — toujours visible, jamais remplacé (image bannière ou header colore) ──
+
+function buildLogoHeader(): string {
+  return `
+  <tr>
+    <td style="background-color: #FFFFFF; padding: 20px 40px 16px; text-align: center;
+               border-bottom: 2px solid #EEE6D8;">
+      <p style="margin: 0 0 2px; font-size: 22px; font-weight: 900; color: #8B6914;
+                letter-spacing: 2px;">
+        MONDIAL HOME
+      </p>
+      <p style="margin: 0; font-size: 10px; color: #999999; letter-spacing: 2px;">
+        MOBILIER &amp; DÉCORATION
+      </p>
+    </td>
+  </tr>`;
+}
+
+// ── Header colore du template — fallback affiche uniquement si pas de bannière image ──
+
+function buildCampaignHeader(
+  header: HeaderConfig,
+  render: (text: string | null) => string
+): string {
+  return `
+  <tr>
+    <td style="background-color: ${header.bgColor}; padding: 32px 40px; text-align: center;">
+      <p style="margin: 0 0 8px; font-size: 32px; line-height: 1;">
+        ${header.icon}
+      </p>
+      <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 800;
+                 color: ${header.textColor}; letter-spacing: 1px; text-transform: uppercase;">
+        ${render(header.title)}
+      </h1>
+      <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.85); line-height: 1.5;">
+        ${render(header.subtitle)}
+      </p>
+    </td>
+  </tr>`;
+}
+
+// ── Bannière image (depuis la campagne) — remplace le header colore quand fournie ──
+
+function buildBannerImage(imageUrl: string, linkUrl: string | null | undefined): string {
+  const safeImageUrl = sanitizeUrl(imageUrl);
+  const safeLinkUrl = linkUrl ? sanitizeUrl(linkUrl) : null;
+
+  const img = `<img
+        src="${safeImageUrl}"
+        alt="Bannière Mondial Home"
+        width="560"
+        style="width: 100%; max-height: 220px; object-fit: cover; display: block;"
+      />`;
+
+  return `
+  <tr>
+    <td style="padding: 0;">
+      ${safeLinkUrl ? `<a href="${safeLinkUrl}" style="display: block;">${img}</a>` : img}
+    </td>
+  </tr>`;
 }
 
 // ── Grille d'articles depuis le catalogue M2 ──────────────────────────────────
