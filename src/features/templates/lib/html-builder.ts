@@ -58,9 +58,8 @@ export function buildEmailHtml(opts: BuildEmailOptions): string {
     body { margin: 0; padding: 0; background-color: #F5EFE6; }
     table { border-spacing: 0; }
     img { border: 0; display: block; }
-    .article-card { display: inline-block; width: 48%; vertical-align: top; }
     @media only screen and (max-width: 480px) {
-      .article-card { width: 100% !important; display: block !important; }
+      .article-td { width: 100% !important; max-width: 100% !important; display: block !important; padding: 0 0 12px !important; }
       .email-container { width: 100% !important; }
     }
   </style>
@@ -252,19 +251,63 @@ function buildBannerImage(imageUrl: string, linkUrl: string | null | undefined):
 
 // ── Grille d'articles depuis le catalogue M2 ──────────────────────────────────
 
+const ARTICLE_CARD_WIDTH = 250;
+
 function buildArticlesGrid(articles: CampaignArticle[]): string {
   if (articles.length === 0) return "";
 
-  const cards = articles.map(buildArticleCard).join("");
+  if (articles.length === 1) {
+    return buildCenteredArticleRow(articles[0]!);
+  }
 
+  const rows: string[] = [];
+  const pairCount = Math.floor(articles.length / 2) * 2;
+
+  for (let i = 0; i < pairCount; i += 2) {
+    rows.push(buildArticlePairRow(articles[i]!, articles[i + 1]!));
+  }
+
+  if (articles.length % 2 === 1) {
+    rows.push(buildCenteredArticleRow(articles[articles.length - 1]!));
+  }
+
+  return rows.join("");
+}
+
+// ── 1 article seul, ou dernier article d'un nombre impair → centré ────────────
+
+function buildCenteredArticleRow(article: CampaignArticle): string {
   return `
-  <table width="100%" cellpadding="0" cellspacing="0">
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 16px;">
     <tr>
-      <td>
-        <!--[if mso]><table width="100%" cellpadding="0" cellspacing="0"><tr><![endif]-->
-        ${cards}
-        <!--[if mso]></tr></table><![endif]-->
+      <td align="center">
+        <table width="${ARTICLE_CARD_WIDTH}" cellpadding="0" cellspacing="0">
+          <tr>
+            <td>${buildArticleCard(article)}</td>
+          </tr>
+        </table>
       </td>
+    </tr>
+  </table>`;
+}
+
+// ── 2 articles côte à côte — colonnes fixes compatibles Outlook ────────────────
+
+function buildArticlePairRow(left: CampaignArticle, right: CampaignArticle): string {
+  return `
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 16px;">
+    <tr>
+      <!--[if mso]><td width="${ARTICLE_CARD_WIDTH}" valign="top"><![endif]-->
+      <td class="article-td" valign="top"
+          style="width: ${ARTICLE_CARD_WIDTH}px; max-width: ${ARTICLE_CARD_WIDTH}px; padding-right: 6px;">
+        ${buildArticleCard(left)}
+      </td>
+      <!--[if mso]></td><td width="${ARTICLE_CARD_WIDTH}" valign="top"><![endif]-->
+      <td class="article-td" valign="top"
+          style="width: ${ARTICLE_CARD_WIDTH}px; max-width: ${ARTICLE_CARD_WIDTH}px; padding-left: 6px;">
+        ${buildArticleCard(right)}
+      </td>
+      <!--[if mso]></td><![endif]-->
     </tr>
   </table>`;
 }
@@ -288,77 +331,72 @@ function buildArticleCard(article: CampaignArticle): string {
   const linkClose = safeLinkUrl ? "</a>" : "";
 
   return `
-  <!--[if mso]><td width="250" valign="top"><![endif]-->
-  <div class="article-card"
-       style="width: 48%; display: inline-block; vertical-align: top; margin: 0 1%; margin-bottom: 16px;">
-    <table width="100%" cellpadding="0" cellspacing="0"
-           style="border: 1px solid #EEE6D8; border-radius: 10px; overflow: hidden;">
+  <table width="100%" cellpadding="0" cellspacing="0"
+         style="border: 1px solid #EEE6D8; border-radius: 8px; overflow: hidden;">
 
-      <tr>
-        <td style="padding: 0; position: relative;">
-          ${linkOpen}
-          ${
-            safeImageUrl
-              ? `<img src="${safeImageUrl}" alt="${escapeHtml(article.name)}" width="100%"
-                    style="width: 100%; height: 180px; object-fit: cover; display: block;" />`
-              : `<div style="width: 100%; height: 180px; background-color: #F5EFE6;
-                           text-align: center; line-height: 180px; font-size: 40px;">
-                 🛋️
-               </div>`
-          }
-          ${linkClose}
-          ${
-            discount
-              ? `
-          <div style="position: absolute; top: 10px; left: 10px; background-color: #DC2626;
-                      color: #FFFFFF; padding: 4px 8px; border-radius: 6px;
-                      font-size: 12px; font-weight: 700;">
-            -${discount}%
-          </div>`
-              : ""
-          }
-        </td>
-      </tr>
+    <tr>
+      <td style="padding: 0; position: relative;">
+        ${linkOpen}
+        ${
+          safeImageUrl
+            ? `<img src="${safeImageUrl}" alt="${escapeHtml(article.name)}" width="100%"
+                  style="width: 100%; height: 160px; object-fit: cover; display: block;" />`
+            : `<div style="width: 100%; height: 160px; background-color: #F5EFE6;
+                         text-align: center; line-height: 160px; font-size: 36px;">
+               🛋️
+             </div>`
+        }
+        ${linkClose}
+        ${
+          discount
+            ? `
+        <div style="position: absolute; top: 10px; left: 10px; background-color: #DC2626;
+                    color: #FFFFFF; padding: 4px 8px; border-radius: 6px;
+                    font-size: 12px; font-weight: 700;">
+          -${discount}%
+        </div>`
+            : ""
+        }
+      </td>
+    </tr>
 
-      <tr>
-        <td style="padding: 12px 14px 14px;">
-          ${linkOpen}
-          <p style="margin: 0 0 8px; font-size: 13px; font-weight: 600;
-                    color: #2D2D2D; line-height: 1.3;">
-            ${escapeHtml(article.name)}
-          </p>
-          ${linkClose}
+    <tr>
+      <td style="padding: 10px 12px 12px;">
+        ${linkOpen}
+        <p style="margin: 0 0 6px; font-size: 12px; font-weight: 700;
+                  color: #2D2D2D; line-height: 1.35;">
+          ${escapeHtml(article.name)}
+        </p>
+        ${linkClose}
 
-          <p style="margin: 0 0 6px; font-size: 10px; color: #AAAAAA;">
-            Réf. ${escapeHtml(article.reference)}
-          </p>
+        <p style="margin: 0 0 6px; font-size: 10px; color: #AAAAAA;">
+          Réf. ${escapeHtml(article.reference)}
+        </p>
 
-          ${
-            originalPrice
-              ? `<p style="margin: 0 0 2px; font-size: 12px; color: #999999;"><s>${originalPrice}</s></p>`
-              : ""
-          }
+        ${
+          originalPrice
+            ? `<p style="margin: 0 0 2px; font-size: 11px; color: #999999;"><s>${originalPrice}</s></p>`
+            : ""
+        }
 
-          <p style="margin: 0 0 10px; font-size: 18px; font-weight: 800; color: #8B6914;">
-            ${displayPrice}
-          </p>
+        <p style="margin: 0 0 8px; font-size: 16px; font-weight: 800; color: #8B6914;">
+          ${displayPrice}
+        </p>
 
-          ${
-            safeLinkUrl
-              ? `<a href="${safeLinkUrl}"
-                   style="display: block; text-align: center; background-color: #F5EFE6;
-                          color: #8B6914; border: 1px solid #C9A66B; border-radius: 6px;
-                          padding: 8px 12px; font-size: 12px; font-weight: 600; text-decoration: none;">
-                  Voir les détails →
-               </a>`
-              : ""
-          }
-        </td>
-      </tr>
+        ${
+          safeLinkUrl
+            ? `<a href="${safeLinkUrl}"
+                 style="display: block; text-align: center; background-color: #F5EFE6;
+                        color: #8B6914; border: 1px solid #C9A66B; border-radius: 5px;
+                        padding: 5px 12px; font-size: 11px; font-weight: 600; text-decoration: none;">
+                Voir →
+             </a>`
+            : ""
+        }
+      </td>
+    </tr>
 
-    </table>
-  </div>
-  <!--[if mso]></td><![endif]-->`;
+  </table>`;
 }
 
 // ── Grille d'images libres (flyers, photos, affiches...) ──────────────────────
