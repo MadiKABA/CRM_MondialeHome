@@ -11,12 +11,14 @@ import {
   articleSchema,
   bulkArticleActionSchema,
   updateStockSchema,
+  quickCreateArticleSchema,
   type ArticleInput,
   type ArticleFilters,
   type BulkArticleActionInput,
   type UpdateStockInput,
+  type QuickCreateArticleInput,
 } from "../schemas/article.schema";
-import { isReferenceUnique } from "./queries";
+import { isReferenceUnique, generateArticleReference } from "./queries";
 import type { ActionResult, ArticleListItemDTO } from "../types";
 
 async function getUser() {
@@ -127,6 +129,60 @@ export async function createArticle(
     return { success: true, data: { id: article.id } };
   } catch (err) {
     logger.error({ err }, "Failed to create article");
+    return { success: false, error: "Une erreur est survenue lors de la création" };
+  }
+}
+
+// ── CRÉATION RAPIDE (4 champs) ──────────────────────────────────────────────
+// Photo, nom, catégorie, isNew. Les autres champs reçoivent des valeurs par
+// défaut ; l'article reste modifiable via le formulaire complet ensuite.
+
+export async function createArticleQuick(
+  input: QuickCreateArticleInput
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const user = await getUser();
+    if (!user) return { success: false, error: "Non authentifié" };
+
+    await checkPermission("articles.create.all");
+
+    const data = quickCreateArticleSchema.parse(input);
+
+    if (data.mainImage?.startsWith("blob:")) {
+      return { success: false, error: "L'image n'a pas été uploadée correctement" };
+    }
+
+    const reference = await generateArticleReference();
+
+    const article = await db.article.create({
+      data: {
+        reference,
+        name: data.name,
+        categoryId: data.categoryId,
+        isNew: data.isNew,
+        price: 0,
+        currency: "XOF",
+        stock: 0,
+        stockAlert: 5,
+        status: "AVAILABLE",
+        mainImage: data.mainImage || null,
+        images: [],
+        tags: [],
+        attributes: {},
+        metadata: {},
+      },
+    });
+
+    await audit(user.id, "article.create", article.id, {
+      reference: article.reference,
+      name: article.name,
+      quickCreate: true,
+    } satisfies Prisma.InputJsonObject);
+
+    revalidatePath("/catalogue/articles");
+    return { success: true, data: { id: article.id } };
+  } catch (err) {
+    logger.error({ err }, "Failed to quick-create article");
     return { success: false, error: "Une erreur est survenue lors de la création" };
   }
 }

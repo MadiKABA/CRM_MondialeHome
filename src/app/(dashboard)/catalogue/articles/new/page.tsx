@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth/auth";
 import { hasPermission } from "@/lib/permissions/server";
 import { getCategoriesForSelect } from "@/features/catalogue/categories/server/queries";
-import { ArticleForm } from "@/features/catalogue/articles/components/article-form";
+import { ArticleCreateTabs } from "@/features/catalogue/articles/components/article-create-tabs";
 
 export const metadata = { title: "Nouvel article — Mondial Home CRM" };
 
@@ -30,7 +30,7 @@ export default async function NewArticlePage() {
       </div>
 
       <div className="bg-card rounded-xl border p-6">
-        <ArticleForm
+        <ArticleCreateTabs
           categories={categories}
           canManagePrices={canManagePrices}
           canViewCost={canViewCost}

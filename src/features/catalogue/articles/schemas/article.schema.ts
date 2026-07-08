@@ -83,6 +83,21 @@ export const articleSchema = z
 export type ArticleInput = z.input<typeof articleSchema>;
 export type ArticleOutput = z.output<typeof articleSchema>;
 
+// ── Création rapide (4 champs) ────────────────────────────────────────────
+// Les autres champs (reference, price, stock, status...) reçoivent des
+// valeurs par défaut côté serveur. L'article reste modifiable ensuite via
+// le formulaire complet (articleSchema).
+
+export const quickCreateArticleSchema = z.object({
+  name: z.string().min(2, "Minimum 2 caractères").max(200, "Trop long"),
+  categoryId: z.string().cuid("Catégorie invalide"),
+  isNew: z.boolean().default(false),
+  mainImage: z.string().optional().nullable(),
+});
+
+export type QuickCreateArticleInput = z.input<typeof quickCreateArticleSchema>;
+export type QuickCreateArticleOutput = z.output<typeof quickCreateArticleSchema>;
+
 export const articleFiltersSchema = z.object({
   search: z.string().optional(),
   categoryId: z.string().cuid().optional(),
