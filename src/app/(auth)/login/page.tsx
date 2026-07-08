@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { LoginForm } from "@/features/auth/components/login-form";
 
 export const metadata: Metadata = {
-  title: "Connexion — Mondial Home CRM",
-  description: "Connectez-vous à votre espace CRM Mondial Home",
+  title: "Connexion — Mondiale Home CRM",
+  description: "Connectez-vous à votre espace CRM Mondiale Home",
 };
 
 export default function LoginPage() {

@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const article = await getArticleById(id);
   return {
-    title: article ? `${article.name} — Mondial Home CRM` : "Article introuvable",
+    title: article ? `${article.name} — Mondiale Home CRM` : "Article introuvable",
   };
 }
 

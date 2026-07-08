@@ -24,7 +24,7 @@ export const PERMISSION_LABELS: Record<PermissionCode, PermissionLabel> = {
   "clients.read.all": {
     code: "clients.read.all",
     label: "Voir tous les clients",
-    description: "Permet de consulter la fiche de n'importe quel client de Mondial Home",
+    description: "Permet de consulter la fiche de n'importe quel client de Mondiale Home",
     example: "Aïssatou peut voir les détails de tous les clients",
     isDangerous: false,
     superAdminOnly: false,
@@ -154,7 +154,7 @@ export const PERMISSION_LABELS: Record<PermissionCode, PermissionLabel> = {
   "sales.read.all": {
     code: "sales.read.all",
     label: "Voir toutes les ventes",
-    description: "Permet de consulter l'ensemble des ventes de Mondial Home",
+    description: "Permet de consulter l'ensemble des ventes de Mondiale Home",
     isDangerous: false,
     superAdminOnly: false,
   },

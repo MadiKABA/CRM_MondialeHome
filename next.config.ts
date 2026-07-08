@@ -29,6 +29,13 @@ const nextConfig: NextConfig = {
 
   images: {
     // Images locales dans public/uploads/ — servies statiquement, pas de remotePattern nécessaire
+    // Images articles/bannières/avatars — uploadées sur Cloudinary
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+      },
+    ],
     formats: ["image/avif", "image/webp"],
     deviceSizes: [640, 750, 828, 1080, 1200],
   },

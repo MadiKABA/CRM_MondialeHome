@@ -3,7 +3,7 @@ import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SegmentForm } from "@/features/segments/components/segment-form";
 
-export const metadata = { title: "Nouveau segment — Mondial Home CRM" };
+export const metadata = { title: "Nouveau segment — Mondiale Home CRM" };
 
 export default function NewSegmentPage() {
   return (

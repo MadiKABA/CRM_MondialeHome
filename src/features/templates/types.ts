@@ -134,7 +134,7 @@ export const HEADER_CONFIGS: Record<string, HeaderConfig> = {
   },
   Événement_default: {
     icon: "🎉",
-    title: "ÉVÉNEMENT MONDIAL HOME",
+    title: "ÉVÉNEMENT MONDIALE HOME",
     subtitle: "Ne manquez pas cet événement",
     bgColor: "#4A2828",
     textColor: "#FFFFFF",

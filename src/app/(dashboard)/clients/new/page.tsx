@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { getAllTags } from "@/features/clients/server/queries";
 import { ClientForm } from "@/features/clients/components/client-form";
 
-export const metadata = { title: "Nouveau client — Mondial Home CRM" };
+export const metadata = { title: "Nouveau client — Mondiale Home CRM" };
 
 export default async function NewClientPage() {
   const tags = await getAllTags();

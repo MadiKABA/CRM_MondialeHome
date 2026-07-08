@@ -25,10 +25,11 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Mondial Home CRM",
-    template: "%s | Mondial Home CRM",
+    default: "Mondiale Home CRM",
+    template: "%s | Mondiale Home CRM",
   },
-  description: "Plateforme CRM pour Mondial Home — Gestion clients, campagnes et ventes.",
+  description:
+    "Plateforme CRM pour Mondiale Home — Gestion clients, campagnes et ventes.",
   robots: { index: false, follow: false },
 };
 

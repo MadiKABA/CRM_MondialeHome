@@ -76,7 +76,7 @@ export function AppSidebar({
           {!isCollapsed && (
             <div className="flex flex-col">
               <span className="font-heading text-sidebar-foreground text-sm leading-tight font-semibold">
-                Mondial Home
+                Mondiale Home
               </span>
               <span className="text-sidebar-foreground/50 text-xs">CRM Platform</span>
             </div>

@@ -154,28 +154,7 @@ export function buildEmailHtml(opts: BuildEmailOptions): string {
           }
 
           <!-- ═══ FOOTER (automatique) ═══ -->
-          <tr>
-            <td style="background-color: #F9F5EF; padding: 24px 40px; text-align: center;
-                       border-top: 1px solid #EEE6D8;">
-              <p style="margin: 0 0 8px; font-size: 13px; font-weight: 700;
-                        color: #8B6914; letter-spacing: 2px;">
-                MONDIAL HOME
-              </p>
-              <p style="margin: 0 0 4px; font-size: 12px; color: #999999;">
-                Dakar, Rue 10 × Liberté 6
-              </p>
-              <p style="margin: 0 0 16px; font-size: 12px; color: #999999;">
-                +221 33 820 00 00
-              </p>
-              <p style="margin: 0; font-size: 11px; color: #CCCCCC;">
-                © ${new Date().getFullYear()} Mondial Home · Dakar, Sénégal
-                &nbsp;·&nbsp;
-                <a href="${appUrl}/unsubscribe" style="color: #BBBBBB; text-decoration: underline;">
-                  Se désabonner
-                </a>
-              </p>
-            </td>
-          </tr>
+          ${buildFooter(appUrl)}
 
         </table>
 
@@ -187,6 +166,67 @@ export function buildEmailHtml(opts: BuildEmailOptions): string {
 </html>`;
 }
 
+// ── Footer — infos réelles Mondiale Home ──
+
+function buildFooter(appUrl: string): string {
+  const links = [
+    { label: "Contact", url: "https://www.mondialehomesn.com/contact" },
+    { label: "Livraison", url: "https://www.mondialehomesn.com/livraison" },
+    { label: "Garantie", url: "https://www.mondialehomesn.com/garantie" },
+    {
+      label: "Service Après-Vente",
+      url: "https://www.mondialehomesn.com/service-apres-vente",
+    },
+  ];
+
+  const linksHtml = links
+    .map(
+      (link) =>
+        `<a href="${sanitizeUrl(link.url)}" style="color: #888888; text-decoration: underline; font-size: 11px;">${escapeHtml(link.label)}</a>`
+    )
+    .join(`<span style="color: #CCCCCC; font-size: 11px;">&nbsp;·&nbsp;</span>`);
+
+  return `
+  <tr>
+    <td style="background-color: #FAF7F2; padding: 24px 32px; text-align: center;
+               border-top: 1px solid #EEE6D8;">
+      <p style="margin: 0 0 8px; font-size: 13px; font-weight: 700;
+                color: #8B6914; letter-spacing: 2px;">
+        MONDIALE HOME
+      </p>
+      <p style="margin: 0 0 2px; font-size: 12px; color: #999999;">
+        Parcelle en face de l'arrêt BRT Police
+      </p>
+      <p style="margin: 0 0 8px; font-size: 12px; color: #999999;">
+        Parcelles, Dakar, Sénégal
+      </p>
+      <p style="margin: 0 0 4px; font-size: 12px;">
+        <a href="tel:+221784514040" style="color: #888888; text-decoration: none;">
+          +221 78 451 40 40
+        </a>
+      </p>
+      <p style="margin: 0 0 8px; font-size: 12px;">
+        <a href="mailto:senmondialhome@gmail.com" style="color: #888888; text-decoration: none;">
+          senmondialhome@gmail.com
+        </a>
+      </p>
+      <p style="margin: 0 0 16px; font-size: 12px; color: #999999;">
+        Lun - Sam : 10h00 - 19h30
+      </p>
+      <p style="margin: 0 0 12px; font-size: 11px;">
+        ${linksHtml}
+      </p>
+      <p style="margin: 0; font-size: 10px; color: #CCCCCC;">
+        © ${new Date().getFullYear()} Mondiale Home
+        &nbsp;·&nbsp;
+        <a href="${appUrl}/unsubscribe" style="color: #BBBBBB; text-decoration: underline;">
+          Se désabonner
+        </a>
+      </p>
+    </td>
+  </tr>`;
+}
+
 // ── Logo header — toujours visible, jamais remplacé (image bannière ou header colore) ──
 
 function buildLogoHeader(): string {
@@ -196,7 +236,7 @@ function buildLogoHeader(): string {
                border-bottom: 2px solid #EEE6D8;">
       <p style="margin: 0 0 2px; font-size: 22px; font-weight: 900; color: #8B6914;
                 letter-spacing: 2px;">
-        MONDIAL HOME
+        MONDIALE HOME
       </p>
       <p style="margin: 0; font-size: 10px; color: #999999; letter-spacing: 2px;">
         MOBILIER &amp; DÉCORATION
@@ -236,7 +276,7 @@ function buildBannerImage(imageUrl: string, linkUrl: string | null | undefined):
 
   const img = `<img
         src="${safeImageUrl}"
-        alt="Bannière Mondial Home"
+        alt="Bannière Mondiale Home"
         width="560"
         style="width: 100%; max-height: 220px; object-fit: cover; display: block;"
       />`;

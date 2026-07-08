@@ -6,7 +6,7 @@ import { getArticleById } from "@/features/catalogue/articles/server/queries";
 import { getCategoriesForSelect } from "@/features/catalogue/categories/server/queries";
 import { ArticleForm } from "@/features/catalogue/articles/components/article-form";
 
-export const metadata = { title: "Modifier l'article — Mondial Home CRM" };
+export const metadata = { title: "Modifier l'article — Mondiale Home CRM" };
 
 interface PageProps {
   params: Promise<{ id: string }>;

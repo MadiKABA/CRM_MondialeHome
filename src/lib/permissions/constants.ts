@@ -1,5 +1,5 @@
 // ============================================================
-// PERMISSIONS — CRM Mondial Home
+// PERMISSIONS — CRM Mondiale Home
 // Format : module.action.scope
 // 59 permissions réparties sur 9 modules
 // ============================================================

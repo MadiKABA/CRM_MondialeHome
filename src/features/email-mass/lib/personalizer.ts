@@ -77,7 +77,7 @@ export function personalizeEmail(
   });
 
   const subject = personalizeSubject(
-    template.subject ?? "Message de Mondial Home",
+    template.subject ?? "Message de Mondiale Home",
     clientData,
     campaignData.campaignVars
   );

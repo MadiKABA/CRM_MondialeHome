@@ -66,7 +66,7 @@ export function ForgotPasswordEmail({
                         letterSpacing: "0.5px",
                       }}
                     >
-                      MONDIAL HOME
+                      MONDIALE HOME
                     </h1>
                     <p
                       style={{
@@ -194,7 +194,7 @@ export function ForgotPasswordEmail({
                     }}
                   >
                     <p style={{ margin: "0", fontSize: "12px", color: "#AAAAAA" }}>
-                      © {new Date().getFullYear()} Mondial Home · Dakar, Sénégal
+                      © {new Date().getFullYear()} Mondiale Home · Dakar, Sénégal
                     </p>
                     <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#CCCCCC" }}>
                       Envoyé depuis{" "}

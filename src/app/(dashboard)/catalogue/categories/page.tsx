@@ -11,7 +11,7 @@ import { CategoryTree } from "@/features/catalogue/categories/components/categor
 import { CategoryTreeSkeleton } from "@/features/catalogue/categories/components/category-tree-skeleton";
 import { AddCategoryButton } from "@/features/catalogue/categories/components/add-category-button";
 
-export const metadata = { title: "Catégories — Mondial Home CRM" };
+export const metadata = { title: "Catégories — Mondiale Home CRM" };
 
 async function StatsRow() {
   const stats = await getCategoryStats();

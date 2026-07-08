@@ -18,7 +18,7 @@ import { ArticlesFilters } from "@/features/catalogue/articles/components/articl
 import { ArticlesStats } from "@/features/catalogue/articles/components/articles-stats";
 import { ExportButton } from "@/features/catalogue/articles/components/export-button";
 
-export const metadata = { title: "Articles — Mondial Home CRM" };
+export const metadata = { title: "Articles — Mondiale Home CRM" };
 
 interface PageProps {
   searchParams: Promise<Record<string, string>>;

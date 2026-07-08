@@ -9,10 +9,10 @@ export default function HomePage() {
         MH
       </div>
       <h1 className="font-heading text-foreground text-4xl font-bold tracking-tight">
-        Mondial Home CRM
+        Mondiale Home CRM
       </h1>
       <p className="text-muted-foreground mt-3 max-w-md text-lg">
-        Plateforme de gestion clients, campagnes et ventes pour Mondial Home Dakar.
+        Plateforme de gestion clients, campagnes et ventes pour Mondiale Home Dakar.
       </p>
       <div className="mt-8 flex gap-4">
         <Button size="lg" render={<Link href="/login" />}>
@@ -21,7 +21,7 @@ export default function HomePage() {
         </Button>
       </div>
       <p className="text-muted-foreground mt-12 text-xs">
-        © {new Date().getFullYear()} Mondial Home — Tous droits réservés
+        © {new Date().getFullYear()} Mondiale Home — Tous droits réservés
       </p>
     </div>
   );

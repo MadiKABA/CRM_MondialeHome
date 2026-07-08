@@ -5,7 +5,7 @@ import { hasPermission } from "@/lib/permissions/server";
 import { getCategoriesForSelect } from "@/features/catalogue/categories/server/queries";
 import { ArticleCreateTabs } from "@/features/catalogue/articles/components/article-create-tabs";
 
-export const metadata = { title: "Nouvel article — Mondial Home CRM" };
+export const metadata = { title: "Nouvel article — Mondiale Home CRM" };
 
 export default async function NewArticlePage() {
   const session = await auth.api.getSession({ headers: await headers() });

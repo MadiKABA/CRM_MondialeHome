@@ -566,7 +566,7 @@ export async function seedEmailTemplates(): Promise<void> {
       content:
         "Bonjour {{prenom}} 👋\n\nNous avons une offre exceptionnelle sur notre collection salon. Profitez de -{{reduction}} sur une sélection de canapés et tables basses.",
       conclusion:
-        "Offre valable jusqu'au {{date_expiration}}.\nCode promo : {{code_promo}}\n\nÀ très bientôt chez Mondial Home,\nL'équipe {{nom_boutique}}",
+        "Offre valable jusqu'au {{date_expiration}}.\nCode promo : {{code_promo}}\n\nÀ très bientôt chez Mondiale Home,\nL'équipe {{nom_boutique}}",
     },
     {
       name: "Arrivage Nouveaux Canapés",
@@ -588,7 +588,7 @@ export async function seedEmailTemplates(): Promise<void> {
       subject: "💛 {{prenom}}, vous nous manquez !",
       preheader: "Une offre spéciale vous attend",
       content:
-        "Bonjour {{prenom}} 👋\n\nCela fait un moment qu'on ne vous a pas vu chez Mondial Home. Pour marquer votre retour, nous vous offrons -{{reduction}} sur votre prochain achat.\n\nCode : {{code_promo}}",
+        "Bonjour {{prenom}} 👋\n\nCela fait un moment qu'on ne vous a pas vu chez Mondiale Home. Pour marquer votre retour, nous vous offrons -{{reduction}} sur votre prochain achat.\n\nCode : {{code_promo}}",
       conclusion:
         "Offre valable jusqu'au {{date_expiration}}.\n\nÀ très bientôt,\nL'équipe {{nom_boutique}}",
     },
@@ -600,7 +600,7 @@ export async function seedEmailTemplates(): Promise<void> {
       subject: "⭐ {{prenom}}, votre offre VIP exclusive vous attend",
       preheader: "Réservée à nos meilleurs clients",
       content:
-        "Bonjour {{prenom}} ⭐\n\nEn tant que client privilégié de Mondial Home, vous bénéficiez d'une offre exclusive : -{{reduction}} sur l'ensemble de notre catalogue.\n\nVotre fidélité mérite d'être récompensée.",
+        "Bonjour {{prenom}} ⭐\n\nEn tant que client privilégié de Mondiale Home, vous bénéficiez d'une offre exclusive : -{{reduction}} sur l'ensemble de notre catalogue.\n\nVotre fidélité mérite d'être récompensée.",
       conclusion:
         "Code exclusif : {{code_promo}}\nValable jusqu'au {{date_expiration}}\n\nAvec toute notre gratitude,\nL'équipe {{nom_boutique}}",
     },
@@ -612,7 +612,7 @@ export async function seedEmailTemplates(): Promise<void> {
       subject: "🛏️ {{prenom}}, notre collection chambre est arrivée !",
       preheader: "Lits, armoires, tables de chevet...",
       content:
-        "Bonjour {{prenom}} 👋\n\nNotre nouvelle collection chambre vient d'arriver chez Mondial Home ! Lits confortables, armoires spacieuses... De quoi transformer votre chambre.",
+        "Bonjour {{prenom}} 👋\n\nNotre nouvelle collection chambre vient d'arriver chez Mondiale Home ! Lits confortables, armoires spacieuses... De quoi transformer votre chambre.",
       conclusion:
         "Venez découvrir toute la collection à {{adresse_boutique}}.\n\nÀ bientôt,\nL'équipe {{nom_boutique}}",
     },

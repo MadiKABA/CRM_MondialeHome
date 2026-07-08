@@ -31,7 +31,7 @@ class BrevoEmailProvider implements EmailProvider {
       sendSmtpEmail.textContent = options.textContent;
       sendSmtpEmail.sender = options.from ?? {
         email: process.env["BREVO_SENDER_EMAIL"] ?? "",
-        name: process.env["BREVO_SENDER_NAME"] ?? "Mondial Home",
+        name: process.env["BREVO_SENDER_NAME"] ?? "Mondiale Home",
       };
 
       if (options.templateId) {

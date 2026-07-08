@@ -3,7 +3,7 @@ import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GroupForm } from "@/features/segments/components/group-form";
 
-export const metadata = { title: "Nouveau groupe — Mondial Home CRM" };
+export const metadata = { title: "Nouveau groupe — Mondiale Home CRM" };
 
 export default function NewGroupPage() {
   return (

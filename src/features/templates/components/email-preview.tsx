@@ -60,7 +60,7 @@ export function EmailPreview({ html, isLoading = false, subject }: EmailPreviewP
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-text-primary truncate text-[11px] font-semibold">
-                Mondial Home CRM
+                Mondiale Home CRM
               </p>
               <p className="text-text-muted truncate text-[11px]">{subject}</p>
             </div>

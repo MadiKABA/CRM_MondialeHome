@@ -19,7 +19,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           </div>
           <div>
             <p className="font-heading text-base font-semibold text-white">
-              Mondial Home
+              Mondiale Home
             </p>
             <p className="text-xs text-white/70">CRM Platform</p>
           </div>
@@ -44,7 +44,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         {/* Footer */}
         <div className="relative z-10">
           <p className="text-xs text-white/50">
-            &copy; {new Date().getFullYear()} Mondial Home &mdash; Dakar, Sénégal
+            &copy; {new Date().getFullYear()} Mondiale Home &mdash; Dakar, Sénégal
           </p>
         </div>
       </div>
@@ -58,7 +58,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           </div>
           <div>
             <p className="font-heading text-base leading-none font-semibold">
-              Mondial Home
+              Mondiale Home
             </p>
             <p className="text-muted-foreground text-xs">CRM Platform</p>
           </div>
@@ -69,7 +69,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
 
         {/* Footer légal */}
         <p className="text-muted-foreground mt-12 text-center text-xs">
-          &copy; {new Date().getFullYear()} Mondial Home &bull;{" "}
+          &copy; {new Date().getFullYear()} Mondiale Home &bull;{" "}
           <a
             href="#"
             className="hover:text-foreground underline-offset-4 hover:underline"

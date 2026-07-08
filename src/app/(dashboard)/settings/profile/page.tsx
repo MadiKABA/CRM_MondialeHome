@@ -73,5 +73,5 @@ export default function ProfilePage() {
 }
 
 export const metadata = {
-  title: "Mon profil — Mondial Home CRM",
+  title: "Mon profil — Mondiale Home CRM",
 };

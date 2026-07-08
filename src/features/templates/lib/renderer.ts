@@ -15,7 +15,7 @@ export const DEFAULT_CLIENT_DATA: ClientData = {
   "{{montant_total}}": "850 000 FCFA",
   "{{nb_commandes}}": "5",
   "{{date_dernier_achat}}": "12 janvier 2026",
-  "{{nom_boutique}}": "Mondial Home",
+  "{{nom_boutique}}": "Mondiale Home",
   "{{adresse_boutique}}": "Dakar, Rue 10 × Liberté 6",
   "{{telephone_boutique}}": "+221 33 820 00 00",
   "{{date_aujourd_hui}}": new Date().toLocaleDateString("fr-FR", {
@@ -120,7 +120,7 @@ export function buildClientData(client: {
           year: "numeric",
         })
       : "",
-    "{{nom_boutique}}": "Mondial Home",
+    "{{nom_boutique}}": "Mondiale Home",
     "{{adresse_boutique}}": "Dakar, Rue 10 × Liberté 6",
     "{{telephone_boutique}}": "+221 33 820 00 00",
     "{{date_aujourd_hui}}": new Date().toLocaleDateString("fr-FR", {

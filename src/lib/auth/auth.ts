@@ -47,7 +47,7 @@ export const auth = betterAuth({
 
   plugins: [
     twoFactor({
-      issuer: "Mondial Home CRM",
+      issuer: "Mondiale Home CRM",
     }),
     magicLink({
       sendMagicLink: async ({ email, url }: { email: string; url: string }) => {

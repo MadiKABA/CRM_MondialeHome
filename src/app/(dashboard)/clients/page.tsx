@@ -20,7 +20,7 @@ interface ClientsPageProps {
   searchParams: Promise<Record<string, string>>;
 }
 
-export const metadata = { title: "Clients — Mondial Home CRM" };
+export const metadata = { title: "Clients — Mondiale Home CRM" };
 
 export default async function ClientsPage({ searchParams }: ClientsPageProps) {
   const params = await searchParams;

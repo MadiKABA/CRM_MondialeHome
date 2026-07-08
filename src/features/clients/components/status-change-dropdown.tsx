@@ -174,7 +174,7 @@ export function StatusChangeDropdown({
             </DialogTitle>
             <DialogDescription>
               {pendingStatus === "BLACKLISTED"
-                ? "Ce client ne recevra plus aucune communication de Mondial Home."
+                ? "Ce client ne recevra plus aucune communication de Mondiale Home."
                 : "Ce client sera désabonné de toutes les communications (SMS, WhatsApp, Email)."}
             </DialogDescription>
           </DialogHeader>

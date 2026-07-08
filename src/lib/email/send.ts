@@ -22,7 +22,7 @@ export async function sendForgotPasswordEmail(params: {
     const { data, error } = await resend.emails.send({
       from: EMAIL_CONFIG.from.formatted,
       to: [params.to],
-      subject: "Réinitialisation de votre mot de passe — Mondial Home CRM",
+      subject: "Réinitialisation de votre mot de passe — Mondiale Home CRM",
       react: ForgotPasswordEmail({
         resetUrl: params.resetUrl,
         userName: params.userName,
@@ -63,7 +63,7 @@ export async function sendInvitationEmail(params: {
     const { data, error } = await resend.emails.send({
       from: EMAIL_CONFIG.from.formatted,
       to: [params.to],
-      subject: "Bienvenue sur Mondial Home CRM — Vos identifiants de connexion",
+      subject: "Bienvenue sur Mondiale Home CRM — Vos identifiants de connexion",
       react: InvitationEmail({
         recipientName: params.recipientName,
         inviterName: params.inviterName,

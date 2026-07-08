@@ -65,7 +65,7 @@ export async function exportToPDF(
 
   doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
-  doc.text("Mondial Home CRM — Liste des Clients", 14, 15);
+  doc.text("Mondiale Home CRM — Liste des Clients", 14, 15);
 
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");

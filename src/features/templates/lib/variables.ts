@@ -99,7 +99,7 @@ export const EMAIL_VARIABLES: VariableDefinition[] = [
     code: "{{nom_boutique}}",
     label: "Nom de la boutique",
     category: "Boutique",
-    example: "Mondial Home",
+    example: "Mondiale Home",
     description: "Nom de l'enseigne",
   },
   {

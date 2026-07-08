@@ -1,5 +1,5 @@
 // ============================================================
-// MODULES — CRM Mondial Home
+// MODULES — CRM Mondiale Home
 // Catalogue des modules pour l'affichage dans l'interface admin
 // ============================================================
 

@@ -5,7 +5,7 @@ import { checkPermission } from "@/lib/permissions/server";
 import { PERMISSIONS } from "@/lib/permissions/constants";
 import { SalesImportWizard } from "@/features/sales/components/import/sales-import-wizard";
 
-export const metadata = { title: "Importer des ventes — Mondial Home CRM" };
+export const metadata = { title: "Importer des ventes — Mondiale Home CRM" };
 
 export default async function ImportSalesPage() {
   const session = await auth.api.getSession({ headers: await headers() });

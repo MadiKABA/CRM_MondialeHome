@@ -23,7 +23,7 @@ export function InvitationEmail({
     <html>
       <head>
         <meta charSet="utf-8" />
-        <title>Bienvenue sur Mondial Home CRM</title>
+        <title>Bienvenue sur Mondiale Home CRM</title>
       </head>
       <body
         style={{
@@ -70,7 +70,7 @@ export function InvitationEmail({
                         fontWeight: "700",
                       }}
                     >
-                      MONDIAL HOME
+                      MONDIALE HOME
                     </h1>
                     <p
                       style={{
@@ -106,7 +106,7 @@ export function InvitationEmail({
                       }}
                     >
                       <strong>{inviterName}</strong> vous a ajouté au CRM de{" "}
-                      <strong>Mondial Home</strong> avec le profil{" "}
+                      <strong>Mondiale Home</strong> avec le profil{" "}
                       <strong>{roleName}</strong>. Voici vos identifiants de connexion :
                     </p>
 
@@ -245,7 +245,7 @@ export function InvitationEmail({
                     }}
                   >
                     <p style={{ margin: "0", fontSize: "12px", color: "#AAAAAA" }}>
-                      © {new Date().getFullYear()} Mondial Home · Dakar, Sénégal
+                      © {new Date().getFullYear()} Mondiale Home · Dakar, Sénégal
                     </p>
                     <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#CCCCCC" }}>
                       <a

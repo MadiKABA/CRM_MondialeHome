@@ -243,7 +243,7 @@ export function ConsentSection({
                   : pendingChange.channel === "whatsapp"
                     ? "messages WhatsApp"
                     : "emails"}{" "}
-              de la part de Mondial Home.
+              de la part de Mondiale Home.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">

@@ -87,7 +87,7 @@ export function exportToPdf(sales: SaleListItemDTO[]): Promise<Blob> {
       const doc = new jsPDF({ orientation: "landscape", format: "a4" });
 
       doc.setFontSize(14);
-      doc.text("Historique des ventes — Mondial Home", 14, 16);
+      doc.text("Historique des ventes — Mondiale Home", 14, 16);
       doc.setFontSize(9);
       doc.text(
         `Exporté le ${new Date().toLocaleDateString("fr-SN")} · ${sales.length} vente(s)`,

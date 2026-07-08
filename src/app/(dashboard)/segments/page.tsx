@@ -5,7 +5,7 @@ import { getAllSegments } from "@/features/segments/server/queries";
 import { SegmentsList } from "@/features/segments/components/segments-list";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Segments — Mondial Home CRM" };
+export const metadata = { title: "Segments — Mondiale Home CRM" };
 
 export default async function SegmentsPage() {
   const data = await getAllSegments();

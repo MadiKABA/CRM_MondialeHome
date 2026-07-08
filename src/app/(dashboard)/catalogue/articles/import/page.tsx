@@ -5,7 +5,7 @@ import { checkPermission } from "@/lib/permissions/server";
 import { getExistingReferences } from "@/features/catalogue/articles/server/import-actions";
 import { ImportWizard } from "@/features/catalogue/articles/components/import/import-wizard";
 
-export const metadata = { title: "Importer des articles — Mondial Home CRM" };
+export const metadata = { title: "Importer des articles — Mondiale Home CRM" };
 
 export default async function ImportArticlesPage() {
   const session = await auth.api.getSession({ headers: await headers() });

@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: SegmentDetailPageProps) {
   const { id } = await params;
   const data = await getSegmentById(id);
   return {
-    title: data ? `${data.segment.name} — Mondial Home CRM` : "Segment introuvable",
+    title: data ? `${data.segment.name} — Mondiale Home CRM` : "Segment introuvable",
   };
 }
 
