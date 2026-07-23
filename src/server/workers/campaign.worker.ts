@@ -7,6 +7,8 @@ import {
   syncCampaignStatsFromBatch,
 } from "@/features/campaigns/server/queries";
 import { sendCampaignCore } from "@/features/campaigns/server/service";
+import { getDueSmsCampaigns } from "@/features/sms/server/queries";
+import { sendSmsCampaignCore } from "@/features/sms/server/service";
 
 const SCHEDULER_QUEUE = "campaign-scheduler";
 const STATS_QUEUE = "campaign-stats-sync";
@@ -35,12 +37,18 @@ export function createCampaignSchedulerWorker(): Worker | null {
   const worker = new Worker(
     SCHEDULER_QUEUE,
     async () => {
-      const due = await getDueCampaigns();
-      if (due.length === 0) return;
+      const [dueEmail, dueSms] = await Promise.all([
+        getDueCampaigns(),
+        getDueSmsCampaigns(),
+      ]);
+      if (dueEmail.length === 0 && dueSms.length === 0) return;
 
-      logger.info({ count: due.length }, "campaigns due for sending");
+      logger.info(
+        { emailCount: dueEmail.length, smsCount: dueSms.length },
+        "campaigns due for sending"
+      );
 
-      for (const campaign of due) {
+      for (const campaign of dueEmail) {
         try {
           const result = await sendCampaignCore(campaign.id, campaign.createdById);
 
@@ -82,6 +90,48 @@ export function createCampaignSchedulerWorker(): Worker | null {
           }
         } catch (err) {
           logger.error({ err, campaignId: campaign.id }, "campaign scheduler error");
+        }
+      }
+
+      for (const campaign of dueSms) {
+        try {
+          const result = await sendSmsCampaignCore(campaign.id, campaign.createdById);
+
+          if (result.success) {
+            if (result.data) {
+              await db.auditLog
+                .create({
+                  data: {
+                    userId: campaign.createdById,
+                    action: "campaign.send",
+                    entity: "Campaign",
+                    entityId: campaign.id,
+                    newValue: {
+                      channel: "SMS",
+                      queued: result.data.queued,
+                      estimatedTime: result.data.estimatedTime,
+                      trigger: "scheduler",
+                    },
+                    status: "success",
+                  },
+                })
+                .catch(() => {});
+            }
+            logger.info(
+              { campaignId: campaign.id, name: campaign.name },
+              "scheduled SMS campaign sent"
+            );
+          } else {
+            logger.error(
+              { campaignId: campaign.id, error: result.error },
+              "failed to send scheduled SMS campaign"
+            );
+            await db.campaign
+              .update({ where: { id: campaign.id }, data: { status: "FAILED" } })
+              .catch(() => {});
+          }
+        } catch (err) {
+          logger.error({ err, campaignId: campaign.id }, "SMS campaign scheduler error");
         }
       }
     },

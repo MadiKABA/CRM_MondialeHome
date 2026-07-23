@@ -1,9 +1,19 @@
 "use client";
 
-import { Eye, Pencil, Copy, Trash2, ToggleLeft, ToggleRight, Mail } from "lucide-react";
+import {
+  Eye,
+  Pencil,
+  Copy,
+  Trash2,
+  ToggleLeft,
+  ToggleRight,
+  Mail,
+  MessageSquare,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { analyzeMessage } from "@/lib/sms/character-counter";
 import type { TemplateDTO } from "../types";
 
 interface TemplateCardProps {
@@ -26,6 +36,8 @@ export function TemplateCard({
   onToggleActive,
 }: TemplateCardProps) {
   const header = template.headerConfig;
+  const isSms = template.channel === "SMS";
+  const analysis = isSms ? analyzeMessage(template.content ?? "") : null;
 
   const contentPreview = template.content
     ? template.content.replace(/\n/g, " ").slice(0, 90) +
@@ -39,18 +51,25 @@ export function TemplateCard({
         "border-l-4",
         !template.isActive && "opacity-60"
       )}
-      style={{ borderLeftColor: header.bgColor }}
+      style={{ borderLeftColor: isSms ? "#4A3728" : header.bgColor }}
     >
-      {/* Mini header coloré */}
+      {/* Mini header */}
       <div
         className="flex items-center gap-2 px-4 py-3"
-        style={{ backgroundColor: header.bgColor }}
+        style={{ backgroundColor: isSms ? "#4A3728" : header.bgColor }}
       >
-        <span className="text-lg">{header.icon}</span>
+        {isSms ? (
+          <MessageSquare className="size-4 text-white/90" />
+        ) : (
+          <span className="text-lg">{header.icon}</span>
+        )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-bold tracking-wide text-white/90 uppercase">
-            {template.category ?? "Email"}
-            {template.productCategory ? ` · ${template.productCategory}` : ""}
+            {isSms
+              ? "SMS"
+              : `${template.category ?? "Email"}${
+                  template.productCategory ? ` · ${template.productCategory}` : ""
+                }`}
           </p>
         </div>
         <div
@@ -74,7 +93,7 @@ export function TemplateCard({
           )}
         </h3>
 
-        {template.subject && (
+        {!isSms && template.subject && (
           <div className="flex items-start gap-1.5">
             <Mail className="text-text-muted mt-0.5 size-3 shrink-0" />
             <p className="text-text-secondary truncate text-xs">{template.subject}</p>
@@ -84,6 +103,13 @@ export function TemplateCard({
         {contentPreview && (
           <p className="text-text-muted line-clamp-2 text-xs leading-relaxed">
             {contentPreview}
+          </p>
+        )}
+
+        {isSms && analysis && (
+          <p className="text-text-muted text-[10px]">
+            {analysis.charCount} car. · {analysis.smsCount} SMS · {analysis.costPerClient}{" "}
+            FCFA
           </p>
         )}
       </div>

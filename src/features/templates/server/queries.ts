@@ -70,18 +70,19 @@ export async function getTemplates(
   const skip = (filters.page - 1) * filters.limit;
 
   const where = {
-    channel: "EMAIL",
+    channel: filters.channel,
     ...(filters.isActive !== undefined && { isActive: filters.isActive }),
     ...(filters.category && { campaignType: filters.category }),
     ...(filters.search && {
       OR: [
         { name: { contains: filters.search, mode: "insensitive" as const } },
         { subject: { contains: filters.search, mode: "insensitive" as const } },
+        { content: { contains: filters.search, mode: "insensitive" as const } },
       ],
     }),
   };
 
-  const [templates, total, emailCount, active] = await Promise.all([
+  const [templates, total, emailCount, smsCount, active] = await Promise.all([
     db.template.findMany({
       where,
       skip,
@@ -91,7 +92,8 @@ export async function getTemplates(
     }),
     db.template.count({ where }),
     db.template.count({ where: { channel: "EMAIL" } }),
-    db.template.count({ where: { channel: "EMAIL", isActive: true } }),
+    db.template.count({ where: { channel: "SMS" } }),
+    db.template.count({ where: { channel: filters.channel, isActive: true } }),
   ]);
 
   return {
@@ -100,8 +102,9 @@ export async function getTemplates(
     page: filters.page,
     totalPages: Math.ceil(total / filters.limit),
     stats: {
-      total: emailCount,
+      total,
       emailCount,
+      smsCount,
       active,
     },
   };
@@ -121,12 +124,13 @@ export async function getTemplateById(id: string): Promise<TemplateDTO | null> {
 
 export async function isTemplateNameUnique(
   name: string,
-  excludeId?: string
+  excludeId?: string,
+  channel: "EMAIL" | "SMS" = "EMAIL"
 ): Promise<boolean> {
   const existing = await db.template.findFirst({
     where: {
       name: { equals: name.trim(), mode: "insensitive" },
-      channel: "EMAIL",
+      channel,
       ...(excludeId && { NOT: { id: excludeId } }),
     },
     select: { id: true },
@@ -139,6 +143,17 @@ export async function isTemplateNameUnique(
 export async function getActiveEmailTemplates(): Promise<TemplateDTO[]> {
   const templates = await db.template.findMany({
     where: { channel: "EMAIL", isActive: true },
+    orderBy: [{ usageCount: "desc" }, { name: "asc" }],
+    select: TEMPLATE_SELECT,
+  });
+  return templates.map((t) => toDTO(t as Parameters<typeof toDTO>[0]));
+}
+
+// ── Templates SMS actifs pour les campagnes ───────────────────────────────────
+
+export async function getActiveSmsTemplates(): Promise<TemplateDTO[]> {
+  const templates = await db.template.findMany({
+    where: { channel: "SMS", isActive: true },
     orderBy: [{ usageCount: "desc" }, { name: "asc" }],
     select: TEMPLATE_SELECT,
   });

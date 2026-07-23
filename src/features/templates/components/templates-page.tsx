@@ -3,8 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Mail } from "lucide-react";
+import { Plus, Mail, MessageSquare } from "lucide-react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { TemplateCard } from "./template-card";
 import { TemplatesFilters } from "./templates-filters";
@@ -15,6 +16,7 @@ import type { TemplateDTO, PaginatedTemplates } from "../types";
 
 interface TemplatesPageProps {
   initialData: PaginatedTemplates;
+  channel: "EMAIL" | "SMS";
   permissions: {
     canCreate: boolean;
     canUpdate: boolean;
@@ -22,7 +24,7 @@ interface TemplatesPageProps {
   };
 }
 
-export function TemplatesPage({ initialData, permissions }: TemplatesPageProps) {
+export function TemplatesPage({ initialData, channel, permissions }: TemplatesPageProps) {
   const router = useRouter();
   const [deleteTarget, setDeleteTarget] = useState<TemplateDTO | null>(null);
   const [duplicateTarget, setDuplicateTarget] = useState<TemplateDTO | null>(null);
@@ -43,6 +45,8 @@ export function TemplatesPage({ initialData, permissions }: TemplatesPageProps) 
   };
 
   const { templates, stats } = initialData;
+  const isSms = channel === "SMS";
+  const newTemplateHref = `/templates/nouveau?channel=${isSms ? "sms" : "email"}`;
 
   return (
     <div className="space-y-6 p-6">
@@ -50,7 +54,7 @@ export function TemplatesPage({ initialData, permissions }: TemplatesPageProps) 
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div>
           <h1 className="text-text-primary font-serif text-2xl font-bold">
-            Templates Email
+            Templates {isSms ? "SMS" : "Email"}
           </h1>
           <p className="text-text-secondary mt-1 text-sm">
             Vos modèles de messages réutilisables
@@ -58,7 +62,7 @@ export function TemplatesPage({ initialData, permissions }: TemplatesPageProps) 
         </div>
 
         {permissions.canCreate && (
-          <Link href="/templates/nouveau">
+          <Link href={newTemplateHref}>
             <Button className="bg-gold-deep hover:bg-gold-darker shrink-0 gap-2 text-white">
               <Plus className="size-4" />
               Nouveau template
@@ -67,12 +71,40 @@ export function TemplatesPage({ initialData, permissions }: TemplatesPageProps) 
         )}
       </div>
 
+      {/* Onglets canal */}
+      <div className="border-cream-darker inline-flex gap-1 rounded-lg border bg-white p-1">
+        <Link
+          href="/templates?channel=email"
+          className={cn(
+            "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+            !isSms ? "bg-gold-deep text-white" : "text-text-secondary hover:bg-cream"
+          )}
+        >
+          <Mail className="size-3.5" />
+          Email
+        </Link>
+        <Link
+          href="/templates?channel=sms"
+          className={cn(
+            "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+            isSms ? "bg-gold-deep text-white" : "text-text-secondary hover:bg-cream"
+          )}
+        >
+          <MessageSquare className="size-3.5" />
+          SMS
+        </Link>
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {[
           { label: "Total", value: stats.total, icon: "📋" },
           { label: "Actifs", value: stats.active, icon: "✅" },
-          { label: "Canal Email", value: stats.emailCount, icon: "✉️" },
+          {
+            label: isSms ? "Canal SMS" : "Canal Email",
+            value: isSms ? stats.smsCount : stats.emailCount,
+            icon: isSms ? "💬" : "✉️",
+          },
         ].map((stat) => (
           <div
             key={stat.label}
@@ -88,20 +120,24 @@ export function TemplatesPage({ initialData, permissions }: TemplatesPageProps) 
       </div>
 
       {/* Filtres */}
-      <TemplatesFilters />
+      <TemplatesFilters channel={channel} />
 
       {/* Grille */}
       {templates.length === 0 ? (
         <div className="border-cream-darker rounded-xl border-2 border-dashed p-16 text-center">
-          <Mail className="text-text-muted mx-auto mb-4 size-10" />
+          {isSms ? (
+            <MessageSquare className="text-text-muted mx-auto mb-4 size-10" />
+          ) : (
+            <Mail className="text-text-muted mx-auto mb-4 size-10" />
+          )}
           <p className="text-text-secondary mb-1 text-base font-medium">
-            Aucun template email
+            Aucun template {isSms ? "SMS" : "email"}
           </p>
           <p className="text-text-muted mb-4 text-sm">
             Créez votre premier modèle de message
           </p>
           {permissions.canCreate && (
-            <Link href="/templates/nouveau">
+            <Link href={newTemplateHref}>
               <Button className="bg-gold-deep hover:bg-gold-darker gap-2 text-white">
                 <Plus className="size-4" />
                 Créer un template

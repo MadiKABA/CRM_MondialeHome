@@ -243,6 +243,7 @@ export interface PaginatedTemplates {
   stats: {
     total: number;
     emailCount: number;
+    smsCount: number;
     active: number;
   };
 }

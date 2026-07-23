@@ -144,6 +144,7 @@ export const sendTestEmailSchema = z
 export const templateFiltersSchema = z.object({
   search: z.string().optional(),
   category: z.string().optional(),
+  channel: z.enum(["EMAIL", "SMS"]).default("EMAIL"),
   isActive: z.coerce.boolean().optional(),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(50).default(20),

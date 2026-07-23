@@ -203,6 +203,10 @@ export async function getDueCampaigns(): Promise<CampaignDTO[]> {
       status: "SCHEDULED",
       deletedAt: null,
       scheduledAt: { lte: new Date() },
+      // SMS (et futur WhatsApp) ont leur propre chemin d'envoi — voir
+      // getDueSmsCampaigns() dans features/sms — pour ne pas les faire
+      // échouer en passant par sendCampaignCore qui exige un templateId email.
+      channels: { has: "EMAIL" },
     },
     select: CAMPAIGN_SELECT,
     take: 10,

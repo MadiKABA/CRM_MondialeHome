@@ -11,6 +11,7 @@ import {
   DEFAULT_CAMPAIGN_VARS,
 } from "@/features/templates/lib/renderer";
 import { TemplateDetailPage } from "@/features/templates/components/template-detail-page";
+import { SmsTemplateDetailPage } from "@/features/sms/components/sms-template-detail-page";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -28,6 +29,12 @@ export default async function TemplatePage({ params }: Props) {
     hasPermission("templates.update.all"),
     hasPermission("templates.delete.all"),
   ]);
+
+  if (template.channel === "SMS") {
+    return (
+      <SmsTemplateDetailPage template={template} permissions={{ canUpdate, canDelete }} />
+    );
+  }
 
   let previewHtml: string | null = null;
   try {

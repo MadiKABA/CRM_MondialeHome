@@ -2,6 +2,8 @@ import AfricasTalking from "africastalking";
 import { logger } from "@/lib/logger";
 import type { MessageResult, SendSmsOptions, SmsProvider } from "./types";
 
+const SMS_SEND_TIMEOUT_MS = 10_000;
+
 function createAfricasTalkingClient() {
   return AfricasTalking({
     apiKey: process.env["AT_API_KEY"] ?? "",
@@ -9,18 +11,59 @@ function createAfricasTalkingClient() {
   });
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("Africa's Talking request timed out")),
+      ms
+    );
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
+
 class AfricasTalkingProvider implements SmsProvider {
-  private client = createAfricasTalkingClient();
+  // Le SDK Africa's Talking valide "apiKey" de façon synchrone dès sa
+  // construction et lève une exception si elle est vide — instancier ce
+  // client au chargement du module planterait tout le process worker
+  // (RFM, segments, email...) tant que AT_API_KEY n'est pas configurée.
+  // On construit donc paresseusement, uniquement une fois les credentials
+  // vérifiées non vides.
+  private client: ReturnType<typeof createAfricasTalkingClient> | null = null;
+
+  private getClient() {
+    this.client ??= createAfricasTalkingClient();
+    return this.client;
+  }
 
   async send(options: SendSmsOptions): Promise<MessageResult[]> {
     const recipients = Array.isArray(options.to) ? options.to : [options.to];
 
+    if (!process.env["AT_USERNAME"] || !process.env["AT_API_KEY"]) {
+      logger.error("Africa's Talking non configuré (AT_USERNAME / AT_API_KEY manquant)");
+      return recipients.map(() => ({
+        success: false,
+        error: "Africa's Talking non configuré",
+      }));
+    }
+
     try {
-      const response = await this.client.SMS.send({
-        to: recipients,
-        message: options.message,
-        from: options.from ?? process.env["AT_SENDER_ID"],
-      });
+      const response = await withTimeout(
+        this.getClient().SMS.send({
+          to: recipients,
+          message: options.message,
+          from: options.from ?? process.env["AT_SENDER_ID"],
+        }),
+        SMS_SEND_TIMEOUT_MS
+      );
 
       const results: MessageResult[] = response.SMSMessageData.Recipients.map((r) => ({
         success: r.status === "Success",
@@ -41,6 +84,11 @@ class AfricasTalkingProvider implements SmsProvider {
         error: error instanceof Error ? error.message : "Unknown error",
       }));
     }
+  }
+
+  async sendOne(to: string, message: string, from?: string): Promise<MessageResult> {
+    const [result] = await this.send({ to, message, ...(from ? { from } : {}) });
+    return result ?? { success: false, error: "Aucune réponse d'Africa's Talking" };
   }
 }
 

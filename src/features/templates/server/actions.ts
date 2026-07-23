@@ -16,7 +16,12 @@ import {
   DEFAULT_CLIENT_DATA,
   DEFAULT_CAMPAIGN_VARS,
 } from "../lib/renderer";
-import { validateTemplateVariables } from "../lib/variables";
+import { extractVariables, validateTemplateVariables } from "../lib/variables";
+import { validateSmsVariables } from "@/features/sms/lib/variables";
+import {
+  createSmsTemplateSchema,
+  type CreateSmsTemplateInput,
+} from "@/features/sms/schemas/sms.schema";
 import {
   createEmailTemplateSchema,
   duplicateTemplateSchema,
@@ -252,6 +257,139 @@ export async function updateEmailTemplate(
   }
 }
 
+// ── CRÉER UN TEMPLATE SMS ─────────────────────────────────────────────────────
+
+export async function createSmsTemplate(
+  input: CreateSmsTemplateInput
+): Promise<Result<{ id: string }>> {
+  try {
+    const user = await getUser();
+    if (!user) return { success: false, error: "Non authentifié" };
+
+    const rl = await checkRateLimit({
+      key: `template:create:${user.id}`,
+      limit: 20,
+      windowMs: 60_000,
+    });
+    if (!rl.allowed)
+      return { success: false, error: "Trop de requêtes. Attendez une minute." };
+
+    await checkPermission("templates.create.all");
+
+    const data = createSmsTemplateSchema.parse(input);
+
+    const isUnique = await isTemplateNameUnique(data.name, undefined, "SMS");
+    if (!isUnique)
+      return { success: false, error: "Un template avec ce nom existe déjà" };
+
+    const varValidation = validateSmsVariables(data.content);
+    if (!varValidation.valid) {
+      return {
+        success: false,
+        error: `Variables inconnues : ${varValidation.unknown.join(", ")}`,
+      };
+    }
+
+    let slug = generateSlug(data.name);
+    const existing = await db.template.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+    if (existing) slug = `${slug}-${Date.now()}`;
+
+    const template = await db.template.create({
+      data: {
+        name: data.name.trim(),
+        slug,
+        channel: "SMS",
+        category: "OTHER",
+        language: "fr",
+        content: data.content,
+        variables: extractVariables(data.content),
+        isActive: true,
+        isSystem: false,
+        createdById: user.id,
+      },
+    });
+
+    await auditLog(user.id, "template.create", template.id, {
+      name: template.name,
+      channel: "SMS",
+    });
+
+    revalidatePath("/templates");
+    return { success: true, data: { id: template.id } };
+  } catch (error) {
+    logger.error({ error }, "createSmsTemplate failed");
+    return { success: false, error: "Une erreur est survenue" };
+  }
+}
+
+// ── MODIFIER UN TEMPLATE SMS ──────────────────────────────────────────────────
+
+export async function updateSmsTemplate(
+  templateId: string,
+  input: CreateSmsTemplateInput
+): Promise<Result> {
+  try {
+    const user = await getUser();
+    if (!user) return { success: false, error: "Non authentifié" };
+
+    const rl = await checkRateLimit({
+      key: `template:update:${user.id}`,
+      limit: 30,
+      windowMs: 60_000,
+    });
+    if (!rl.allowed) return { success: false, error: "Trop de requêtes." };
+
+    await checkPermission("templates.update.all");
+
+    const data = createSmsTemplateSchema.parse(input);
+
+    const existing = await db.template.findUnique({
+      where: { id: templateId },
+      select: { isSystem: true, channel: true },
+    });
+    if (!existing) return { success: false, error: "Template introuvable" };
+    if (existing.isSystem)
+      return {
+        success: false,
+        error: "Les templates système ne peuvent pas être modifiés",
+      };
+    if (existing.channel !== "SMS")
+      return { success: false, error: "Ce template n'est pas un template SMS" };
+
+    const isUnique = await isTemplateNameUnique(data.name, templateId, "SMS");
+    if (!isUnique)
+      return { success: false, error: "Un template avec ce nom existe déjà" };
+
+    const varValidation = validateSmsVariables(data.content);
+    if (!varValidation.valid) {
+      return {
+        success: false,
+        error: `Variables inconnues : ${varValidation.unknown.join(", ")}`,
+      };
+    }
+
+    await db.template.update({
+      where: { id: templateId },
+      data: {
+        name: data.name.trim(),
+        content: data.content,
+        variables: extractVariables(data.content),
+      },
+    });
+
+    await auditLog(user.id, "template.update", templateId);
+    revalidatePath("/templates");
+    revalidatePath(`/templates/${templateId}`);
+    return { success: true };
+  } catch (error) {
+    logger.error({ error }, "updateSmsTemplate failed");
+    return { success: false, error: "Une erreur est survenue" };
+  }
+}
+
 // ── DUPLIQUER ─────────────────────────────────────────────────────────────────
 
 export async function duplicateTemplate(input: unknown): Promise<Result<{ id: string }>> {
@@ -266,7 +404,11 @@ export async function duplicateTemplate(input: unknown): Promise<Result<{ id: st
     const source = await db.template.findUnique({ where: { id: data.templateId } });
     if (!source) return { success: false, error: "Template introuvable" };
 
-    const isUnique = await isTemplateNameUnique(data.newName);
+    const isUnique = await isTemplateNameUnique(
+      data.newName,
+      undefined,
+      source.channel as "EMAIL" | "SMS"
+    );
     if (!isUnique)
       return { success: false, error: "Un template avec ce nom existe déjà" };
 
@@ -282,7 +424,7 @@ export async function duplicateTemplate(input: unknown): Promise<Result<{ id: st
         name: data.newName.trim(),
         slug,
         description: source.description,
-        channel: "EMAIL",
+        channel: source.channel,
         category: source.category,
         campaignType: source.campaignType,
         productCategory: source.productCategory,

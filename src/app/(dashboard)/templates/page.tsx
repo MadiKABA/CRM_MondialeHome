@@ -7,7 +7,11 @@ import { hasPermission } from "@/lib/permissions/server";
 import { getTemplates } from "@/features/templates/server/queries";
 import { TemplatesPage } from "@/features/templates/components/templates-page";
 
-export default async function TemplatesListPage() {
+interface Props {
+  searchParams: Promise<{ channel?: string; search?: string; category?: string }>;
+}
+
+export default async function TemplatesListPage({ searchParams }: Props) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) redirect("/login");
 
@@ -17,9 +21,22 @@ export default async function TemplatesListPage() {
     hasPermission("templates.delete.all"),
   ]);
 
-  const data = await getTemplates({ page: 1, limit: 20 });
+  const params = await searchParams;
+  const channel = params.channel === "sms" ? "SMS" : "EMAIL";
+
+  const data = await getTemplates({
+    page: 1,
+    limit: 20,
+    channel,
+    ...(params.search && { search: params.search }),
+    ...(params.category && { category: params.category }),
+  });
 
   return (
-    <TemplatesPage initialData={data} permissions={{ canCreate, canUpdate, canDelete }} />
+    <TemplatesPage
+      initialData={data}
+      channel={channel}
+      permissions={{ canCreate, canUpdate, canDelete }}
+    />
   );
 }

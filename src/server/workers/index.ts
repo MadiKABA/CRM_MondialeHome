@@ -5,6 +5,7 @@ import { redis } from "@/lib/redis";
 import { createRFMWorker, scheduleNightlyRFM } from "./rfm.worker";
 import { createSegmentWorker } from "./segment.worker";
 import { createEmailWorker } from "./email.worker";
+import { createSmsWorker } from "./sms.worker";
 import {
   createCampaignSchedulerWorker,
   createCampaignStatsSyncWorker,
@@ -118,6 +119,14 @@ if (emailWorker) {
 }
 
 // ============================================================
+// SMS WORKER
+// ============================================================
+const smsWorker = createSmsWorker();
+if (smsWorker) {
+  logger.info("✅ SMS worker démarré");
+}
+
+// ============================================================
 // CAMPAIGN SCHEDULER WORKER
 // ============================================================
 const campaignSchedulerWorker = createCampaignSchedulerWorker();
@@ -161,6 +170,7 @@ const shutdown = async () => {
     ...(rfmWorker ? [rfmWorker.close()] : []),
     ...(segmentWorker ? [segmentWorker.close()] : []),
     ...(emailWorker ? [emailWorker.close()] : []),
+    ...(smsWorker ? [smsWorker.close()] : []),
     ...(campaignSchedulerWorker ? [campaignSchedulerWorker.close()] : []),
     ...(campaignStatsSyncWorker ? [campaignStatsSyncWorker.close()] : []),
   ];

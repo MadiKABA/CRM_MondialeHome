@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth/auth";
 import { hasPermission } from "@/lib/permissions/server";
 import { getTemplateById } from "@/features/templates/server/queries";
 import { TemplateForm } from "@/features/templates/components/template-form/template-form";
+import { SmsTemplateForm } from "@/features/sms/components/sms-template-form";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -24,7 +25,11 @@ export default async function EditTemplatePage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-7xl p-6">
-      <TemplateForm mode="edit" template={template} />
+      {template.channel === "SMS" ? (
+        <SmsTemplateForm mode="edit" template={template} />
+      ) : (
+        <TemplateForm mode="edit" template={template} />
+      )}
     </div>
   );
 }

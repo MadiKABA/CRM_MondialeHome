@@ -754,6 +754,9 @@ model Campaign {
   template     Template?  @relation("CampaignEmailTemplate", fields: [templateId], references: [id])
   campaignData Json?
 
+  // M6 SMS Integration — produit / reduction saisis à la création de la campagne
+  smsCampaignData Json?
+
   emailBatchId String?    @unique
   emailBatch   EmailBatch? @relation(fields: [emailBatchId], references: [id])
 

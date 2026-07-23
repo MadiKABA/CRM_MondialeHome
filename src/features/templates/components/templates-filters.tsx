@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { CAMPAIGN_TYPES } from "../types";
 
-export function TemplatesFilters() {
+interface TemplatesFiltersProps {
+  channel: "EMAIL" | "SMS";
+}
+
+export function TemplatesFilters({ channel }: TemplatesFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -82,26 +86,28 @@ export function TemplatesFilters() {
         )}
       </div>
 
-      {/* Chips type de campagne */}
-      <div className="flex flex-wrap gap-1.5">
-        {CAMPAIGN_TYPES.map((type) => {
-          const isActive = currentCategory === type;
-          return (
-            <button
-              key={type}
-              onClick={() => handleCategory(type)}
-              className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium transition-all",
-                isActive
-                  ? "bg-gold-deep border-gold-deep text-white"
-                  : "border-cream-darker text-text-secondary hover:border-gold/50 hover:bg-cream"
-              )}
-            >
-              {type}
-            </button>
-          );
-        })}
-      </div>
+      {/* Chips type de campagne — non applicable aux templates SMS */}
+      {channel === "EMAIL" && (
+        <div className="flex flex-wrap gap-1.5">
+          {CAMPAIGN_TYPES.map((type) => {
+            const isActive = currentCategory === type;
+            return (
+              <button
+                key={type}
+                onClick={() => handleCategory(type)}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-medium transition-all",
+                  isActive
+                    ? "bg-gold-deep border-gold-deep text-white"
+                    : "border-cream-darker text-text-secondary hover:border-gold/50 hover:bg-cream"
+                )}
+              >
+                {type}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

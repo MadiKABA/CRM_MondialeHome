@@ -5,6 +5,7 @@ import {
   Tag,
   ShoppingCart,
   Megaphone,
+  MessageSquare,
   GitBranch,
   Zap,
   FileText,
@@ -68,6 +69,12 @@ export const NAV_GROUPS: NavGroup[] = [
         title: "Campagnes",
         href: "/campagnes",
         icon: Megaphone,
+        permission: "campaigns.read.all",
+      },
+      {
+        title: "SMS",
+        href: "/sms",
+        icon: MessageSquare,
         permission: "campaigns.read.all",
       },
       {
