@@ -12,6 +12,7 @@ import { sendCampaignSchema } from "@/features/campaigns/schemas/campaign.schema
 import { getTemplateById } from "@/features/templates/server/queries";
 import { analyzeMessage } from "@/lib/sms/character-counter";
 import { personalizeSmsMessage } from "@/lib/sms/personalizer";
+import { smsConfig } from "@/lib/sms/config";
 import {
   createSmsCampaignSchema,
   previewSmsMessageSchema,
@@ -132,7 +133,7 @@ export async function createSmsCampaign(
             channel: "SMS",
             content: data.content,
             templateId: data.templateId ?? null,
-            senderId: process.env["AT_SENDER_ID"] || null,
+            senderId: smsConfig.senderId,
           },
         },
       },

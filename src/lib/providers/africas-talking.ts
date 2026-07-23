@@ -1,13 +1,14 @@
 import AfricasTalking from "africastalking";
 import { logger } from "@/lib/logger";
+import { smsConfig } from "@/lib/sms/config";
 import type { MessageResult, SendSmsOptions, SmsProvider } from "./types";
 
 const SMS_SEND_TIMEOUT_MS = 10_000;
 
 function createAfricasTalkingClient() {
   return AfricasTalking({
-    apiKey: process.env["AT_API_KEY"] ?? "",
-    username: process.env["AT_USERNAME"] ?? "sandbox",
+    apiKey: smsConfig.apiKey,
+    username: smsConfig.username,
   });
 }
 
@@ -47,7 +48,7 @@ class AfricasTalkingProvider implements SmsProvider {
   async send(options: SendSmsOptions): Promise<MessageResult[]> {
     const recipients = Array.isArray(options.to) ? options.to : [options.to];
 
-    if (!process.env["AT_USERNAME"] || !process.env["AT_API_KEY"]) {
+    if (!smsConfig.apiKey) {
       logger.error("Africa's Talking non configuré (AT_USERNAME / AT_API_KEY manquant)");
       return recipients.map(() => ({
         success: false,
@@ -60,7 +61,7 @@ class AfricasTalkingProvider implements SmsProvider {
         this.getClient().SMS.send({
           to: recipients,
           message: options.message,
-          from: options.from ?? process.env["AT_SENDER_ID"],
+          from: options.from ?? smsConfig.senderId ?? undefined,
         }),
         SMS_SEND_TIMEOUT_MS
       );
