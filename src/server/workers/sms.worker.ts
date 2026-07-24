@@ -2,7 +2,7 @@ import { Worker, Queue } from "bullmq";
 import { redis } from "@/lib/redis";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { africasTalkingProvider } from "@/lib/providers/africas-talking";
+import { twilioProvider } from "@/lib/providers/twilio";
 import { personalizeSmsMessage } from "@/lib/sms/personalizer";
 import { analyzeMessage } from "@/lib/sms/character-counter";
 import { isValidSmsNumber, normalizePhoneNumber } from "@/lib/sms/validator";
@@ -11,7 +11,7 @@ import type { SmsJobPayload } from "@/features/sms/types";
 const QUEUE_NAME = "sms-send";
 const BATCH_SIZE = 100;
 const BATCH_DELAY = 2_000;
-const SEND_INTERVAL = 100; // Africa's Talking — 100ms entre chaque SMS individuel
+const SEND_INTERVAL = 100; // Twilio — 100ms entre chaque SMS individuel
 const COST_PER_SMS_FCFA = 7;
 
 export const smsQueue = redis
@@ -138,7 +138,7 @@ export function createSmsWorker(): Worker | null {
           );
           const analysis = analyzeMessage(message);
 
-          const result = await africasTalkingProvider.sendOne(
+          const result = await twilioProvider.sendOne(
             normalizedPhone,
             message,
             variant.senderId ?? undefined
@@ -155,7 +155,7 @@ export function createSmsWorker(): Worker | null {
               content: message,
               status: result.success ? "SENT" : "FAILED",
               externalId: result.messageId ?? null,
-              providerName: "africas-talking",
+              providerName: "twilio",
               errorMessage: result.error ?? null,
               sentAt: result.success ? new Date() : null,
               failedAt: result.success ? null : new Date(),

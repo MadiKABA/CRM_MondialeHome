@@ -123,7 +123,7 @@ if (emailWorker) {
 // ============================================================
 const smsWorker = createSmsWorker();
 if (smsWorker) {
-  logger.info("✅ SMS worker démarré");
+  logger.info("✅ SMS worker démarré (Twilio)");
 }
 
 // ============================================================

@@ -69,7 +69,7 @@ export interface ExportJobData {
 }
 
 export interface WebhookJobData {
-  provider: "africas-talking" | "brevo" | "meta";
+  provider: "twilio" | "brevo" | "meta";
   event: string;
   payload: Record<string, unknown>;
 }

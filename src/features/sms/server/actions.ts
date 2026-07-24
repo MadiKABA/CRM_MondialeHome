@@ -133,7 +133,7 @@ export async function createSmsCampaign(
             channel: "SMS",
             content: data.content,
             templateId: data.templateId ?? null,
-            senderId: smsConfig.senderId,
+            senderId: smsConfig.phoneNumber,
           },
         },
       },
