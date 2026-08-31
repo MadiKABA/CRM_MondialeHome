@@ -125,3 +125,6 @@ export const TERMINAL_STATUSES: CampaignStatus[] = ["SENT", "COMPLETED", "CANCEL
 
 // Statuts supprimables (soft delete)
 export const DELETABLE_STATUSES: CampaignStatus[] = ["DRAFT", "CANCELLED", "FAILED"];
+
+// Statuts modifiables via le wizard (page /campagnes/[id]/modifier)
+export const EDITABLE_STATUSES: CampaignStatus[] = ["DRAFT", "SCHEDULED", "FAILED"];

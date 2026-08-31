@@ -1,27 +1,67 @@
 "use client";
 
-import { Users, Mail, Eye, MousePointerClick, Copy, Ban, Calendar } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import {
+  Users,
+  Mail,
+  Eye,
+  MousePointerClick,
+  Copy,
+  Ban,
+  Calendar,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  RotateCcw,
+  Loader2,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { CampaignStatusBadge } from "./campaign-status-badge";
+import { EDITABLE_STATUSES, DELETABLE_STATUSES } from "../types";
 import type { CampaignDTO } from "../types";
 
 interface Props {
   campaign: CampaignDTO;
-  permissions: { canCancel: boolean };
+  permissions: {
+    canUpdate: boolean;
+    canCreate: boolean;
+    canCancel: boolean;
+    canDelete: boolean;
+  };
   onView: () => void;
+  onEdit: () => void;
   onCancel: () => void;
   onDuplicate: () => void;
+  onDelete: () => void;
+  onRetry: () => void;
+  isDuplicating?: boolean;
+  isRetrying?: boolean;
 }
 
 export function CampaignCard({
   campaign: c,
   permissions,
   onView,
+  onEdit,
   onCancel,
   onDuplicate,
+  onDelete,
+  onRetry,
+  isDuplicating,
+  isRetrying,
 }: Props) {
   const canCancel =
     permissions.canCancel && ["SCHEDULED", "SENDING", "PAUSED"].includes(c.status);
+  const canEdit = permissions.canUpdate && EDITABLE_STATUSES.includes(c.status);
+  const canDuplicate = permissions.canCreate && c.status !== "SENDING";
+  const canRetry = permissions.canUpdate && c.status === "FAILED";
+  const canDeleteThis = permissions.canDelete && DELETABLE_STATUSES.includes(c.status);
+  const hasAnyAction = canEdit || canDuplicate || canCancel || canRetry || canDeleteThis;
 
   return (
     <div
@@ -86,28 +126,75 @@ export function CampaignCard({
         )}
 
         {/* Actions */}
-        <div className="flex shrink-0 gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onDuplicate}
-            className="text-text-secondary hover:bg-cream h-8 gap-1.5 text-xs"
-            title="Dupliquer"
-          >
-            <Copy className="size-3.5" />
-          </Button>
-          {canCancel && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onCancel}
-              className="h-8 gap-1.5 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
-              title="Annuler"
-            >
-              <Ban className="size-3.5" />
-            </Button>
-          )}
-        </div>
+        {hasAnyAction && (
+          <div className="flex shrink-0 gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="text-text-secondary hover:bg-cream flex h-8 w-8 items-center justify-center rounded-md"
+                title="Actions"
+              >
+                <MoreVertical className="size-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {canEdit && (
+                  <DropdownMenuItem onClick={onEdit} className="gap-2">
+                    <Pencil className="size-3.5" />
+                    Modifier
+                  </DropdownMenuItem>
+                )}
+                {canDuplicate && (
+                  <DropdownMenuItem
+                    onClick={onDuplicate}
+                    disabled={isDuplicating}
+                    className="gap-2"
+                  >
+                    {isDuplicating ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Copy className="size-3.5" />
+                    )}
+                    Dupliquer
+                  </DropdownMenuItem>
+                )}
+                {canRetry && (
+                  <DropdownMenuItem
+                    onClick={onRetry}
+                    disabled={isRetrying}
+                    className="gap-2"
+                  >
+                    {isRetrying ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <RotateCcw className="size-3.5" />
+                    )}
+                    Relancer
+                  </DropdownMenuItem>
+                )}
+                {canCancel && (
+                  <DropdownMenuItem
+                    onClick={onCancel}
+                    className="gap-2 text-red-500 focus:text-red-700"
+                  >
+                    <Ban className="size-3.5" />
+                    Annuler
+                  </DropdownMenuItem>
+                )}
+                {canDeleteThis && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={onDelete}
+                      className="gap-2 text-red-500 focus:text-red-700"
+                    >
+                      <Trash2 className="size-3.5" />
+                      Supprimer
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
       </div>
 
       {/* Barre de progression si en cours */}

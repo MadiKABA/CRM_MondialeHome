@@ -101,7 +101,7 @@ export const createCampaignSchema = z
     }
   );
 
-// ── Modifier une campagne (DRAFT uniquement) ──────────────────────────────────
+// ── Modifier une campagne (DRAFT, SCHEDULED, FAILED) ──────────────────────────
 
 export const updateCampaignSchema = z
   .object({
@@ -168,10 +168,10 @@ export const cancelCampaignSchema = z.object({
 });
 
 // ── Dupliquer une campagne ────────────────────────────────────────────────────
+// Le nom de la copie ("Copie de X") est généré côté serveur — voir duplicateCampaign()
 
 export const duplicateCampaignSchema = z.object({
   campaignId: z.string().cuid(),
-  newName: z.string().min(2).max(100).trim(),
 });
 
 // ── Filtres liste ─────────────────────────────────────────────────────────────

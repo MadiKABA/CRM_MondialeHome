@@ -20,21 +20,23 @@ export default async function CampaignPage({ params }: Props) {
   const campaign = await getCampaignById(id);
   if (!campaign) notFound();
 
-  const [canUpdate, canSend, canCancel, canDelete, recipients] = await Promise.all([
-    hasPermission("campaigns.update.all"),
-    hasPermission("campaigns.send.all"),
-    hasPermission("campaigns.cancel.all"),
-    hasPermission("campaigns.delete.all"),
-    campaign.emailBatchId
-      ? getBatchMessages(campaign.emailBatchId, 1, 50)
-      : Promise.resolve({ messages: [], total: 0 }),
-  ]);
+  const [canUpdate, canCreate, canSend, canCancel, canDelete, recipients] =
+    await Promise.all([
+      hasPermission("campaigns.update.all"),
+      hasPermission("campaigns.create.all"),
+      hasPermission("campaigns.send.all"),
+      hasPermission("campaigns.cancel.all"),
+      hasPermission("campaigns.delete.all"),
+      campaign.emailBatchId
+        ? getBatchMessages(campaign.emailBatchId, 1, 50)
+        : Promise.resolve({ messages: [], total: 0 }),
+    ]);
 
   return (
     <CampaignDetailPage
       campaign={campaign}
       recipients={recipients}
-      permissions={{ canUpdate, canSend, canCancel, canDelete }}
+      permissions={{ canUpdate, canCreate, canSend, canCancel, canDelete }}
     />
   );
 }

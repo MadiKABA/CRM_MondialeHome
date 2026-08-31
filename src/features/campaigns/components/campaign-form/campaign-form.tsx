@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { createCampaign } from "../../server/actions";
+import { createCampaign, updateCampaign } from "../../server/actions";
 import { uploadCampaignImages } from "../../lib/cloudinary-upload";
 import { StepInfo } from "./step-info";
 import { StepTemplate } from "./step-template";
@@ -54,13 +54,23 @@ export interface CampaignFormState {
 interface Props {
   templates: TemplateDTO[];
   segments: SegmentDTO[];
+  mode?: "create" | "edit";
+  campaignId?: string;
+  initialState?: Partial<CampaignFormState>;
 }
 
-export function CampaignForm({ templates, segments }: Props) {
+export function CampaignForm({
+  templates,
+  segments,
+  mode = "create",
+  campaignId,
+  initialState,
+}: Props) {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const isEdit = mode === "edit" && !!campaignId;
 
   const [formState, setFormState] = useState<CampaignFormState>({
     name: "",
@@ -75,6 +85,7 @@ export function CampaignForm({ templates, segments }: Props) {
     banner: INITIAL_BANNER,
     campaignVars: {},
     scheduledAt: null,
+    ...initialState,
   });
 
   // Révoque les blob URLs restantes si l'utilisateur quitte le wizard sans
@@ -121,51 +132,71 @@ export function CampaignForm({ templates, segments }: Props) {
         return;
       }
 
-      setUploadStatus("Création de la campagne...");
-      const result = await createCampaign({
-        name: formState.name,
-        description: formState.description || undefined,
-        segmentId: formState.segmentId,
-        templateId: formState.templateId,
-        campaignData: {
-          contentMode: formState.contentMode,
-          articles: formState.articles,
-          freeImages: freeImages
-            .filter(
-              (img): img is FreeImage & { cloudinaryId: string } =>
-                img.isUploaded && !!img.cloudinaryId
-            )
-            .map((img) => ({
-              id: img.id,
-              cloudinaryId: img.cloudinaryId,
-              url: img.url,
-              alt: img.alt,
-              caption: img.caption,
-              linkUrl: img.linkUrl,
-              width: img.width,
-              height: img.height,
-              layout: img.layout,
-            })),
-          ctaText: formState.ctaText || null,
-          ctaUrl: formState.ctaUrl || null,
-          bannerImageUrl: banner.url || null,
-          bannerLinkUrl: banner.linkUrl || null,
-          campaignVars: formState.campaignVars,
-        },
-        scheduledAt: formState.scheduledAt ?? undefined,
-      });
+      const campaignData = {
+        contentMode: formState.contentMode,
+        articles: formState.articles,
+        freeImages: freeImages
+          .filter(
+            (img): img is FreeImage & { cloudinaryId: string } =>
+              img.isUploaded && !!img.cloudinaryId
+          )
+          .map((img) => ({
+            id: img.id,
+            cloudinaryId: img.cloudinaryId,
+            url: img.url,
+            alt: img.alt,
+            caption: img.caption,
+            linkUrl: img.linkUrl,
+            width: img.width,
+            height: img.height,
+            layout: img.layout,
+          })),
+        ctaText: formState.ctaText || null,
+        ctaUrl: formState.ctaUrl || null,
+        bannerImageUrl: banner.url || null,
+        bannerLinkUrl: banner.linkUrl || null,
+        campaignVars: formState.campaignVars,
+      };
+
+      setUploadStatus(
+        isEdit ? "Mise à jour de la campagne..." : "Création de la campagne..."
+      );
+
+      const result = isEdit
+        ? await updateCampaign(campaignId!, {
+            name: formState.name,
+            description: formState.description || undefined,
+            segmentId: formState.segmentId,
+            templateId: formState.templateId,
+            campaignData,
+            scheduledAt: formState.scheduledAt ?? null,
+          })
+        : await createCampaign({
+            name: formState.name,
+            description: formState.description || undefined,
+            segmentId: formState.segmentId,
+            templateId: formState.templateId,
+            campaignData,
+            scheduledAt: formState.scheduledAt ?? undefined,
+          });
 
       if (!result.success) {
         toast.error(result.error);
         return;
       }
-      if (!result.data) {
+
+      const targetId = isEdit ? campaignId! : result.data?.id;
+      if (!targetId) {
         toast.error("Erreur interne");
         return;
       }
 
-      toast.success(`Campagne "${formState.name}" créée`);
-      router.push(`/campagnes/${result.data.id}`);
+      toast.success(
+        isEdit
+          ? `Campagne "${formState.name}" mise à jour`
+          : `Campagne "${formState.name}" créée`
+      );
+      router.push(`/campagnes/${targetId}`);
       router.refresh();
     } catch {
       toast.error("Une erreur est survenue");
@@ -276,8 +307,10 @@ export function CampaignForm({ templates, segments }: Props) {
               {isSubmitting ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  {uploadStatus ?? "Création..."}
+                  {uploadStatus ?? (isEdit ? "Mise à jour..." : "Création...")}
                 </>
+              ) : isEdit ? (
+                "Enregistrer les modifications"
               ) : (
                 "Créer la campagne →"
               )}

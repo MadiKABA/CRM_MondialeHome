@@ -29,7 +29,7 @@ import {
   type CreateCampaignInput,
   type UpdateCampaignInput,
 } from "../schemas/campaign.schema";
-import { isTransitionAllowed, DELETABLE_STATUSES } from "../types";
+import { isTransitionAllowed, DELETABLE_STATUSES, EDITABLE_STATUSES } from "../types";
 
 type Result<T = void> = { success: true; data?: T } | { success: false; error: string };
 
@@ -153,7 +153,7 @@ export async function createCampaign(
   }
 }
 
-// ── MODIFIER UNE CAMPAGNE (DRAFT uniquement) ──────────────────────────────────
+// ── MODIFIER UNE CAMPAGNE (DRAFT, SCHEDULED, FAILED) ──────────────────────────
 
 export async function updateCampaign(
   campaignId: string,
@@ -179,10 +179,12 @@ export async function updateCampaign(
       select: { status: true, name: true },
     });
     if (!existing) return { success: false, error: "Campagne introuvable" };
-    if (existing.status !== "DRAFT") {
+    if (
+      !EDITABLE_STATUSES.includes(existing.status as (typeof EDITABLE_STATUSES)[number])
+    ) {
       return {
         success: false,
-        error: "Seules les campagnes en brouillon peuvent être modifiées",
+        error: `Cette campagne (statut "${existing.status}") ne peut plus être modifiée`,
       };
     }
 
@@ -191,6 +193,36 @@ export async function updateCampaign(
       if (!isUnique) {
         return { success: false, error: "Ce nom est déjà utilisé" };
       }
+    }
+
+    if (data.segmentId) {
+      const segment = await db.segment.findUnique({
+        where: { id: data.segmentId },
+        select: { id: true, isActive: true },
+      });
+      if (!segment) return { success: false, error: "Segment introuvable" };
+      if (!segment.isActive) return { success: false, error: "Ce segment est désactivé" };
+    }
+
+    if (data.templateId) {
+      const template = await db.template.findUnique({
+        where: { id: data.templateId },
+        select: { id: true, isActive: true },
+      });
+      if (!template) return { success: false, error: "Template introuvable" };
+      if (!template.isActive) {
+        return { success: false, error: "Ce template est désactivé" };
+      }
+    }
+
+    // Une SCHEDULED sans date redevient DRAFT, une DRAFT/FAILED avec une date
+    // devient SCHEDULED, et une FAILED corrigée sans replanification retombe
+    // en DRAFT — elle doit être renvoyée manuellement, jamais silencieusement.
+    let newStatus: string | undefined;
+    if (data.scheduledAt !== undefined) {
+      newStatus = data.scheduledAt ? "SCHEDULED" : "DRAFT";
+    } else if (existing.status === "FAILED") {
+      newStatus = "DRAFT";
     }
 
     await db.campaign.update({
@@ -210,6 +242,7 @@ export async function updateCampaign(
         ...(data.scheduledAt !== undefined && {
           scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
         }),
+        ...(newStatus && { status: newStatus as never }),
         updatedById: user.id,
       },
     });
@@ -378,6 +411,13 @@ export async function duplicateCampaign(input: unknown): Promise<Result<{ id: st
     const user = await getUser();
     if (!user) return { success: false, error: "Non authentifié" };
 
+    const rl = await checkRateLimit({
+      key: `campaign:duplicate:${user.id}`,
+      limit: 10,
+      windowMs: 60_000,
+    });
+    if (!rl.allowed) return { success: false, error: "Trop de requêtes." };
+
     await checkPermission("campaigns.create.all");
 
     const data = duplicateCampaignSchema.parse(input);
@@ -387,14 +427,19 @@ export async function duplicateCampaign(input: unknown): Promise<Result<{ id: st
     });
     if (!source) return { success: false, error: "Campagne introuvable" };
 
-    const isUnique = await isCampaignNameUnique(data.newName);
-    if (!isUnique) {
-      return { success: false, error: "Ce nom est déjà utilisé" };
+    // Nom auto-généré "Copie de X" — on ajoute un suffixe numérique tant que
+    // le nom n'est pas unique, pour éviter de bloquer la duplication.
+    const baseName = `Copie de ${source.name}`.slice(0, 100);
+    let newName = baseName;
+    let suffix = 2;
+    while (!(await isCampaignNameUnique(newName))) {
+      newName = `${baseName} (${suffix})`.slice(0, 100);
+      suffix++;
     }
 
     const copy = await db.campaign.create({
       data: {
-        name: data.newName.trim(),
+        name: newName,
         description: source.description,
         status: "DRAFT",
         type: "MANUAL",
@@ -410,13 +455,49 @@ export async function duplicateCampaign(input: unknown): Promise<Result<{ id: st
 
     await createAuditLog(user.id, "campaign.duplicate", copy.id, {
       sourceId: source.id,
-      newName: data.newName,
+      newName,
     });
 
     revalidatePath("/campagnes");
     return { success: true, data: { id: copy.id } };
   } catch (error) {
     logger.error({ error }, "duplicateCampaign failed");
+    return { success: false, error: "Une erreur est survenue" };
+  }
+}
+
+// ── RELANCER UNE CAMPAGNE ÉCHOUÉE (FAILED → DRAFT) ────────────────────────────
+// Retour rapide en brouillon sans repasser par le wizard — pour un renvoi
+// immédiat sans correction. "Modifier" reste disponible pour corriger avant.
+
+export async function retryCampaign(campaignId: string): Promise<Result> {
+  try {
+    const user = await getUser();
+    if (!user) return { success: false, error: "Non authentifié" };
+
+    await checkPermission("campaigns.update.all");
+
+    const campaign = await getCampaignById(campaignId);
+    if (!campaign) return { success: false, error: "Campagne introuvable" };
+
+    if (!isTransitionAllowed(campaign.status, "DRAFT")) {
+      return {
+        success: false,
+        error: `Impossible de relancer une campagne en statut "${campaign.status}"`,
+      };
+    }
+
+    await db.campaign.update({
+      where: { id: campaignId },
+      data: { status: "DRAFT", updatedById: user.id },
+    });
+
+    await createAuditLog(user.id, "campaign.retry", campaignId);
+    revalidatePath("/campagnes");
+    revalidatePath(`/campagnes/${campaignId}`);
+    return { success: true };
+  } catch (error) {
+    logger.error({ error }, "retryCampaign failed");
     return { success: false, error: "Une erreur est survenue" };
   }
 }

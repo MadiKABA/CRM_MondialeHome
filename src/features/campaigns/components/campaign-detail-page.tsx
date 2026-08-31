@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Pencil, Ban, Send, Mail, Users } from "lucide-react";
+import { toast } from "sonner";
+import { ArrowLeft, Pencil, Copy, Ban, Send, Mail, Users, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { CampaignStatusBadge } from "./campaign-status-badge";
@@ -13,6 +14,8 @@ import { CampaignRecipientsTable } from "./campaign-recipients-table";
 import { CampaignEmailPreview } from "./campaign-email-preview";
 import { SendNowDialog } from "./send-now-dialog";
 import { CancelCampaignDialog } from "./cancel-campaign-dialog";
+import { duplicateCampaign } from "../server/actions";
+import { EDITABLE_STATUSES } from "../types";
 import type { CampaignDTO } from "../types";
 import type { MessageLogDTO } from "@/features/email-mass/types";
 
@@ -28,6 +31,7 @@ interface Props {
   recipients: { messages: MessageLogDTO[]; total: number };
   permissions: {
     canUpdate: boolean;
+    canCreate: boolean;
     canSend: boolean;
     canCancel: boolean;
     canDelete: boolean;
@@ -39,10 +43,28 @@ export function CampaignDetailPage({ campaign, recipients, permissions }: Props)
   const [sendOpen, setSendOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("preview");
+  const [isDuplicating, setIsDuplicating] = useState(false);
 
   const canSendNow = permissions.canSend && campaign.status === "DRAFT";
   const canCancel =
     permissions.canCancel && ["SCHEDULED", "SENDING", "PAUSED"].includes(campaign.status);
+  const canEdit = permissions.canUpdate && EDITABLE_STATUSES.includes(campaign.status);
+  const canDuplicate = permissions.canCreate && campaign.status !== "SENDING";
+
+  const handleDuplicate = async () => {
+    setIsDuplicating(true);
+    try {
+      const result = await duplicateCampaign({ campaignId: campaign.id });
+      if (result.success && result.data) {
+        toast.success("Campagne dupliquée. Modifiez-la avant d'envoyer.");
+        router.push(`/campagnes/${result.data.id}/modifier`);
+      } else if (!result.success) {
+        toast.error(result.error);
+      }
+    } finally {
+      setIsDuplicating(false);
+    }
+  };
 
   const dateToShow = campaign.scheduledAt ?? campaign.sentAt ?? campaign.createdAt;
   const dateLabel = campaign.scheduledAt
@@ -97,7 +119,7 @@ export function CampaignDetailPage({ campaign, recipients, permissions }: Props)
               Annuler
             </Button>
           )}
-          {permissions.canUpdate && campaign.status === "DRAFT" && (
+          {canEdit && (
             <Link href={`/campagnes/${campaign.id}/modifier`}>
               <Button
                 variant="outline"
@@ -108,6 +130,22 @@ export function CampaignDetailPage({ campaign, recipients, permissions }: Props)
                 Modifier
               </Button>
             </Link>
+          )}
+          {canDuplicate && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDuplicate}
+              disabled={isDuplicating}
+              className="border-cream-darker hover:bg-cream gap-1.5"
+            >
+              {isDuplicating ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Copy className="size-4" />
+              )}
+              Dupliquer
+            </Button>
           )}
         </div>
       </div>

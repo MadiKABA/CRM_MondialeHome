@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Plus, Send } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CampaignCard } from "./campaign-card";
 import { CampaignsFilters } from "./campaigns-filters";
 import { CancelCampaignDialog } from "./cancel-campaign-dialog";
-import { DuplicateCampaignDialog } from "./duplicate-campaign-dialog";
+import { DeleteCampaignDialog } from "./delete-campaign-dialog";
+import { duplicateCampaign, retryCampaign } from "../server/actions";
 import type { CampaignDTO, PaginatedCampaigns } from "../types";
 
 interface Props {
@@ -25,9 +27,41 @@ interface Props {
 export function CampaignsPage({ initialData, permissions }: Props) {
   const router = useRouter();
   const [cancelTarget, setCancelTarget] = useState<CampaignDTO | null>(null);
-  const [duplicateTarget, setDuplicateTarget] = useState<CampaignDTO | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CampaignDTO | null>(null);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const { campaigns, stats } = initialData;
+
+  const handleDuplicate = async (c: CampaignDTO) => {
+    setDuplicatingId(c.id);
+    try {
+      const result = await duplicateCampaign({ campaignId: c.id });
+      if (result.success && result.data) {
+        toast.success("Campagne dupliquée. Modifiez-la avant d'envoyer.");
+        router.push(`/campagnes/${result.data.id}/modifier`);
+      } else if (!result.success) {
+        toast.error(result.error);
+      }
+    } finally {
+      setDuplicatingId(null);
+    }
+  };
+
+  const handleRetry = async (c: CampaignDTO) => {
+    setRetryingId(c.id);
+    try {
+      const result = await retryCampaign(c.id);
+      if (result.success) {
+        toast.success("Campagne remise en brouillon");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } finally {
+      setRetryingId(null);
+    }
+  };
 
   return (
     <div className="space-y-6 p-6">
@@ -99,8 +133,13 @@ export function CampaignsPage({ initialData, permissions }: Props) {
               campaign={c}
               permissions={permissions}
               onView={() => router.push(`/campagnes/${c.id}`)}
+              onEdit={() => router.push(`/campagnes/${c.id}/modifier`)}
               onCancel={() => setCancelTarget(c)}
-              onDuplicate={() => setDuplicateTarget(c)}
+              onDuplicate={() => handleDuplicate(c)}
+              onDelete={() => setDeleteTarget(c)}
+              onRetry={() => handleRetry(c)}
+              isDuplicating={duplicatingId === c.id}
+              isRetrying={retryingId === c.id}
             />
           ))}
         </div>
@@ -117,13 +156,16 @@ export function CampaignsPage({ initialData, permissions }: Props) {
           router.refresh();
         }}
       />
-      <DuplicateCampaignDialog
-        open={!!duplicateTarget}
+      <DeleteCampaignDialog
+        open={!!deleteTarget}
         onOpenChange={(o) => {
-          if (!o) setDuplicateTarget(null);
+          if (!o) setDeleteTarget(null);
         }}
-        campaign={duplicateTarget}
-        onSuccess={(id) => router.push(`/campagnes/${id}`)}
+        campaign={deleteTarget}
+        onSuccess={() => {
+          setDeleteTarget(null);
+          router.refresh();
+        }}
       />
     </div>
   );
