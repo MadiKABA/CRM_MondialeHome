@@ -1,0 +1,83 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  # ─────────────────────────────────────────
+  # JOB 1 : Vérifications qualité (bloquantes)
+  # ─────────────────────────────────────────
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Installer pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Installer les dépendances
+        run: pnpm install --frozen-lockfile
+
+      - name: Générer le client Prisma
+        run: pnpm prisma generate
+
+      - name: Vérification TypeScript
+        run: pnpm type-check
+
+      - name: Linting
+        run: pnpm lint
+
+  # ─────────────────────────────────────────
+  # JOB 2 : Déploiement (seulement si checks OK)
+  # ─────────────────────────────────────────
+  deploy:
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Déployer via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd /var/www/CRM_MondialeHome
+
+            echo "📥 Récupération du code..."
+            git pull origin main
+
+            echo "📦 Installation des dépendances..."
+            pnpm install --frozen-lockfile
+
+            echo "🗄️ Génération du client Prisma..."
+            pnpm prisma generate
+
+            echo "🗄️ Application des migrations..."
+            pnpm prisma migrate deploy
+
+            echo "🏗️ Build de l'application..."
+            pnpm build
+
+            echo "📁 Copie des fichiers statiques..."
+            cp -r public .next/standalone/public
+            rm -rf .next/standalone/.next/static
+            cp -r .next/static .next/standalone/.next/static
+
+            echo "♻️ Redémarrage PM2..."
+            pm2 restart CRM_MondialeHome
+            pm2 restart crm-workers
+
+            echo "✅ Déploiement terminé avec succès"
