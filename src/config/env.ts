@@ -16,10 +16,11 @@ const serverEnvSchema = z.object({
   // Redis
   REDIS_URL: z.string().url("REDIS_URL must be a valid URL"),
 
-  // Twilio
-  TWILIO_ACCOUNT_SID: z.string().min(1),
-  TWILIO_AUTH_TOKEN: z.string().min(1),
-  TWILIO_PHONE_NUMBER: z.string().min(1),
+  // Mtarget
+  MTARGET_USERNAME: z.string().min(1),
+  MTARGET_PASSWORD: z.string().min(1),
+  MTARGET_SERVICE_ID: z.string().optional(),
+  MTARGET_SENDER_ID: z.string().optional(),
 
   // Brevo
   BREVO_API_KEY: z.string().min(1),
@@ -94,10 +95,11 @@ export const env = {
   // Redis
   REDIS_URL: process.env["REDIS_URL"] as string,
 
-  // Twilio
-  TWILIO_ACCOUNT_SID: process.env["TWILIO_ACCOUNT_SID"] as string,
-  TWILIO_AUTH_TOKEN: process.env["TWILIO_AUTH_TOKEN"] as string,
-  TWILIO_PHONE_NUMBER: process.env["TWILIO_PHONE_NUMBER"] as string,
+  // Mtarget
+  MTARGET_USERNAME: process.env["MTARGET_USERNAME"] as string,
+  MTARGET_PASSWORD: process.env["MTARGET_PASSWORD"] as string,
+  MTARGET_SERVICE_ID: process.env["MTARGET_SERVICE_ID"],
+  MTARGET_SENDER_ID: process.env["MTARGET_SENDER_ID"],
 
   // Brevo
   BREVO_API_KEY: process.env["BREVO_API_KEY"] as string,
