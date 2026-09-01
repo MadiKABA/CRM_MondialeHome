@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { SmsCampaignCard } from "./sms-campaign-card";
 import { SmsCampaignsFilters } from "./sms-campaigns-filters";
+import { SmsBalanceIndicator } from "./sms-balance-indicator";
 import type { PaginatedSmsCampaigns } from "../types";
 
 interface Props {
@@ -25,7 +26,7 @@ export function SmsCampaignsPage({ initialData, permissions }: Props) {
             Campagnes SMS
           </h1>
           <p className="text-text-secondary mt-1 text-sm">
-            Créez et suivez vos campagnes SMS Africa&apos;s Talking
+            Créez et suivez vos campagnes SMS Mtarget
           </p>
         </div>
         {permissions.canCreate && (
@@ -37,6 +38,8 @@ export function SmsCampaignsPage({ initialData, permissions }: Props) {
           </Link>
         )}
       </div>
+
+      <SmsBalanceIndicator />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
