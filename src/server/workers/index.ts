@@ -123,7 +123,7 @@ if (emailWorker) {
 // ============================================================
 const smsWorker = createSmsWorker();
 if (smsWorker) {
-  logger.info("✅ SMS worker démarré (Twilio)");
+  logger.info("✅ SMS worker démarré (Mtarget)");
 }
 
 // ============================================================

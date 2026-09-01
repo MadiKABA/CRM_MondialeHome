@@ -2,7 +2,7 @@ import { Worker, Queue } from "bullmq";
 import { redis } from "@/lib/redis";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { twilioProvider } from "@/lib/providers/twilio";
+import { sendSms, checkSmsBalance } from "@/lib/providers/mtarget";
 import { personalizeSmsMessage } from "@/lib/sms/personalizer";
 import { analyzeMessage } from "@/lib/sms/character-counter";
 import { isValidSmsNumber, normalizePhoneNumber } from "@/lib/sms/validator";
@@ -11,8 +11,9 @@ import type { SmsJobPayload } from "@/features/sms/types";
 const QUEUE_NAME = "sms-send";
 const BATCH_SIZE = 100;
 const BATCH_DELAY = 2_000;
-const SEND_INTERVAL = 100; // Twilio — 100ms entre chaque SMS individuel
+const SEND_INTERVAL = 100;
 const COST_PER_SMS_FCFA = 7;
+const MIN_BALANCE_EUR = 2;
 
 export const smsQueue = redis
   ? new Queue<SmsJobPayload>(QUEUE_NAME, {
@@ -67,12 +68,30 @@ export function createSmsWorker(): Worker | null {
         throw new Error(`CampaignVariant ${variantId} introuvable`);
       }
 
+      const balance = await checkSmsBalance();
+      if (
+        balance.success &&
+        balance.amount !== undefined &&
+        balance.amount < MIN_BALANCE_EUR
+      ) {
+        logger.error(
+          { amount: balance.amount, currency: balance.currency },
+          `Crédit Mtarget insuffisant (${balance.amount}€) — Batch annulé`
+        );
+        await db.campaign.update({
+          where: { id: campaignId },
+          data: { status: "FAILED" },
+        });
+        throw new Error(`Crédit Mtarget insuffisant (${balance.amount}€)`);
+      }
+
       let sentCount = 0;
       let failedCount = 0;
       let skippedCount = 0;
+      let creditExhausted = false;
       const totalBatches = Math.ceil(clientIds.length / BATCH_SIZE);
 
-      for (let i = 0; i < clientIds.length; i += BATCH_SIZE) {
+      for (let i = 0; i < clientIds.length && !creditExhausted; i += BATCH_SIZE) {
         const batchClientIds = clientIds.slice(i, i + BATCH_SIZE);
         const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
 
@@ -84,6 +103,8 @@ export function createSmsWorker(): Worker | null {
         });
 
         for (const client of clients) {
+          if (creditExhausted) break;
+
           const existing = await db.message.findFirst({
             where: { campaignId, clientId: client.id, channel: "SMS" },
           });
@@ -138,13 +159,9 @@ export function createSmsWorker(): Worker | null {
           );
           const analysis = analyzeMessage(message);
 
-          const result = await twilioProvider.sendOne(
-            normalizedPhone,
-            message,
-            variant.senderId ?? undefined
-          );
-
-          await db.message.create({
+          // Créée en PENDING d'abord — son id sert de remoteid Mtarget, ce qui
+          // permet au webhook DLR de retrouver ce message directement.
+          const pending = await db.message.create({
             data: {
               campaignId,
               variantId,
@@ -153,23 +170,41 @@ export function createSmsWorker(): Worker | null {
               recipient: normalizedPhone,
               senderId: variant.senderId,
               content: message,
-              status: result.success ? "SENT" : "FAILED",
-              externalId: result.messageId ?? null,
-              providerName: "twilio",
-              errorMessage: result.error ?? null,
-              sentAt: result.success ? new Date() : null,
-              failedAt: result.success ? null : new Date(),
+              status: "PENDING",
+              providerName: "mtarget",
               cost: analysis.smsCount * COST_PER_SMS_FCFA,
               segments: analysis.smsCount,
             },
           });
 
+          const result = await sendSms(normalizedPhone, message, pending.id);
+
+          await db.message.update({
+            where: { id: pending.id },
+            data: {
+              status: result.success ? "SENT" : "FAILED",
+              externalId: result.messageId ?? null,
+              errorMessage: result.error ?? null,
+              sentAt: result.success ? new Date() : null,
+              failedAt: result.success ? null : new Date(),
+            },
+          });
+
           if (result.success) {
             sentCount++;
-            logger.info({ clientId: client.id, messageId: result.messageId }, "SMS sent");
+            logger.info({ clientId: client.id, ticket: result.messageId }, "SMS sent");
           } else {
             failedCount++;
-            logger.error({ clientId: client.id, error: result.error }, "SMS send failed");
+            logger.error(
+              { clientId: client.id, error: result.error, code: result.code },
+              "SMS send failed"
+            );
+
+            if (result.code === "-11") {
+              logger.error("Crédit Mtarget insuffisant — Batch annulé");
+              creditExhausted = true;
+              break;
+            }
           }
 
           await sleep(SEND_INTERVAL);
@@ -193,7 +228,7 @@ export function createSmsWorker(): Worker | null {
       await db.campaign.update({
         where: { id: campaignId },
         data: {
-          status: "SENT",
+          status: creditExhausted ? "FAILED" : "SENT",
           sentAt: new Date(),
           completedAt: new Date(),
           totalRecipients: clientIds.length,
@@ -205,7 +240,7 @@ export function createSmsWorker(): Worker | null {
       });
 
       logger.info(
-        { campaignId, sentCount, failedCount, skippedCount },
+        { campaignId, sentCount, failedCount, skippedCount, creditExhausted },
         "SMS batch completed"
       );
 
