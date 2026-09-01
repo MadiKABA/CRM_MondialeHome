@@ -24,7 +24,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "workers": "tsx src/server/workers/index.ts",
-    "workers:dev": "tsx --env-file .env.local watch src/server/workers/index.ts",
+    "workers:dev": "tsx watch --env-file .env.local src/server/workers/index.ts",
     "prepare": "husky"
   },
   "dependencies": {
