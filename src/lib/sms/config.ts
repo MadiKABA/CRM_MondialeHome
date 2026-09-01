@@ -3,56 +3,56 @@ import { logger } from "@/lib/logger";
 // Pas de "server-only" ici : ce module est importé par src/server/workers/sms.worker.ts,
 // exécuté via tsx (pas de bundler Next.js) — server-only y jetterait une exception au chargement.
 
-export type TwilioEnvironment = "test" | "production";
+export type MtargetEnvironment = "sandbox" | "production";
 
-export interface SmsConfig {
-  isTest: boolean;
-  environment: TwilioEnvironment;
-  accountSid: string;
-  authToken: string;
-  phoneNumber: string;
+export interface MtargetConfig {
+  readonly isSandbox: boolean;
+  readonly environment: MtargetEnvironment;
+  readonly apiUrl: string;
+  readonly balanceUrl: string;
+  readonly username: string;
+  readonly password: string;
+  readonly serviceId: string | null;
+  readonly senderId: string;
+  readonly timeout: number;
 }
 
-// Numéro "magic" fourni par Twilio pour les tests sandbox — jamais utilisable en prod.
-const TWILIO_TEST_PHONE_NUMBERS = new Set([
-  "+15005550006",
-  "+15005550001",
-  "+15005550007",
-]);
+// URLs Mtarget en dur — jamais dérivées du .env.
+const MTARGET_PRODUCTION_URL = "https://api-public.mtarget.fr/messages";
+const MTARGET_SANDBOX_URL = "https://api-test.mtarget.fr/messages";
+const MTARGET_BALANCE_URL = "https://api-public.mtarget.fr/balance";
 
-function resolveIsTest(): boolean {
-  const twilioEnv = process.env["TWILIO_ENV"];
-  if (twilioEnv === "test") return true;
-  if (twilioEnv === "production") return false;
-  // TWILIO_ENV absent : test par défaut sauf en production (NODE_ENV) — sécurité par défaut
-  return process.env["NODE_ENV"] !== "production";
+function resolveIsSandbox(): boolean {
+  return process.env["MTARGET_ENV"] === "sandbox";
 }
 
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value || value.trim() === "") {
-    throw new Error(`Variable d'environnement manquante : ${name}`);
+    throw new Error(`${name} manquant dans .env.local`);
   }
   return value;
 }
 
-const isTest = resolveIsTest();
-const accountSid = requireEnv("TWILIO_ACCOUNT_SID");
-const authToken = requireEnv("TWILIO_AUTH_TOKEN");
-const phoneNumber = requireEnv("TWILIO_PHONE_NUMBER");
+const isSandbox = resolveIsSandbox();
+const username = requireEnv("MTARGET_USERNAME");
+const password = requireEnv("MTARGET_PASSWORD");
+const serviceId = process.env["MTARGET_SERVICE_ID"]?.trim() || null;
+const senderId = process.env["MTARGET_SENDER_ID"]?.trim() || "MondialHome";
 
-logger.info(isTest ? "🧪 Twilio SMS — mode TEST" : "🚀 Twilio SMS — mode PRODUCTION");
+logger.info(
+  isSandbox ? "🧪 Mtarget SMS — mode SANDBOX" : "🚀 Mtarget SMS — mode PRODUCTION"
+);
+logger.info({ username }, "SMS provider: Mtarget");
 
-if (!isTest && TWILIO_TEST_PHONE_NUMBERS.has(phoneNumber)) {
-  logger.warn(
-    "TWILIO_ENV=production mais TWILIO_PHONE_NUMBER est un numéro de test Twilio. Aucun SMS réel ne sera livré."
-  );
-}
-
-export const smsConfig: SmsConfig = {
-  isTest,
-  environment: isTest ? "test" : "production",
-  accountSid,
-  authToken,
-  phoneNumber,
+export const mtargetConfig: MtargetConfig = {
+  isSandbox,
+  environment: isSandbox ? "sandbox" : "production",
+  apiUrl: isSandbox ? MTARGET_SANDBOX_URL : MTARGET_PRODUCTION_URL,
+  balanceUrl: MTARGET_BALANCE_URL,
+  username,
+  password,
+  serviceId,
+  senderId,
+  timeout: 45_000,
 };
