@@ -12,7 +12,9 @@ import { sendCampaignSchema } from "@/features/campaigns/schemas/campaign.schema
 import { getTemplateById } from "@/features/templates/server/queries";
 import { analyzeMessage } from "@/lib/sms/character-counter";
 import { personalizeSmsMessage } from "@/lib/sms/personalizer";
-import { smsConfig } from "@/lib/sms/config";
+import { mtargetConfig } from "@/lib/sms/config";
+import { checkSmsBalance } from "@/lib/providers/mtarget";
+import { getRedisClient } from "@/lib/redis";
 import {
   createSmsCampaignSchema,
   previewSmsMessageSchema,
@@ -133,7 +135,7 @@ export async function createSmsCampaign(
             channel: "SMS",
             content: data.content,
             templateId: data.templateId ?? null,
-            senderId: smsConfig.phoneNumber,
+            senderId: mtargetConfig.senderId,
           },
         },
       },
@@ -239,6 +241,62 @@ export async function previewSmsMessage(
     };
   } catch (error) {
     logger.error({ error }, "previewSmsMessage failed");
+    return { success: false, error: "Une erreur est survenue" };
+  }
+}
+
+// ── SOLDE SMS MTARGET ──────────────────────────────────────────────────────────
+// Caché 5min dans Redis pour éviter de sur-solliciter l'API Mtarget.
+
+const SMS_BALANCE_CACHE_KEY = "sms:mtarget:balance";
+const SMS_BALANCE_CACHE_TTL_SECONDS = 5 * 60;
+
+export async function getSmsBalance(): Promise<
+  Result<{ amount: number; currency: string }>
+> {
+  try {
+    const user = await getUser();
+    if (!user) return { success: false, error: "Non authentifié" };
+
+    const rl = await checkRateLimit({
+      key: `sms:balance:${user.id}`,
+      limit: 10,
+      windowMs: 60_000,
+    });
+    if (!rl.allowed) return { success: false, error: "Trop de requêtes." };
+
+    await checkPermission("campaigns.read.all");
+
+    const redis = getRedisClient();
+    if (redis) {
+      const cached = await redis.get(SMS_BALANCE_CACHE_KEY);
+      if (cached) {
+        return {
+          success: true,
+          data: JSON.parse(cached) as { amount: number; currency: string },
+        };
+      }
+    }
+
+    const result = await checkSmsBalance();
+    if (!result.success || result.amount === undefined) {
+      return { success: false, error: result.error ?? "Solde Mtarget indisponible" };
+    }
+
+    const data = { amount: result.amount, currency: result.currency ?? "EUR" };
+
+    if (redis) {
+      await redis.set(
+        SMS_BALANCE_CACHE_KEY,
+        JSON.stringify(data),
+        "EX",
+        SMS_BALANCE_CACHE_TTL_SECONDS
+      );
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    logger.error({ error }, "getSmsBalance failed");
     return { success: false, error: "Une erreur est survenue" };
   }
 }
