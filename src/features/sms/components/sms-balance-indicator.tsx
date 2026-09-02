@@ -6,12 +6,14 @@ import { getSmsBalance } from "../server/actions";
 
 const EUR_PER_SMS = 0.03;
 const XOF_PER_EUR = 655.96;
+const EMPTY_CREDIT_EUR = 0.01;
 
 type BalanceLevel = "ok" | "warning" | "low";
 
-function levelFor(amount: number): BalanceLevel {
-  if (amount < 5) return "low";
-  if (amount < 20) return "warning";
+// Seuils basés sur le nombre de SMS estimés, pas sur un montant fixe en euros.
+function levelFor(estimatedSms: number): BalanceLevel {
+  if (estimatedSms < 5) return "low";
+  if (estimatedSms < 20) return "warning";
   return "ok";
 }
 
@@ -77,9 +79,10 @@ export function SmsBalanceIndicator() {
     return null;
   }
 
-  const level = levelFor(state.amount);
-  const { border, bg, text, icon: Icon } = LEVEL_STYLES[level];
   const estimatedSms = Math.floor(state.amount / EUR_PER_SMS);
+  const isEmpty = state.amount < EMPTY_CREDIT_EUR;
+  const level = levelFor(estimatedSms);
+  const { border, bg, text, icon: Icon } = LEVEL_STYLES[level];
   const estimatedFcfa = Math.round(state.amount * XOF_PER_EUR);
 
   return (
@@ -90,14 +93,18 @@ export function SmsBalanceIndicator() {
         <Icon className={`size-5 shrink-0 ${text}`} />
         <div>
           <p className={`text-sm font-semibold ${text}`}>
-            Solde SMS : {state.amount.toFixed(2)} {state.currency}
+            {state.amount.toFixed(2)} {state.currency} disponible
+            {" · "}~{estimatedSms.toLocaleString("fr-FR")} SMS estimés
             {" · "}
             {estimatedFcfa.toLocaleString("fr-FR")} FCFA
           </p>
           <p className="text-text-muted text-xs">
-            {level === "ok" && `~${estimatedSms.toLocaleString("fr-FR")} SMS disponibles`}
-            {level === "warning" && "Pensez à recharger bientôt"}
-            {level === "low" && "Recharger avant d'envoyer"}
+            {isEmpty && "Crédit épuisé"}
+            {!isEmpty && level === "ok" && "Solde SMS"}
+            {!isEmpty &&
+              level === "warning" &&
+              "Solde faible — pensez à recharger bientôt"}
+            {!isEmpty && level === "low" && "Recharger avant d'envoyer"}
           </p>
         </div>
       </div>

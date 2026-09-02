@@ -13,7 +13,7 @@ const BATCH_SIZE = 100;
 const BATCH_DELAY = 2_000;
 const SEND_INTERVAL = 100;
 const COST_PER_SMS_FCFA = 7;
-const MIN_BALANCE_EUR = 2;
+const LOW_BALANCE_WARNING_EUR = 0.01;
 
 export const smsQueue = redis
   ? new Queue<SmsJobPayload>(QUEUE_NAME, {
@@ -68,21 +68,27 @@ export function createSmsWorker(): Worker | null {
         throw new Error(`CampaignVariant ${variantId} introuvable`);
       }
 
+      // Le solde estimé n'est qu'indicatif — Mtarget est la seule source de
+      // vérité sur le crédit (voir code -11 lors de l'envoi réel). On ne bloque
+      // jamais le batch dessus.
       const balance = await checkSmsBalance();
-      if (
-        balance.success &&
-        balance.amount !== undefined &&
-        balance.amount < MIN_BALANCE_EUR
-      ) {
-        logger.error(
-          { amount: balance.amount, currency: balance.currency },
-          `Crédit Mtarget insuffisant (${balance.amount}€) — Batch annulé`
+      if (balance.success && balance.amount !== undefined) {
+        if (balance.amount < LOW_BALANCE_WARNING_EUR) {
+          logger.warn(
+            { amount: balance.amount, currency: balance.currency },
+            `⚠️ Solde Mtarget très faible : ${balance.amount}€`
+          );
+        } else {
+          logger.info(
+            { amount: balance.amount, currency: balance.currency },
+            `Solde Mtarget: ${balance.amount}€`
+          );
+        }
+      } else if (!balance.success) {
+        logger.warn(
+          { error: balance.error },
+          "Vérification du solde Mtarget indisponible"
         );
-        await db.campaign.update({
-          where: { id: campaignId },
-          data: { status: "FAILED" },
-        });
-        throw new Error(`Crédit Mtarget insuffisant (${balance.amount}€)`);
       }
 
       let sentCount = 0;
@@ -179,12 +185,16 @@ export function createSmsWorker(): Worker | null {
 
           const result = await sendSms(normalizedPhone, message, pending.id);
 
+          const isCreditExhausted = result.code === "-11";
+
           await db.message.update({
             where: { id: pending.id },
             data: {
               status: result.success ? "SENT" : "FAILED",
               externalId: result.messageId ?? null,
-              errorMessage: result.error ?? null,
+              errorMessage: isCreditExhausted
+                ? "Crédit Mtarget épuisé — recharger le compte"
+                : (result.error ?? null),
               sentAt: result.success ? new Date() : null,
               failedAt: result.success ? null : new Date(),
             },
@@ -200,8 +210,12 @@ export function createSmsWorker(): Worker | null {
               "SMS send failed"
             );
 
-            if (result.code === "-11") {
-              logger.error("Crédit Mtarget insuffisant — Batch annulé");
+            if (isCreditExhausted) {
+              const currentBalance = await checkSmsBalance();
+              logger.error(
+                { amount: currentBalance.amount, currency: currentBalance.currency },
+                "Crédit Mtarget épuisé mid-batch — Batch annulé"
+              );
               creditExhausted = true;
               break;
             }
@@ -222,6 +236,41 @@ export function createSmsWorker(): Worker | null {
 
         if (i + BATCH_SIZE < clientIds.length) {
           await sleep(BATCH_DELAY);
+        }
+      }
+
+      if (creditExhausted) {
+        const processed = await db.message.findMany({
+          where: { campaignId, channel: "SMS" },
+          select: { clientId: true },
+        });
+        const processedIds = new Set(processed.map((m) => m.clientId));
+        const remainingClientIds = clientIds.filter((id) => !processedIds.has(id));
+
+        if (remainingClientIds.length > 0) {
+          const remainingClients = await db.client.findMany({
+            where: { id: { in: remainingClientIds } },
+            select: { id: true, phone: true },
+          });
+
+          await db.message.createMany({
+            data: remainingClients.map((c) => ({
+              campaignId,
+              variantId,
+              clientId: c.id,
+              channel: "SMS",
+              recipient: c.phone ?? "",
+              content: "",
+              status: "FAILED" as const,
+              errorMessage: "Batch annulé — crédit épuisé",
+            })),
+          });
+
+          failedCount += remainingClients.length;
+          logger.info(
+            { campaignId, count: remainingClients.length },
+            "Clients restants marqués FAILED — crédit épuisé"
+          );
         }
       }
 
