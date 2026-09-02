@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { createSmsCampaign, sendSmsCampaign } from "../../server/actions";
+import { analyzeMessage } from "@/lib/sms/character-counter";
+import { personalizeSmsMessage } from "@/lib/sms/personalizer";
+import { createSmsCampaign } from "../../server/actions";
 import { SmsStepInfo } from "./sms-step-info";
 import { SmsStepMessage } from "./sms-step-message";
 import { SmsStepSchedule } from "./sms-step-schedule";
 import { SmsStepReview } from "./sms-step-review";
+import { SmsSendConfirmDialog } from "../sms-send-confirm-dialog";
 import type { SmsCampaignFormState, SmsSegmentDTO } from "../../types";
 import type { TemplateDTO } from "@/features/templates/types";
 
@@ -41,6 +44,7 @@ export function SmsCampaignForm({ segments, templates }: Props) {
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formState, setFormState] = useState<SmsCampaignFormState>(INITIAL_STATE);
+  const [pendingCampaignId, setPendingCampaignId] = useState<string | null>(null);
 
   const update = (patch: Partial<SmsCampaignFormState>) =>
     setFormState((prev) => ({ ...prev, ...patch }));
@@ -79,21 +83,16 @@ export function SmsCampaignForm({ segments, templates }: Props) {
         return;
       }
 
-      // Sans date de planification : "Créer la campagne" envoie immédiatement.
-      // Avec date : createSmsCampaign a déjà créé la campagne en statut SCHEDULED.
+      // Avec date de planification : createSmsCampaign a déjà créé la campagne
+      // en statut SCHEDULED, rien de plus à faire ici.
+      // Sans date : la campagne est en DRAFT — on demande confirmation avant
+      // de déclencher l'envoi (sendSmsCampaign est une action séparée).
       if (!formState.scheduledAt && result.data) {
-        const sendResult = await sendSmsCampaign({ campaignId: result.data.id });
-        if (!sendResult.success) {
-          toast.error(`Campagne créée mais l'envoi a échoué : ${sendResult.error}`);
-          router.push("/campagnes");
-          router.refresh();
-          return;
-        }
-        toast.success(`Campagne SMS "${formState.name}" en cours d'envoi`);
-      } else {
-        toast.success(`Campagne SMS "${formState.name}" planifiée`);
+        setPendingCampaignId(result.data.id);
+        return;
       }
 
+      toast.success(`Campagne SMS "${formState.name}" planifiée`);
       router.push("/campagnes");
       router.refresh();
     } catch {
@@ -102,6 +101,27 @@ export function SmsCampaignForm({ segments, templates }: Props) {
       setIsSubmitting(false);
     }
   };
+
+  const handleSent = () => {
+    setPendingCampaignId(null);
+    toast.success(`Campagne SMS "${formState.name}" en cours d'envoi`);
+    router.push("/campagnes");
+    router.refresh();
+  };
+
+  const handleCancelSend = () => {
+    setPendingCampaignId(null);
+    toast.info(`Campagne SMS "${formState.name}" enregistrée en brouillon`);
+    router.push("/campagnes");
+    router.refresh();
+  };
+
+  const finalMessage = personalizeSmsMessage(
+    formState.content,
+    { firstName: "Mamadou" },
+    { produit: formState.produit, reduction: formState.reduction }
+  );
+  const costPerClient = analyzeMessage(formState.content).costPerClient;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -216,6 +236,22 @@ export function SmsCampaignForm({ segments, templates }: Props) {
           </div>
         )}
       </div>
+
+      {pendingCampaignId && (
+        <SmsSendConfirmDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) handleCancelSend();
+          }}
+          campaignId={pendingCampaignId}
+          campaignName={formState.name}
+          segmentName={selectedSegment?.name ?? "—"}
+          recipientCount={selectedSegment?.smsEligibleCount ?? 0}
+          messagePreview={finalMessage}
+          costPerClient={costPerClient}
+          onSent={handleSent}
+        />
+      )}
     </div>
   );
 }
