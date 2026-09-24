@@ -31,6 +31,10 @@ export const metadata: Metadata = {
   description:
     "Plateforme CRM pour Mondiale Home — Gestion clients, campagnes et ventes.",
   robots: { index: false, follow: false },
+  icons: {
+    icon: "/images/mondiale-home-icon.png",
+    apple: "/images/mondiale-home-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
