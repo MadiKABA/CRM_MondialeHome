@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { ReactNode } from "react";
 
 export const dynamic = "force-dynamic";
@@ -14,9 +15,14 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
 
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
-            <span className="font-heading text-sm font-bold text-white">MH</span>
-          </div>
+          <Image
+            src="/images/mondiale-home-icon.png"
+            alt="Mondiale Home"
+            width={40}
+            height={40}
+            className="size-10 shrink-0 rounded-xl"
+            priority
+          />
           <div>
             <p className="font-heading text-base font-semibold text-white">
               Mondiale Home
@@ -53,9 +59,14 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <div className="flex min-h-screen flex-col items-center justify-center px-6 py-12 sm:px-12">
         {/* Logo mobile (visible uniquement sur mobile/tablette) */}
         <div className="mb-8 flex items-center gap-3 lg:hidden">
-          <div className="bg-primary text-primary-foreground font-heading flex size-10 items-center justify-center rounded-xl text-sm font-bold">
-            MH
-          </div>
+          <Image
+            src="/images/mondiale-home-icon.png"
+            alt="Mondiale Home"
+            width={40}
+            height={40}
+            className="size-10 shrink-0 rounded-xl"
+            priority
+          />
           <div>
             <p className="font-heading text-base leading-none font-semibold">
               Mondiale Home
