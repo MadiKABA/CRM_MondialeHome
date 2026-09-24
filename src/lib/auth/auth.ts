@@ -24,6 +24,7 @@ export const auth = betterAuth({
     enabled: true,
     requireEmailVerification: false, // TODO: activer en production
     minPasswordLength: 8,
+    revokeSessionsOnPasswordReset: true,
   },
 
   ...(googleConfig

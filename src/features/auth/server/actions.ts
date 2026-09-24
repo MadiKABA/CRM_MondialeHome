@@ -3,14 +3,23 @@
 import { headers } from "next/headers";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { auth } from "@/lib/auth/auth";
 import { logger } from "@/lib/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { sendForgotPasswordEmail } from "@/lib/email/send";
 import { EMAIL_CONFIG } from "@/lib/email/config";
+import {
+  resetPasswordSchema,
+  type ResetPasswordFormValues,
+} from "../schemas/auth.schema";
 
 const forgotPasswordSchema = z.object({
   email: z.string().min(1, "Email requis").email("Email invalide"),
 });
+
+type ActionResult<T = void> =
+  | { success: true; data?: T }
+  | { success: false; error: string };
 
 export async function requestPasswordReset(input: unknown): Promise<{ success: true }> {
   const h = await headers();
@@ -48,14 +57,12 @@ export async function requestPasswordReset(input: unknown): Promise<{ success: t
     const { nanoid } = await import("nanoid");
     const token = nanoid(32);
 
-    // Supprimer les tokens précédents pour cet email, créer le nouveau
-    await db.verification.deleteMany({
-      where: { identifier: `reset-password:${email.toLowerCase()}` },
-    });
+    // Format attendu par l'endpoint natif Better Auth auth.api.resetPassword :
+    // identifier = "reset-password:<token>", value = userId
     await db.verification.create({
       data: {
-        identifier: `reset-password:${email.toLowerCase()}`,
-        value: token,
+        identifier: `reset-password:${token}`,
+        value: user.id,
         expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 heure
         userId: user.id,
       },
@@ -74,6 +81,74 @@ export async function requestPasswordReset(input: unknown): Promise<{ success: t
   } catch (err) {
     logger.error({ err, email }, "requestPasswordReset failed");
   }
+
+  return { success: true };
+}
+
+export async function resetPassword(
+  input: ResetPasswordFormValues
+): Promise<ActionResult> {
+  const h = await headers();
+  const ip = h.get("x-forwarded-for") ?? "unknown";
+
+  const rateCheck = await checkRateLimit({
+    key: `reset_password:${ip}`,
+    limit: 5,
+    windowMs: 900_000,
+  });
+  if (!rateCheck.allowed) {
+    return { success: false, error: "Trop de tentatives. Réessayez plus tard." };
+  }
+
+  const parsed = resetPasswordSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Données invalides",
+    };
+  }
+
+  const { token, newPassword } = parsed.data;
+
+  const verification = await db.verification.findFirst({
+    where: { identifier: `reset-password:${token}` },
+    select: { userId: true, expiresAt: true },
+  });
+
+  if (!verification || verification.expiresAt < new Date()) {
+    return {
+      success: false,
+      error: "Ce lien est invalide ou a expiré. Demandez un nouveau lien.",
+    };
+  }
+
+  try {
+    await auth.api.resetPassword({ body: { newPassword, token } });
+  } catch (err) {
+    logger.warn({ err }, "Password reset failed");
+    return {
+      success: false,
+      error: "Ce lien est invalide ou a expiré. Demandez un nouveau lien.",
+    };
+  }
+
+  await db.auditLog
+    .create({
+      data: {
+        userId: verification.userId,
+        action: "password.reset",
+        entity: "User",
+        entityId: verification.userId ?? undefined,
+        ipAddress: ip,
+        userAgent: h.get("user-agent") ?? undefined,
+        status: "success",
+      },
+    })
+    .catch((err: unknown) => {
+      logger.error({ err }, "Failed to write audit log for password reset");
+    });
+
+  logger.info({ userId: verification.userId }, "Password reset successful");
 
   return { success: true };
 }
