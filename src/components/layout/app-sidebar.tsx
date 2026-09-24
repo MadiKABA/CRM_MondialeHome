@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -70,9 +71,14 @@ export function AppSidebar({
             isCollapsed && "justify-center"
           )}
         >
-          <div className="bg-primary text-primary-foreground font-heading flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold">
-            MH
-          </div>
+          <Image
+            src="/images/mondiale-home-icon.png"
+            alt="Mondiale Home"
+            width={36}
+            height={36}
+            className="size-9 shrink-0 rounded-lg object-cover"
+            priority
+          />
           {!isCollapsed && (
             <div className="flex flex-col">
               <span className="font-heading text-sidebar-foreground text-sm leading-tight font-semibold">
