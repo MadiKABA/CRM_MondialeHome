@@ -13,6 +13,7 @@ import {
   DEFAULT_CAMPAIGN_VARS,
 } from "@/features/templates/lib/renderer";
 import { getTemplateById } from "@/features/templates/server/queries";
+import { recomputeAllCampaignStats } from "../lib/stats";
 import { sendCampaignCore } from "./service";
 import {
   getCampaignById,
@@ -616,5 +617,35 @@ export async function syncCampaignStats(campaignId: string): Promise<void> {
     revalidatePath(`/campagnes/${campaignId}`);
   } catch (error) {
     logger.error({ error, campaignId }, "syncCampaignStats failed");
+  }
+}
+
+// ── RATTRAPAGE : RECALCUL DES STATS DE TOUTES LES CAMPAGNES ───────────────────
+
+export async function recalculateAllCampaignStats(): Promise<
+  Result<{ processed: number; failed: number }>
+> {
+  try {
+    const user = await getUser();
+    if (!user) return { success: false, error: "Non authentifié" };
+
+    const rl = await checkRateLimit({
+      key: `campaign:recalc-stats:${user.id}`,
+      limit: 3,
+      windowMs: 60_000,
+    });
+    if (!rl.allowed) return { success: false, error: "Trop de requêtes." };
+
+    await checkPermission("admin.view.all");
+
+    const result = await recomputeAllCampaignStats();
+
+    await createAuditLog(user.id, "campaign.recalculate_stats", undefined, result);
+
+    revalidatePath("/campagnes");
+    return { success: true, data: result };
+  } catch (error) {
+    logger.error({ error }, "recalculateAllCampaignStats failed");
+    return { success: false, error: "Une erreur est survenue" };
   }
 }
