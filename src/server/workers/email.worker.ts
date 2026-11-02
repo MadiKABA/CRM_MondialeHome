@@ -9,6 +9,7 @@ import {
   personalizeEmail,
   checkClientEligibility,
 } from "@/features/email-mass/lib/personalizer";
+import { recomputeBatchStats } from "@/features/campaigns/lib/stats";
 import type { EmailJobPayload } from "@/features/email-mass/types";
 
 const QUEUE_NAME = "email-send";
@@ -140,7 +141,18 @@ export function createEmailWorker(): Worker | null {
             personalizedEmail = personalizeEmail(clientData, template, campaignData);
           } catch (err) {
             logger.error({ err, clientId: client.id }, "Personalization failed");
+            await db.messageLog.create({
+              data: {
+                batchId,
+                templateId,
+                clientId: client.id,
+                email: client.email ?? "",
+                status: "FAILED",
+                errorMessage: "Personnalisation impossible",
+              },
+            });
             failedCount++;
+            await refreshStats(batchId);
             continue;
           }
 
@@ -190,13 +202,9 @@ export function createEmailWorker(): Worker | null {
             logger.error({ err: sendErr, clientId: client.id }, "Email send failed");
           }
 
+          await refreshStats(batchId);
           await sleep(SEND_INTERVAL);
         }
-
-        await db.emailBatch.update({
-          where: { id: batchId },
-          data: { sentCount, failedCount },
-        });
 
         logger.info(
           { batchId, batchNumber, totalBatches, sent: sentCount, failed: failedCount },
@@ -213,11 +221,11 @@ export function createEmailWorker(): Worker | null {
         data: {
           status: "COMPLETED",
           completedAt: new Date(),
-          sentCount,
-          failedCount,
           totalCount: clientIds.length,
         },
       });
+      // Compteurs lot + campagne recalculés depuis les logs (passe la campagne à SENT)
+      await recomputeBatchStats(batchId);
 
       logger.info(
         { batchId, sentCount, failedCount, skippedCount },
@@ -244,6 +252,15 @@ export function createEmailWorker(): Worker | null {
   });
 
   return worker;
+}
+
+// Mise à jour des compteurs non bloquante : un échec ne doit pas interrompre l'envoi
+async function refreshStats(batchId: string): Promise<void> {
+  try {
+    await recomputeBatchStats(batchId);
+  } catch (err) {
+    logger.warn({ err, batchId }, "Batch stats refresh failed");
+  }
 }
 
 function sleep(ms: number): Promise<void> {

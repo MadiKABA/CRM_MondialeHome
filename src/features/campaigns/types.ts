@@ -65,6 +65,7 @@ export interface CampaignDTO {
   deliveredCount: number;
   openedCount: number;
   clickedCount: number;
+  bouncedCount: number;
   failedCount: number;
   unsubscribedCount: number;
   // Taux
@@ -72,6 +73,8 @@ export interface CampaignDTO {
   openRate: number;
   clickRate: number;
   bounceRate: number;
+  // true = emails envoyés mais aucun événement webhook reçu
+  trackingPending: boolean;
   // Batch M8
   emailBatchId: string | null;
   // Audit

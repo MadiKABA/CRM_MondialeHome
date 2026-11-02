@@ -149,7 +149,7 @@ export function createCampaignSchedulerWorker(): Worker | null {
 }
 
 // ── Worker stats sync ─────────────────────────────────────────────────────────
-// Synchronise toutes les 5 minutes les stats des campagnes en cours
+// Filet de sécurité toutes les 5 minutes : recalcul depuis les logs (campagnes en cours + 7 derniers jours)
 
 export function createCampaignStatsSyncWorker(): Worker | null {
   if (!redis) return null;
@@ -169,12 +169,19 @@ export function createCampaignStatsSyncWorker(): Worker | null {
     async () => {
       const sending = await db.campaign.findMany({
         where: {
-          status: { in: ["SENDING"] },
           deletedAt: null,
           emailBatchId: { not: null },
+          // En cours, ou envoyées récemment (les webhooks arrivent après l'envoi)
+          OR: [
+            { status: "SENDING" },
+            {
+              status: { in: ["SENT", "COMPLETED"] },
+              sentAt: { gte: new Date(Date.now() - 7 * 24 * 3600 * 1000) },
+            },
+          ],
         },
         select: { id: true },
-        take: 20,
+        take: 50,
       });
 
       for (const campaign of sending) {

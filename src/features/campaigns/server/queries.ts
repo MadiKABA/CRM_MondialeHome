@@ -7,6 +7,8 @@ import type {
   PaginatedCampaigns,
 } from "../types";
 import type { CampaignFilters } from "../schemas/campaign.schema";
+import { recomputeBatchStats } from "../lib/stats";
+import { computeRates, isTrackingPending } from "../lib/stats-math";
 import type { EmailCampaignData } from "@/features/email-mass/types";
 
 // ── Select partagé ────────────────────────────────────────────────────────────
@@ -28,6 +30,7 @@ const CAMPAIGN_SELECT = {
   totalOpened: true,
   totalClicked: true,
   totalFailed: true,
+  totalBounced: true,
   totalUnsubscribed: true,
   deliveryRate: true,
   openRate: true,
@@ -51,10 +54,15 @@ type CampaignQueryResult = Prisma.CampaignGetPayload<{
 // ── Mapper Prisma → DTO ───────────────────────────────────────────────────────
 
 function toDTO(c: CampaignQueryResult): CampaignDTO {
-  const sent = c.totalSent ?? 0;
-  const delivered = c.totalDelivered ?? 0;
-  const opened = c.totalOpened ?? 0;
-  const clicked = c.totalClicked ?? 0;
+  const counts = {
+    sent: c.totalSent ?? 0,
+    delivered: c.totalDelivered ?? 0,
+    opened: c.totalOpened ?? 0,
+    clicked: c.totalClicked ?? 0,
+    bounced: c.totalBounced ?? 0,
+    failed: c.totalFailed ?? 0,
+  };
+  const rates = computeRates(counts);
 
   return {
     id: c.id,
@@ -71,16 +79,18 @@ function toDTO(c: CampaignQueryResult): CampaignDTO {
     sentAt: c.sentAt,
     completedAt: c.completedAt,
     totalCount: c.totalRecipients ?? 0,
-    sentCount: sent,
-    deliveredCount: delivered,
-    openedCount: opened,
-    clickedCount: clicked,
-    failedCount: c.totalFailed ?? 0,
+    sentCount: counts.sent,
+    deliveredCount: counts.delivered,
+    openedCount: counts.opened,
+    clickedCount: counts.clicked,
+    bouncedCount: counts.bounced,
+    failedCount: counts.failed,
     unsubscribedCount: c.totalUnsubscribed ?? 0,
-    deliveryRate: c.deliveryRate ?? (sent > 0 ? Math.round((delivered / sent) * 100) : 0),
-    openRate: c.openRate ?? (delivered > 0 ? Math.round((opened / delivered) * 100) : 0),
-    clickRate: c.clickRate ?? (opened > 0 ? Math.round((clicked / opened) * 100) : 0),
-    bounceRate: c.bounceRate ?? 0,
+    deliveryRate: rates.deliveryRate,
+    openRate: rates.openRate,
+    clickRate: rates.clickRate,
+    bounceRate: rates.bounceRate,
+    trackingPending: isTrackingPending(counts),
     emailBatchId: c.emailBatchId,
     createdById: c.createdById,
     createdByName: c.createdBy?.name ?? null,
@@ -153,7 +163,8 @@ export async function getCampaigns(
     totalSent: totalSentCount,
     avgOpenRate:
       totalDelivered > 0 ? Math.round((totalOpened / totalDelivered) * 100) : 0,
-    avgClickRate: totalOpened > 0 ? Math.round((totalClicked / totalOpened) * 100) : 0,
+    avgClickRate:
+      totalDelivered > 0 ? Math.round((totalClicked / totalDelivered) * 100) : 0,
     avgDeliveryRate:
       totalSentCount > 0 ? Math.round((totalDelivered / totalSentCount) * 100) : 0,
     lastCampaignAt: sentAgg._max.sentAt,
@@ -214,58 +225,13 @@ export async function getDueCampaigns(): Promise<CampaignDTO[]> {
   return campaigns.map(toDTO);
 }
 
-// ── Synchroniser les stats depuis EmailBatch ──────────────────────────────────
+// ── Synchroniser les stats d'une campagne depuis les logs de messages ─────────
 
 export async function syncCampaignStatsFromBatch(campaignId: string): Promise<void> {
   const campaign = await db.campaign.findUnique({
     where: { id: campaignId },
     select: { emailBatchId: true },
   });
-
   if (!campaign?.emailBatchId) return;
-
-  const batch = await db.emailBatch.findUnique({
-    where: { id: campaign.emailBatchId },
-    select: {
-      totalCount: true,
-      sentCount: true,
-      deliveredCount: true,
-      openedCount: true,
-      clickedCount: true,
-      bouncedCount: true,
-      failedCount: true,
-      status: true,
-    },
-  });
-
-  if (!batch) return;
-
-  const sent = batch.sentCount ?? 0;
-  const delivered = batch.deliveredCount ?? 0;
-  const opened = batch.openedCount ?? 0;
-  const clicked = batch.clickedCount ?? 0;
-  const bounced = batch.bouncedCount ?? 0;
-
-  await db.campaign.update({
-    where: { id: campaignId },
-    data: {
-      totalRecipients: batch.totalCount,
-      totalSent: sent,
-      totalDelivered: delivered,
-      totalOpened: opened,
-      totalClicked: clicked,
-      totalFailed: batch.failedCount,
-      deliveryRate: sent > 0 ? (delivered / sent) * 100 : 0,
-      openRate: delivered > 0 ? (opened / delivered) * 100 : 0,
-      clickRate: opened > 0 ? (clicked / opened) * 100 : 0,
-      bounceRate: sent > 0 ? (bounced / sent) * 100 : 0,
-      ...(batch.status === "COMPLETED" && {
-        status: "SENT",
-        sentAt: new Date(),
-      }),
-      ...(batch.status === "FAILED" && {
-        status: "FAILED",
-      }),
-    },
-  });
+  await recomputeBatchStats(campaign.emailBatchId);
 }

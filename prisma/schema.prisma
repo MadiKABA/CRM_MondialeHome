@@ -731,6 +731,7 @@ model Campaign {
   totalOpened       Int @default(0)
   totalClicked      Int @default(0)
   totalFailed       Int @default(0)
+  totalBounced      Int @default(0)
   totalUnsubscribed Int @default(0)
 
   // ROI
@@ -949,6 +950,7 @@ enum MessageStatus {
   CLICKED
   FAILED
   BOUNCED
+  COMPLAINED
   REJECTED
   UNSUBSCRIBED
   EXPIRED
@@ -1424,4 +1426,18 @@ model MessageLog {
   @@index([resendId])
   @@index([email])
   @@map("message_logs")
+}
+
+// Journal des événements webhook Resend (idempotence via svix-id)
+model WebhookEvent {
+  id        String   @id @default(cuid())
+  svixId    String   @unique
+  type      String
+  resendId  String?
+  result    String
+  createdAt DateTime @default(now())
+
+  @@index([resendId])
+  @@index([createdAt])
+  @@map("webhook_events")
 }
