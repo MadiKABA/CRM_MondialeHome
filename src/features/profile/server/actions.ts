@@ -7,7 +7,12 @@ import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { validateUploadedFile } from "@/lib/upload/sanitize";
 import { compressAvatar } from "@/lib/upload/compress";
-import { saveFile, deleteFile } from "@/lib/upload/storage";
+import {
+  uploadImageBuffer,
+  deleteImageByPublicId,
+  extractCloudinaryPublicId,
+} from "@/lib/cloudinary/upload";
+import { deleteFile } from "@/lib/upload/storage";
 import { UPLOAD_CONFIG } from "@/lib/upload/config";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
@@ -20,6 +25,21 @@ import {
 type ActionResult<T = void> =
   | { success: true; data?: T }
   | { success: false; error: string };
+
+// Supprime l'ancien avatar (Cloudinary ou ancien fichier local) sans jamais bloquer l'action
+async function removePreviousAvatar(image: string | null, userId: string) {
+  if (!image) return;
+  try {
+    if (image.includes("res.cloudinary.com")) {
+      const publicId = extractCloudinaryPublicId(image);
+      if (publicId) await deleteImageByPublicId(publicId);
+    } else if (image.startsWith("/uploads/")) {
+      await deleteFile(`avatars/${userId}`, UPLOAD_CONFIG.AVATAR.FILENAME);
+    }
+  } catch (err) {
+    logger.warn({ err, userId }, "Previous avatar cleanup failed");
+  }
+}
 
 // ── Upload avatar ─────────────────────────────────────────────────────────────
 
@@ -51,11 +71,16 @@ export async function uploadAvatar(
 
     const compressed = await compressAvatar(buffer);
 
-    const url = await saveFile(
-      `avatars/${session.user.id}`,
-      UPLOAD_CONFIG.AVATAR.FILENAME,
-      compressed.buffer
-    );
+    const previous = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { image: true },
+    });
+
+    const uploaded = await uploadImageBuffer(compressed.buffer, "avatars", [
+      "avatar",
+      "mondial-home",
+    ]);
+    const url = uploaded.url;
 
     await db.user.update({
       where: { id: session.user.id },
@@ -78,6 +103,8 @@ export async function uploadAvatar(
       },
     });
 
+    await removePreviousAvatar(previous?.image ?? null, session.user.id);
+
     logger.info(
       { userId: session.user.id, savings: compressed.savings },
       "Avatar uploaded"
@@ -87,7 +114,7 @@ export async function uploadAvatar(
 
     return { success: true, data: { url } };
   } catch (error) {
-    logger.error({ error }, "Failed to upload avatar");
+    logger.error({ err: error }, "Failed to upload avatar");
     return { success: false, error: "Erreur lors de l'upload" };
   }
 }
@@ -99,7 +126,11 @@ export async function deleteAvatar(): Promise<ActionResult> {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) return { success: false, error: "Non authentifié" };
 
-    await deleteFile(`avatars/${session.user.id}`, UPLOAD_CONFIG.AVATAR.FILENAME);
+    const current = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { image: true },
+    });
+    await removePreviousAvatar(current?.image ?? null, session.user.id);
 
     await db.user.update({
       where: { id: session.user.id },
@@ -122,7 +153,7 @@ export async function deleteAvatar(): Promise<ActionResult> {
 
     return { success: true };
   } catch (error) {
-    logger.error({ error }, "Failed to delete avatar");
+    logger.error({ err: error }, "Failed to delete avatar");
     return { success: false, error: "Erreur lors de la suppression" };
   }
 }
@@ -187,7 +218,7 @@ export async function updateProfile(input: UpdateProfileInput): Promise<ActionRe
 
     return { success: true };
   } catch (error) {
-    logger.error({ error }, "Failed to update profile");
+    logger.error({ err: error }, "Failed to update profile");
     return { success: false, error: "Une erreur est survenue" };
   }
 }
@@ -251,7 +282,7 @@ export async function changePassword(input: ChangePasswordInput): Promise<Action
 
     return { success: true };
   } catch (error) {
-    logger.error({ error }, "Failed to change password");
+    logger.error({ err: error }, "Failed to change password");
     return { success: false, error: "Une erreur est survenue" };
   }
 }
@@ -289,7 +320,7 @@ export async function revokeSession(sessionId: string): Promise<ActionResult> {
     revalidatePath("/settings/profile");
     return { success: true };
   } catch (error) {
-    logger.error({ error }, "Failed to revoke session");
+    logger.error({ err: error }, "Failed to revoke session");
     return { success: false, error: "Une erreur est survenue" };
   }
 }
@@ -319,7 +350,7 @@ export async function revokeAllOtherSessions(): Promise<ActionResult> {
     revalidatePath("/settings/profile");
     return { success: true };
   } catch (error) {
-    logger.error({ error }, "Failed to revoke all sessions");
+    logger.error({ err: error }, "Failed to revoke all sessions");
     return { success: false, error: "Une erreur est survenue" };
   }
 }
