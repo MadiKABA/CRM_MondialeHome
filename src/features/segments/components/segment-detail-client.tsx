@@ -10,6 +10,7 @@ import { AddMembersDialog } from "./add-members-dialog";
 import { DeleteSegmentDialog } from "./delete-segment-dialog";
 import { EditGroupDialog } from "./edit-group-dialog";
 import { EditSegmentDialog } from "./edit-segment-dialog";
+import { GuardedButton } from "@/components/shared/guarded-button";
 import { usePermission } from "@/hooks/use-permission";
 import { PERMISSIONS } from "@/lib/permissions/constants";
 import { refreshSegment } from "@/features/segments/server/actions";
@@ -65,8 +66,10 @@ export function SegmentDetailClient({
     <div className="space-y-4">
       {/* Barre d'actions */}
       <div className="flex flex-wrap items-center gap-2">
-        {canUpdate && !segment.isSystem && (
-          <Button
+        {!segment.isSystem && (
+          <GuardedButton
+            allowed={canUpdate}
+            deniedReason="Permission requise : modifier les segments"
             variant="outline"
             size="sm"
             className="border-cream-darker text-text-secondary hover:bg-cream gap-1.5"
@@ -74,11 +77,13 @@ export function SegmentDetailClient({
           >
             <Pencil className="size-4" />
             Modifier
-          </Button>
+          </GuardedButton>
         )}
 
-        {segment.type === "STATIC" && canManageMembers && (
-          <Button
+        {segment.type === "STATIC" && (
+          <GuardedButton
+            allowed={canManageMembers}
+            deniedReason="Permission requise : gérer les membres des segments"
             variant="outline"
             size="sm"
             className="border-cream-darker text-text-secondary hover:bg-cream gap-1.5"
@@ -86,7 +91,14 @@ export function SegmentDetailClient({
           >
             <UserPlus className="size-4" />
             Ajouter des clients
-          </Button>
+          </GuardedButton>
+        )}
+
+        {segment.type === "DYNAMIC" && (
+          <p className="text-text-secondary text-xs">
+            Segment dynamique : les membres sont calculés automatiquement par ses
+            critères, il n&apos;est pas possible d&apos;en ajouter manuellement.
+          </p>
         )}
 
         {segment.type === "DYNAMIC" && canUpdate && (

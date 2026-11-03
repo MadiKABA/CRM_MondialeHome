@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTransition, useState } from "react";
 import { toast } from "sonner";
 import { Eye, RefreshCw, Users2, Trash2, UserPlus, Pencil } from "lucide-react";
+import { GuardedButton } from "@/components/shared/guarded-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { refreshSegment } from "@/features/segments/server/actions";
@@ -177,8 +178,10 @@ export function SegmentCard({
             Voir
           </Button>
 
-          {canUpdate && !segment.isSystem && (
-            <Button
+          {!segment.isSystem && (
+            <GuardedButton
+              allowed={canUpdate}
+              deniedReason="Permission requise : modifier les segments"
               variant="outline"
               size="sm"
               className="border-cream-darker text-text-secondary hover:bg-cream flex-1 gap-1.5 text-xs"
@@ -186,11 +189,13 @@ export function SegmentCard({
             >
               <Pencil className="size-3.5" />
               Modifier
-            </Button>
+            </GuardedButton>
           )}
 
-          {segment.type === "STATIC" && canManageMembers && (
-            <Button
+          {segment.type === "STATIC" && (
+            <GuardedButton
+              allowed={canManageMembers}
+              deniedReason="Permission requise : gérer les membres des segments"
               variant="outline"
               size="sm"
               className="border-cream-darker text-text-secondary hover:bg-cream flex-1 gap-1.5 text-xs"
@@ -198,7 +203,7 @@ export function SegmentCard({
             >
               <UserPlus className="size-3.5" />
               Ajouter
-            </Button>
+            </GuardedButton>
           )}
 
           {segment.type === "DYNAMIC" && canUpdate && (
