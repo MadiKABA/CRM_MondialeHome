@@ -348,42 +348,6 @@ export async function getArticlesForExport(
   return articles.map(toListItem);
 }
 
-export async function isReferenceUnique(
-  reference: string,
-  excludeId?: string
-): Promise<boolean> {
-  const existing = await db.article.findFirst({
-    where: {
-      reference: reference.toUpperCase(),
-      deletedAt: null,
-      ...(excludeId ? { NOT: { id: excludeId } } : {}),
-    },
-  });
-  return !existing;
-}
-
-// Génère une référence auto MH-00001, MH-00002... pour la création rapide.
-// La contrainte @unique porte sur toute la table (y compris soft-deleted),
-// donc on boucle sur isReferenceUnique tant qu'une collision est possible.
-export async function generateArticleReference(): Promise<string> {
-  const last = await db.article.findFirst({
-    where: { reference: { startsWith: "MH-" } },
-    orderBy: { reference: "desc" },
-    select: { reference: true },
-  });
-
-  let next = 1;
-  const match = last?.reference.match(/^MH-(\d+)$/);
-  if (match?.[1]) next = parseInt(match[1], 10) + 1;
-
-  let candidate = `MH-${String(next).padStart(5, "0")}`;
-  while (!(await isReferenceUnique(candidate))) {
-    next += 1;
-    candidate = `MH-${String(next).padStart(5, "0")}`;
-  }
-  return candidate;
-}
-
 export async function getDistinctBrands(): Promise<string[]> {
   const rows = await db.article.findMany({
     where: { deletedAt: null, brand: { not: null } },
