@@ -150,7 +150,7 @@ export function createSmsWorker(): Worker | null {
                 content: "",
                 status: "FAILED",
                 errorCode: "INVALID_PHONE",
-                errorMessage: "Numéro de téléphone invalide",
+                errorMessage: "Numéro de téléphone invalide pour son pays",
               },
             });
             failedCount++;
