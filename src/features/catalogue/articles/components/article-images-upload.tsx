@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
+import { prepareImageForUpload } from "@/lib/upload/resize";
+import { validateImageType } from "@/lib/upload/client";
 import { ImagePlus, Loader2, Trash2, Star, AlertTriangle, Eye, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -27,7 +29,6 @@ import {
 
 const MAX_FILES = 5; // max secondary images
 const MAX_SIZE_MB = 5;
-const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
 interface UploadingItem {
   localId: string;
@@ -78,19 +79,15 @@ export function ArticleImagesUpload({
     if (mainInputRef.current) mainInputRef.current.value = "";
     if (!file) return;
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      toast.error("Format non supporté (JPG, PNG ou WebP)");
-      return;
-    }
-    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-      toast.error(`Image trop volumineuse (max ${MAX_SIZE_MB} Mo)`);
-      return;
-    }
-
     setUploadingMain(true);
     try {
+      const prepared = await prepareImageForUpload(file);
+      if ("error" in prepared) {
+        toast.error(prepared.error);
+        return;
+      }
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", prepared.file);
 
       const result = await uploadArticleMainImage(articleId, formData);
 
@@ -141,12 +138,9 @@ export function ArticleImagesUpload({
     }
 
     for (const file of toProcess) {
-      if (!ALLOWED_TYPES.includes(file.type)) {
-        toast.error(`${file.name} : format non supporté`);
-        return;
-      }
-      if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-        toast.error(`${file.name} dépasse ${MAX_SIZE_MB} Mo`);
+      const typeError = validateImageType(file);
+      if (typeError) {
+        toast.error(`${file.name} : ${typeError}`);
         return;
       }
     }
@@ -160,8 +154,13 @@ export function ArticleImagesUpload({
       setUploadingSecondary((prev) => [...prev, item]);
 
       try {
+        const prepared = await prepareImageForUpload(file);
+        if ("error" in prepared) {
+          toast.error(`${file.name} : ${prepared.error}`);
+          continue;
+        }
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", prepared.file);
 
         const result = await uploadArticleSecondaryImage(articleId, formData);
 

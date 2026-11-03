@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Image as ImageIcon, Loader2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
+import { prepareImageForUpload } from "@/lib/upload/resize";
 import { postImage, uploadErrorMessage } from "@/lib/upload/client";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -26,7 +27,16 @@ export function BannerUpload({ value, onChange }: BannerUploadProps) {
       toast.error("Format non accepté. Utilisez JPG, PNG, WEBP ou GIF");
       return;
     }
-    if (file.size > MAX_SIZE) {
+    // Les GIF (animés) sont envoyés tels quels ; les autres formats sont redimensionnés
+    let toSend = file;
+    if (file.type !== "image/gif") {
+      const prepared = await prepareImageForUpload(file);
+      if ("error" in prepared) {
+        toast.error(prepared.error);
+        return;
+      }
+      toSend = prepared.file;
+    } else if (file.size > MAX_SIZE) {
       toast.error("Image trop lourde. Maximum 5 MB");
       return;
     }
@@ -37,7 +47,7 @@ export function BannerUpload({ value, onChange }: BannerUploadProps) {
 
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", toSend);
 
       const body = await postImage<{ url: string }>("/api/upload/banner", formData);
 

@@ -38,8 +38,8 @@ export const UPLOAD_MESSAGES = {
   forbidden: "Vous n'avez pas la permission d'envoyer des images.",
 } as const;
 
-// Validation avant envoi : renvoie un message utilisateur, ou null si valide
-export function validateImageFile(file: File): string | null {
+// Type de fichier seul (le poids est vérifié après redimensionnement)
+export function validateImageType(file: File): string | null {
   const name = file.name.toLowerCase();
   if (/image\/hei[cf]/.test(file.type) || /\.(heic|heif)$/.test(name)) {
     return UPLOAD_MESSAGES.heic;
@@ -47,6 +47,13 @@ export function validateImageFile(file: File): string | null {
   if (!ALLOWED_IMAGE_TYPES.includes(file.type as (typeof ALLOWED_IMAGE_TYPES)[number])) {
     return UPLOAD_MESSAGES.format;
   }
+  return null;
+}
+
+// Validation complète avant envoi : renvoie un message utilisateur, ou null si valide
+export function validateImageFile(file: File): string | null {
+  const typeError = validateImageType(file);
+  if (typeError) return typeError;
   if (file.size > MAX_IMAGE_BYTES) return UPLOAD_MESSAGES.tooLarge;
   return null;
 }

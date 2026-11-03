@@ -10,7 +10,7 @@ import {
   LayoutTemplate,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { validateImageFile } from "../lib/cloudinary-upload";
+import { prepareImageForUpload } from "@/lib/upload/resize";
 import type { FreeImage } from "@/features/templates/types";
 
 interface Props {
@@ -23,12 +23,14 @@ interface Props {
 export function ImagePicker({ image, onChange, onRemove, onLayoutToggle }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = (file: File) => {
-    const error = validateImageFile(file);
-    if (error) {
-      toast.error(error);
+  const handleFile = async (original: File) => {
+    const prepared = await prepareImageForUpload(original);
+    if ("error" in prepared) {
+      toast.error(prepared.error);
+      if (inputRef.current) inputRef.current.value = "";
       return;
     }
+    const file = prepared.file;
 
     if (image.url.startsWith("blob:")) URL.revokeObjectURL(image.url);
 

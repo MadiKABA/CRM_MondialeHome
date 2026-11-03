@@ -1,5 +1,7 @@
 "use client";
 
+import { toast } from "sonner";
+import { prepareImageForUpload } from "@/lib/upload/resize";
 import { useRef, useState } from "react";
 import Image from "next/image";
 import { ImagePlus, X, ZoomIn } from "lucide-react";
@@ -26,23 +28,19 @@ export function ArticleMainImagePicker({
 
   const previewUrl = typeof value === "string" ? value : (value?.previewUrl ?? null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const original = e.target.files?.[0];
     if (inputRef.current) inputRef.current.value = "";
-    if (!file) return;
+    if (!original) return;
 
-    const allowed = ["image/jpeg", "image/png", "image/webp"];
-    if (!allowed.includes(file.type)) {
-      alert("Format non supporté. Utilisez JPG, PNG ou WebP.");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      alert("L'image ne doit pas dépasser 5 Mo.");
+    const prepared = await prepareImageForUpload(original);
+    if ("error" in prepared) {
+      toast.error(prepared.error);
       return;
     }
 
     // Créer l'aperçu local — aucun upload ici
-    onChange({ file, previewUrl: URL.createObjectURL(file) });
+    onChange({ file: prepared.file, previewUrl: URL.createObjectURL(prepared.file) });
   };
 
   const handleRemove = () => {

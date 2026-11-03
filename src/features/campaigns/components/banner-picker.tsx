@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import { toast } from "sonner";
 import { Upload, X, Image as ImageIcon, Link as LinkIcon } from "lucide-react";
-import { validateImageFile } from "../lib/cloudinary-upload";
+import { prepareImageForUpload } from "@/lib/upload/resize";
 import type { BannerData } from "@/features/templates/types";
 
 interface Props {
@@ -14,12 +14,14 @@ interface Props {
 export function BannerPicker({ banner, onChange }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = (file: File) => {
-    const error = validateImageFile(file);
-    if (error) {
-      toast.error(error);
+  const handleFile = async (original: File) => {
+    const prepared = await prepareImageForUpload(original);
+    if ("error" in prepared) {
+      toast.error(prepared.error);
+      if (inputRef.current) inputRef.current.value = "";
       return;
     }
+    const file = prepared.file;
 
     if (banner.url?.startsWith("blob:")) URL.revokeObjectURL(banner.url);
 
