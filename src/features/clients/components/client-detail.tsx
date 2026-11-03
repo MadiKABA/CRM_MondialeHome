@@ -1,5 +1,6 @@
 "use client";
 
+import { PhoneDisplay } from "@/components/shared/phone-display";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -71,11 +72,6 @@ export function ClientDetail({ client, consentLogs, sellers }: ClientDetailProps
   const formatDate = (d: Date | null | undefined) =>
     d ? new Date(d).toLocaleDateString("fr-FR") : null;
 
-  const formatPhone = (p: string | null) => {
-    if (!p) return null;
-    return p.replace(/(\+221)(\d{2})(\d{3})(\d{2})(\d{2})/, "$1 $2 $3 $4 $5");
-  };
-
   const currentSeller = client.assignedTo ?? null;
 
   return (
@@ -110,7 +106,9 @@ export function ClientDetail({ client, consentLogs, sellers }: ClientDetailProps
                 {client.phone && (
                   <span className="flex items-center gap-1.5">
                     <Phone className="text-text-secondary size-3.5" />
-                    <span className="font-mono">{formatPhone(client.phone)}</span>
+                    <span className="font-mono">
+                      <PhoneDisplay phone={client.phone} />
+                    </span>
                   </span>
                 )}
                 {client.email && (

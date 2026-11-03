@@ -1,5 +1,6 @@
 "use client";
 
+import { PhoneDisplay } from "@/components/shared/phone-display";
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import { Eye, Pencil, Trash2, Phone, Mail, Star } from "lucide-react";
@@ -149,7 +150,10 @@ export function ClientsTable({
                     {client.phone && (
                       <div className="flex items-center gap-1.5">
                         <Phone className="text-text-secondary size-3.5 shrink-0" />
-                        <span className="font-mono text-xs">{client.phone}</span>
+                        <PhoneDisplay
+                          phone={client.phone}
+                          className="font-mono text-xs"
+                        />
                       </div>
                     )}
                     {client.email && (
@@ -270,7 +274,7 @@ export function ClientsTable({
               {client.phone && (
                 <div className="text-text-secondary flex items-center gap-2">
                   <Phone className="size-3.5" />
-                  <span className="font-mono text-xs">{client.phone}</span>
+                  <PhoneDisplay phone={client.phone} className="font-mono text-xs" />
                 </div>
               )}
               {client.city && (

@@ -1,3 +1,4 @@
+import { phoneSearchTerms } from "@/lib/phone";
 import "server-only";
 
 import { type Prisma } from "@prisma/client";
@@ -123,6 +124,9 @@ function buildWhere(
         { lastName: { contains: filters.search, mode: "insensitive" as const } },
         { fullName: { contains: filters.search, mode: "insensitive" as const } },
         { phone: { contains: filters.search } },
+        ...phoneSearchTerms(filters.search).map((term) => ({
+          phone: { contains: term },
+        })),
         { email: { contains: filters.search, mode: "insensitive" as const } },
         { reference: { contains: filters.search, mode: "insensitive" as const } },
       ],

@@ -1,3 +1,4 @@
+import { phoneSearchTerms } from "@/lib/phone";
 import { type Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
@@ -617,6 +618,7 @@ export async function getClientsNotInGroup(
           { firstName: { contains: search, mode: "insensitive" as const } },
           { lastName: { contains: search, mode: "insensitive" as const } },
           { phone: { contains: search } },
+          ...phoneSearchTerms(search).map((term) => ({ phone: { contains: term } })),
         ],
       }),
     },

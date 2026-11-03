@@ -1,5 +1,6 @@
 "use client";
 
+import { PhoneDisplay } from "@/components/shared/phone-display";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -183,7 +184,7 @@ export function AddMembersDialog({
                       {client.firstName} {client.lastName ?? ""}
                     </p>
                     <p className="text-text-secondary truncate text-xs">
-                      {client.phone ?? "—"}
+                      {client.phone ? <PhoneDisplay phone={client.phone} /> : "—"}
                       {client.city ? ` · ${client.city}` : ""}
                     </p>
                   </div>

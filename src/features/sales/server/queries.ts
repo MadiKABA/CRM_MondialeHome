@@ -1,3 +1,4 @@
+import { phoneSearchTerms } from "@/lib/phone";
 import "server-only";
 
 import { type SaleStatus } from "@prisma/client";
@@ -116,6 +117,9 @@ function buildWhere(
               { firstName: { contains: filters.search, mode: "insensitive" as const } },
               { lastName: { contains: filters.search, mode: "insensitive" as const } },
               { phone: { contains: filters.search } },
+              ...phoneSearchTerms(filters.search).map((term) => ({
+                phone: { contains: term },
+              })),
             ],
           },
         },

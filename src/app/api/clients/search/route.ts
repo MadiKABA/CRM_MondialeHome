@@ -1,3 +1,4 @@
+import { phoneSearchTerms } from "@/lib/phone";
 import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerSession } from "@/lib/permissions/server";
@@ -19,6 +20,7 @@ export async function GET(req: NextRequest) {
         { lastName: { contains: q, mode: "insensitive" } },
         { fullName: { contains: q, mode: "insensitive" } },
         { phone: { contains: q } },
+        ...phoneSearchTerms(q).map((term) => ({ phone: { contains: term } })),
         { reference: { contains: q, mode: "insensitive" } },
       ],
     },
