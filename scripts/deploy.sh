@@ -27,8 +27,10 @@ $PNPM_BIN prisma migrate deploy
 $PNPM_BIN build
 
 # 6. Copy static files
-cp -r .next/static .next/standalone/.next/static
-cp -r public .next/standalone/public
+# Copier le CONTENU des dossiers ("/.") : évite public/public si la cible existe déjà
+mkdir -p .next/standalone/.next/static .next/standalone/public
+cp -r .next/static/. .next/standalone/.next/static/
+cp -r public/. .next/standalone/public/
 
 # 7. Reload PM2
 pm2 reload ecosystem.config.js --env production --update-env
