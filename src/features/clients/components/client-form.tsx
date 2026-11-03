@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { clientSchema, type ClientInput } from "../schemas/client.schema";
 import { createClient, updateClient } from "../server/actions";
+import { PhoneInput } from "@/components/forms/phone-input";
 import { TagInput } from "./tag-input";
 import type { ClientDetailDTO } from "../types";
 
@@ -184,33 +185,51 @@ export function ClientForm({ client, tagSuggestions = [] }: ClientFormProps) {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <Label htmlFor="phone">Téléphone principal</Label>
-            <Input
-              id="phone"
-              placeholder="+221 77 123 45 67"
-              className="mt-1"
-              {...register("phone")}
+            <Controller
+              control={control}
+              name="phone"
+              render={({ field }) => (
+                <PhoneInput
+                  id="phone"
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  invalid={!!errors.phone}
+                />
+              )}
             />
-            <FieldError message={errors.phone?.message} />
           </div>
           <div>
             <Label htmlFor="phoneSecondary">Téléphone secondaire</Label>
-            <Input
-              id="phoneSecondary"
-              placeholder="+221 70 123 45 67"
-              className="mt-1"
-              {...register("phoneSecondary")}
+            <Controller
+              control={control}
+              name="phoneSecondary"
+              render={({ field }) => (
+                <PhoneInput
+                  id="phoneSecondary"
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  invalid={!!errors.phoneSecondary}
+                />
+              )}
             />
-            <FieldError message={errors.phoneSecondary?.message} />
           </div>
           <div>
             <Label htmlFor="whatsapp">WhatsApp</Label>
-            <Input
-              id="whatsapp"
-              placeholder="+221 77 123 45 67"
-              className="mt-1"
-              {...register("whatsapp")}
+            <Controller
+              control={control}
+              name="whatsapp"
+              render={({ field }) => (
+                <PhoneInput
+                  id="whatsapp"
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  invalid={!!errors.whatsapp}
+                />
+              )}
             />
-            <FieldError message={errors.whatsapp?.message} />
           </div>
           <div className="sm:col-span-2">
             <Label htmlFor="email">Email</Label>
