@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import type { Prisma } from "@prisma/client";
+import type { ZodError } from "zod";
 import { checkPermission, hasPermission } from "@/lib/permissions/server";
 import {
   articleSchema,
@@ -55,6 +56,10 @@ function createErrorMessage(err: unknown): string {
   return "Une erreur est survenue. Réessayez.";
 }
 
+function validationError(err: ZodError): { success: false; error: string } {
+  return { success: false, error: err.issues[0]?.message ?? "Données invalides" };
+}
+
 // ── CRÉER ──────────────────────────────────────────────────────────────────
 
 export async function createArticle(
@@ -66,7 +71,9 @@ export async function createArticle(
 
     await checkPermission("articles.create.all");
 
-    const data = articleSchema.parse(input);
+    const parsed = articleSchema.safeParse(input);
+    if (!parsed.success) return validationError(parsed.error);
+    const data = parsed.data;
 
     if (data.promoPrice !== null && data.promoPrice !== undefined) {
       const canManagePrices = await hasPermission("articles.manage_prices");
@@ -102,7 +109,7 @@ export async function createArticle(
       dimensions: data.dimensions || null,
       weight: data.weight ?? null,
       attributes: (data.attributes ?? {}) as Prisma.InputJsonObject,
-      price: data.price,
+      price: data.price ?? 0,
       promoPrice: data.promoPrice ?? null,
       promoStartDate: data.promoStartDate ?? null,
       promoEndDate: data.promoEndDate ?? null,
@@ -112,7 +119,7 @@ export async function createArticle(
       stockAlert: data.stockAlert,
       status: data.status,
       isNew: data.isNew,
-      arrivalDate: data.arrivalDate ?? null,
+      arrivalDate: data.isNew ? (data.arrivalDate ?? null) : null,
       mainImage: data.mainImage ?? null,
       images: data.images ?? [],
       videoUrl: data.videoUrl || null,
@@ -146,7 +153,9 @@ export async function createArticleQuick(
 
     await checkPermission("articles.create.all");
 
-    const data = quickCreateArticleSchema.parse(input);
+    const parsed = quickCreateArticleSchema.safeParse(input);
+    if (!parsed.success) return validationError(parsed.error);
+    const data = parsed.data;
 
     if (data.mainImage?.startsWith("blob:")) {
       return { success: false, error: "L'image n'a pas été uploadée correctement" };
@@ -156,6 +165,7 @@ export async function createArticleQuick(
       name: data.name,
       categoryId: data.categoryId,
       isNew: data.isNew,
+      arrivalDate: data.isNew ? (data.arrivalDate ?? null) : null,
       price: 0,
       currency: "XOF",
       stock: 0,
@@ -194,7 +204,9 @@ export async function updateArticle(
 
     await checkPermission("articles.update.all");
 
-    const data = articleSchema.parse(input);
+    const parsed = articleSchema.safeParse(input);
+    if (!parsed.success) return validationError(parsed.error);
+    const data = parsed.data;
 
     if (data.promoPrice !== null && data.promoPrice !== undefined) {
       const canManagePrices = await hasPermission("articles.manage_prices");
@@ -236,7 +248,7 @@ export async function updateArticle(
         dimensions: data.dimensions || null,
         weight: data.weight ?? null,
         attributes: (data.attributes ?? {}) as Prisma.InputJsonObject,
-        price: data.price,
+        price: data.price ?? 0,
         promoPrice: data.promoPrice ?? null,
         promoStartDate: data.promoStartDate ?? null,
         promoEndDate: data.promoEndDate ?? null,
@@ -246,7 +258,7 @@ export async function updateArticle(
         stockAlert: data.stockAlert,
         status: data.status,
         isNew: data.isNew,
-        arrivalDate: data.arrivalDate ?? null,
+        arrivalDate: data.isNew ? (data.arrivalDate ?? null) : null,
         mainImage: data.mainImage ?? null,
         images: data.images ?? [],
         videoUrl: data.videoUrl || null,
@@ -257,7 +269,7 @@ export async function updateArticle(
 
     await audit(user.id, "article.update", articleId, {
       before: old ? { name: old.name, status: old.status } : null,
-      after: { name: data.name, price: data.price, status: data.status },
+      after: { name: data.name, price: data.price ?? 0, status: data.status },
     } satisfies Prisma.InputJsonObject);
 
     revalidatePath("/catalogue/articles");
