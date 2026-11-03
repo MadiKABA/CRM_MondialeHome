@@ -10,7 +10,7 @@ interface RateLimitConfig {
 
 export async function checkRateLimit(
   config: RateLimitConfig
-): Promise<{ allowed: boolean; remaining: number }> {
+): Promise<{ allowed: boolean; remaining: number; retryAfterSec?: number }> {
   try {
     // Si Redis pas dispo, skip le rate limit
     if (!redis) {
@@ -22,9 +22,20 @@ export async function checkRateLimit(
     if (current === 1) {
       await redis.pexpire(redisKey, config.windowMs);
     }
+    const allowed = current <= config.limit;
+    // Délai avant la fin de la fenêtre (utile pour l'en-tête Retry-After)
+    let retryAfterSec: number | undefined;
+    if (!allowed) {
+      const ttlMs = await redis.pttl(redisKey);
+      retryAfterSec = Math.max(
+        1,
+        Math.ceil((ttlMs > 0 ? ttlMs : config.windowMs) / 1000)
+      );
+    }
     return {
-      allowed: current <= config.limit,
+      allowed,
       remaining: Math.max(0, config.limit - current),
+      ...(retryAfterSec !== undefined && { retryAfterSec }),
     };
   } catch {
     // Redis indisponible → ne pas bloquer l'utilisateur

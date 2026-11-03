@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Image as ImageIcon, Loader2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
+import { postImage, uploadErrorMessage } from "@/lib/upload/client";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_SIZE = 5 * 1024 * 1024;
@@ -38,18 +39,13 @@ export function BannerUpload({ value, onChange }: BannerUploadProps) {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch("/api/upload/banner", { method: "POST", body: formData });
-      const body = await res.json();
-
-      if (!res.ok) {
-        throw new Error(body.error ?? "Erreur upload");
-      }
+      const body = await postImage<{ url: string }>("/api/upload/banner", formData);
 
       onChange(body.url);
       setPreview(body.url);
       toast.success("Image uploadée avec succès");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Erreur lors de l'upload");
+      toast.error(uploadErrorMessage(error));
       setPreview(value || null);
     } finally {
       setIsUploading(false);

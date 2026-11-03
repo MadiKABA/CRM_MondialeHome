@@ -36,9 +36,10 @@ export async function POST(request: NextRequest) {
     ...RATE_LIMITS.UPLOAD_IMAGE,
   });
   if (!rl.allowed) {
+    const retryAfter = rl.retryAfterSec ?? 60;
     return NextResponse.json(
-      { error: "Trop de requêtes. Attendez une minute." },
-      { status: 429 }
+      { error: `Trop d'envois. Réessayez dans ${retryAfter} s.` },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } }
     );
   }
 

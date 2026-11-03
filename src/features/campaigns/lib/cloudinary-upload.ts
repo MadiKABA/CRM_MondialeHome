@@ -5,20 +5,10 @@
 // Cloudinary passe par notre API route (/api/upload/campaign-image), qui
 // signe la requête côté serveur — jamais d'upload anonyme depuis le navigateur.
 
+import { postImage, uploadErrorMessage } from "@/lib/upload/client";
 import type { BannerData, FreeImage } from "@/features/templates/types";
 
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
-const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
-
-export function validateImageFile(file: File): string | null {
-  if (!ALLOWED_TYPES.includes(file.type as (typeof ALLOWED_TYPES)[number])) {
-    return "Format non accepté. Utilisez JPG, PNG ou WEBP";
-  }
-  if (file.size > MAX_SIZE) {
-    return "Image trop lourde. Maximum 5 MB";
-  }
-  return null;
-}
+export { validateImageFile } from "@/lib/upload/client";
 
 interface UploadApiResult {
   cloudinaryId: string;
@@ -35,17 +25,7 @@ async function uploadCampaignImage(
   formData.append("file", file);
   formData.append("folder", folder);
 
-  const res = await fetch("/api/upload/campaign-image", {
-    method: "POST",
-    body: formData,
-  });
-  const body = await res.json();
-
-  if (!res.ok) {
-    throw new Error(body.error ?? `Erreur upload (${res.status})`);
-  }
-
-  return body as UploadApiResult;
+  return postImage<UploadApiResult>("/api/upload/campaign-image", formData);
 }
 
 export interface UploadCampaignImagesResult {
@@ -74,7 +54,7 @@ export async function uploadCampaignImages(
         isUploaded: true,
       };
     } catch (err) {
-      errors.push(`Bannière : ${err instanceof Error ? err.message : "erreur inconnue"}`);
+      errors.push(`Bannière : ${uploadErrorMessage(err)}`);
       uploadedBanner = banner;
     }
   }
@@ -94,9 +74,7 @@ export async function uploadCampaignImages(
           isUploaded: true,
         });
       } catch (err) {
-        errors.push(
-          `Image "${img.alt || img.id}" : ${err instanceof Error ? err.message : "erreur inconnue"}`
-        );
+        errors.push(`Image "${img.alt || img.id}" : ${uploadErrorMessage(err)}`);
         uploadedImages.push(img);
       }
     } else {
