@@ -64,6 +64,7 @@ export function ArticleForm({
     handleSubmit,
     watch,
     setValue,
+    getValues,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(articleSchema),
@@ -514,7 +515,9 @@ export function ArticleForm({
             mainImage={watchedMainImage ?? null}
             images={watchedImages ?? []}
             onMainImageChange={(url) => setValue("mainImage", url, { shouldDirty: true })}
-            onImagesChange={(urls) => setValue("images", urls, { shouldDirty: true })}
+            onImagesChange={(update) =>
+              setValue("images", update(getValues("images") ?? []), { shouldDirty: true })
+            }
             disabled={isPending}
           />
         ) : (

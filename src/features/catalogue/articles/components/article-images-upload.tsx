@@ -40,7 +40,8 @@ interface ArticleImagesUploadProps {
   mainImage: string | null;
   images: string[];
   onMainImageChange: (url: string | null) => void;
-  onImagesChange: (urls: string[]) => void;
+  // Forme fonctionnelle : évite l'état obsolète quand plusieurs envois se suivent
+  onImagesChange: (update: (prev: string[]) => string[]) => void;
   disabled?: boolean;
 }
 
@@ -56,6 +57,9 @@ export function ArticleImagesUpload({
   const secondaryInputRef = useRef<HTMLInputElement>(null);
 
   const [uploadingMain, setUploadingMain] = useState(false);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(
+    null
+  );
   const [uploadingSecondary, setUploadingSecondary] = useState<UploadingItem[]>([]);
   const [deletingMain, setDeletingMain] = useState(false);
   const [deletingUrl, setDeletingUrl] = useState<string | null>(null);
@@ -147,7 +151,8 @@ export function ArticleImagesUpload({
       }
     }
 
-    for (const file of toProcess) {
+    for (const [index, file] of toProcess.entries()) {
+      setProgress({ current: index + 1, total: toProcess.length });
       const localId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const previewUrl = URL.createObjectURL(file);
       const item: UploadingItem = { localId, previewUrl, filename: file.name };
@@ -163,7 +168,8 @@ export function ArticleImagesUpload({
         if (!result.success) {
           toast.error("Échec de l'upload", { description: result.error });
         } else {
-          onImagesChange([...images, result.data!.url]);
+          const newUrl = result.data!.url;
+          onImagesChange((prev) => [...prev, newUrl]);
           toast.success(`${file.name} uploadé`);
         }
       } catch {
@@ -175,6 +181,7 @@ export function ArticleImagesUpload({
         setUploadingSecondary((prev) => prev.filter((i) => i.localId !== localId));
       }
     }
+    setProgress(null);
   };
 
   const handleDeleteSecondary = async (url: string) => {
@@ -185,7 +192,7 @@ export function ArticleImagesUpload({
         toast.error(result.error);
         return;
       }
-      onImagesChange(images.filter((img) => img !== url));
+      onImagesChange((prev) => prev.filter((img) => img !== url));
       toast.success("Image supprimée");
     } finally {
       setDeletingUrl(null);
@@ -201,10 +208,13 @@ export function ArticleImagesUpload({
         return;
       }
       // Update local state to reflect the swap
-      const newImages = images.filter((img) => img !== url);
-      if (mainImage) newImages.unshift(mainImage);
+      const previousMain = mainImage;
       onMainImageChange(url);
-      onImagesChange(newImages);
+      onImagesChange((prev) => {
+        const next = prev.filter((img) => img !== url);
+        if (previousMain) next.unshift(previousMain);
+        return next;
+      });
       toast.success("Image principale mise à jour");
     } catch {
       toast.error("Erreur lors de la mise à jour");
@@ -332,6 +342,11 @@ export function ArticleImagesUpload({
           <span className="text-muted-foreground ml-2 font-normal">
             ({images.length + uploadingSecondary.length}/{MAX_FILES})
           </span>
+          {progress && progress.total > 1 && (
+            <span className="text-gold-deep ml-2 text-xs font-normal">
+              Envoi {progress.current} sur {progress.total}…
+            </span>
+          )}
         </p>
 
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
