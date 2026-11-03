@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { UserDetail } from "@/features/admin/components/users/user-detail";
 import { UserRolesSection } from "@/features/admin/components/users/user-roles-section";
 import { UserEffectivePermissions } from "@/features/admin/components/users/user-effective-permissions";
+import { UserPermissionOverrides } from "@/features/admin/components/users/user-permission-overrides";
 import { UserSessionsSection } from "@/features/admin/components/users/user-sessions-section";
 import { UserDangerZone } from "@/features/admin/components/users/user-danger-zone";
 import { getUserById } from "@/features/admin/server/queries/users.queries";
@@ -76,6 +77,8 @@ export default async function UserDetailPage({ params }: PageProps) {
         effectivePermissions={effectivePermissions}
         isSuperAdmin={user.isSuperAdmin}
       />
+
+      {!user.isSuperAdmin && <UserPermissionOverrides userId={user.id} />}
 
       {/* Section 5 — Zone de danger */}
       {!user.isSuperAdmin ? (
