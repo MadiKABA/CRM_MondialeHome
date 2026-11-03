@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    logger.error({ error }, "uploadCampaignImage failed");
+    logger.error({ err: error }, "uploadCampaignImage failed");
     return NextResponse.json({ error: "Erreur lors de l'upload" }, { status: 500 });
   }
 }

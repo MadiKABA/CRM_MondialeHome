@@ -1,20 +1,12 @@
-import { existsSync } from "fs";
-import { mkdir, writeFile } from "fs/promises";
-import { join } from "path";
 import { type NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { getServerSession, hasPermission } from "@/lib/permissions/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { uploadImageBuffer } from "@/lib/cloudinary/upload";
 
-// Upload local temporaire pour les tests — à migrer vers Cloudinary avant la prod
+// Envoi signé côté serveur vers Cloudinary (le disque du build est perdu à chaque déploiement)
 const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-const ALLOWED_EXTENSIONS: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/gif": "gif",
-};
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession();
@@ -65,28 +57,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const uploadDir = join(process.cwd(), "public", "uploads", "banners");
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
-
-    const ext = ALLOWED_EXTENSIONS[file.type];
-    const filename = `banner_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const filepath = join(uploadDir, filename);
-
     const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(filepath, buffer);
-
-    // URL absolue requise : previewTemplateSchema/sendTestEmailSchema valident
-    // bannerImageUrl avec z.string().url(), et un vrai email a besoin d'une
-    // URL publique complète (pas d'un chemin relatif)
-    const url = new URL(
-      `/uploads/banners/${filename}`,
-      request.nextUrl.origin
-    ).toString();
+    const result = await uploadImageBuffer(buffer, "templates/banners", [
+      "template-banner",
+      "mondial-home",
+    ]);
+    const url = result.url;
     return NextResponse.json({ url }, { status: 200 });
   } catch (error) {
-    logger.error({ error }, "uploadBanner failed");
+    logger.error({ err: error }, "uploadBanner failed");
     return NextResponse.json({ error: "Erreur lors de l'upload" }, { status: 500 });
   }
 }
