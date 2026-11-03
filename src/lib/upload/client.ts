@@ -101,19 +101,79 @@ function errorFromResponse(
   return new UploadError("invalid", serverMessage ?? UPLOAD_MESSAGES.format, status);
 }
 
-// POST multipart vers une route d'upload ; renvoie le JSON de succès
-export async function postImage<T>(url: string, formData: FormData): Promise<T> {
-  let res: Response;
+const TIMEOUT_MS = 30_000;
+const MAX_RETRIES = 2;
+const BACKOFF_MS = [1000, 2000];
+// Au-delà, on n'attend pas automatiquement : l'utilisateur voit le délai
+const MAX_AUTO_WAIT_SEC = 30;
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+// Un seul envoi, avec délai d'attente de 30 s
+async function postOnce<T>(url: string, formData: FormData): Promise<T> {
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, TIMEOUT_MS);
+
   try {
-    res = await fetch(url, { method: "POST", body: formData });
-  } catch {
-    throw new UploadError("network", UPLOAD_MESSAGES.network);
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        body: formData,
+        signal: controller.signal,
+      });
+    } catch {
+      throw timedOut
+        ? new UploadError("timeout", UPLOAD_MESSAGES.timeout)
+        : new UploadError("network", UPLOAD_MESSAGES.network);
+    }
+
+    // Corps lu en texte (le délai couvre aussi la lecture), JSON tenté ensuite
+    let text = "";
+    try {
+      text = await res.text();
+    } catch {
+      throw timedOut
+        ? new UploadError("timeout", UPLOAD_MESSAGES.timeout)
+        : new UploadError("network", UPLOAD_MESSAGES.network);
+    }
+    const body = parseJson(text);
+
+    if (!res.ok)
+      throw errorFromResponse(res.status, body, res.headers.get("retry-after"));
+    if (!body) throw new UploadError("server", UPLOAD_MESSAGES.server, res.status);
+    return body as T;
+  } finally {
+    clearTimeout(timer);
   }
+}
 
-  const text = await res.text().catch(() => "");
-  const body = parseJson(text);
+// POST multipart vers une route d'upload ; renvoie le JSON de succès.
+// Réessaie 2 fois (attente 1 s puis 2 s) sur réseau, délai dépassé et 5xx.
+// Jamais d'essai sur 400 (fichier invalide) ni 413. Sur 429, attend le délai
+// indiqué par le serveur (si raisonnable) au lieu de réessayer tout de suite.
+export async function postImage<T>(url: string, formData: FormData): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await postOnce<T>(url, formData);
+    } catch (err) {
+      if (!(err instanceof UploadError) || attempt >= MAX_RETRIES) throw err;
 
-  if (!res.ok) throw errorFromResponse(res.status, body, res.headers.get("retry-after"));
-  if (!body) throw new UploadError("server", UPLOAD_MESSAGES.server, res.status);
-  return body as T;
+      if (err.kind === "rate_limit") {
+        const wait = err.retryAfterSec ?? 60;
+        if (wait > MAX_AUTO_WAIT_SEC) throw err;
+        await sleep(wait * 1000);
+        continue;
+      }
+
+      const retryable =
+        err.kind === "network" || err.kind === "timeout" || err.kind === "server";
+      if (!retryable) throw err;
+      await sleep(BACKOFF_MS[attempt] ?? 2000);
+    }
+  }
 }
