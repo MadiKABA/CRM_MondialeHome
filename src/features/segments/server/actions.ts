@@ -233,6 +233,7 @@ export async function addMembersToGroup(
     });
 
     await audit(userId, "segment.members.add", data.groupId, {
+      requested: data.clientIds.length,
       added: result.count,
       total: newCount,
     });
@@ -297,6 +298,7 @@ export async function removeMemberFromGroup(input: unknown): Promise<Result> {
 
     await audit(userId, "segment.members.remove", data.groupId, {
       clientId: data.clientId,
+      removed: 1,
     });
 
     revalidatePath(`/segments/${data.groupId}`);
@@ -395,7 +397,17 @@ export async function searchClientsForGroup(
   >
 > {
   try {
-    await requireAuth();
+    const session = await requireAuth();
+
+    const rl = await checkRateLimit({
+      key: `segment_search_clients:${session.user.id}`,
+      limit: 60,
+      windowMs: 60_000,
+    });
+    if (!rl.allowed) {
+      return { success: false, error: "Trop de requêtes. Attendez une minute." };
+    }
+
     await checkPermission(PERMISSIONS.SEGMENTS_MANAGE_MEMBERS_ALL);
 
     const clients = await getClientsNotInGroup(groupId, search || undefined, 20);
