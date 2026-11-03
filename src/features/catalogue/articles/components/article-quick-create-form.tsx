@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,6 +36,7 @@ interface ArticleQuickCreateFormProps {
 export function ArticleQuickCreateForm({ categories }: ArticleQuickCreateFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const submittingRef = useRef(false);
   const [selectedImageFile, setSelectedImageFile] = useState<SelectedImageFile | null>(
     null
   );
@@ -55,32 +56,40 @@ export function ArticleQuickCreateForm({ categories }: ArticleQuickCreateFormPro
   const watchedCategoryId = watch("categoryId");
 
   const onSubmit = (values: QuickCreateArticleInput) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     startTransition(async () => {
-      const createResult = await createArticleQuick({ ...values, mainImage: null });
-      if (!createResult.success) {
-        toast.error(createResult.error);
-        return;
-      }
-
-      const articleId = createResult.data?.id;
-
-      if (articleId && selectedImageFile) {
-        const formData = new FormData();
-        formData.append("file", selectedImageFile.file);
-        URL.revokeObjectURL(selectedImageFile.previewUrl);
-        setSelectedImageFile(null);
-
-        const imgResult = await uploadArticleMainImage(articleId, formData);
-        if (!imgResult.success) {
-          toast.warning("Article créé, mais l'image n'a pas pu être uploadée", {
-            description: imgResult.error,
-            duration: 6000,
-          });
+      try {
+        const createResult = await createArticleQuick({ ...values, mainImage: null });
+        if (!createResult.success) {
+          toast.error(createResult.error);
+          return;
         }
-      }
 
-      toast.success("Article créé");
-      router.push(articleId ? `/catalogue/articles/${articleId}` : "/catalogue/articles");
+        const articleId = createResult.data?.id;
+
+        if (articleId && selectedImageFile) {
+          const formData = new FormData();
+          formData.append("file", selectedImageFile.file);
+          URL.revokeObjectURL(selectedImageFile.previewUrl);
+          setSelectedImageFile(null);
+
+          const imgResult = await uploadArticleMainImage(articleId, formData);
+          if (!imgResult.success) {
+            toast.warning("Article créé, mais l'image n'a pas pu être uploadée", {
+              description: imgResult.error,
+              duration: 6000,
+            });
+          }
+        }
+
+        toast.success("Article créé");
+        router.push(
+          articleId ? `/catalogue/articles/${articleId}` : "/catalogue/articles"
+        );
+      } finally {
+        submittingRef.current = false;
+      }
     });
   };
 

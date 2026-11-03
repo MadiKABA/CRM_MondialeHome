@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -57,6 +57,7 @@ export function ArticleForm({
     null
   );
   const isEditing = !!article;
+  const submittingRef = useRef(false);
 
   const {
     register,
@@ -152,44 +153,52 @@ export function ArticleForm({
   };
 
   const onSubmit = (values: FormValues) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     startTransition(async () => {
-      if (isEditing) {
-        const result = await updateArticle(article.id, values);
-        if (result.success) {
-          toast.success("Article modifié");
-          router.push(`/catalogue/articles/${article.id}`);
-        } else {
-          toast.error(result.error);
+      try {
+        if (isEditing) {
+          const result = await updateArticle(article.id, values);
+          if (result.success) {
+            toast.success("Article modifié");
+            router.push(`/catalogue/articles/${article.id}`);
+          } else {
+            toast.error(result.error);
+          }
+          return;
         }
-        return;
-      }
 
-      // Mode création : créer l'article sans image d'abord, puis uploader
-      const createResult = await createArticle({ ...values, mainImage: null });
-      if (!createResult.success) {
-        toast.error(createResult.error);
-        return;
-      }
-
-      const articleId = (createResult as { data?: { id: string } }).data?.id;
-
-      if (articleId && selectedImageFile) {
-        const formData = new FormData();
-        formData.append("file", selectedImageFile.file);
-        URL.revokeObjectURL(selectedImageFile.previewUrl);
-        setSelectedImageFile(null);
-
-        const imgResult = await uploadArticleMainImage(articleId, formData);
-        if (!imgResult.success) {
-          toast.warning("Article créé, mais l'image n'a pas pu être uploadée", {
-            description: imgResult.error,
-            duration: 6000,
-          });
+        // Mode création : créer l'article sans image d'abord, puis uploader
+        const createResult = await createArticle({ ...values, mainImage: null });
+        if (!createResult.success) {
+          toast.error(createResult.error);
+          return;
         }
-      }
 
-      toast.success("Article créé");
-      router.push(articleId ? `/catalogue/articles/${articleId}` : "/catalogue/articles");
+        const articleId = (createResult as { data?: { id: string } }).data?.id;
+
+        if (articleId && selectedImageFile) {
+          const formData = new FormData();
+          formData.append("file", selectedImageFile.file);
+          URL.revokeObjectURL(selectedImageFile.previewUrl);
+          setSelectedImageFile(null);
+
+          const imgResult = await uploadArticleMainImage(articleId, formData);
+          if (!imgResult.success) {
+            toast.warning("Article créé, mais l'image n'a pas pu être uploadée", {
+              description: imgResult.error,
+              duration: 6000,
+            });
+          }
+        }
+
+        toast.success("Article créé");
+        router.push(
+          articleId ? `/catalogue/articles/${articleId}` : "/catalogue/articles"
+        );
+      } finally {
+        submittingRef.current = false;
+      }
     });
   };
 
@@ -206,21 +215,15 @@ export function ArticleForm({
         <h2 className="font-heading text-base font-semibold">Informations générales</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="reference">
-              Référence <span className="text-destructive">*</span>
-            </Label>
+            <Label htmlFor="reference">Référence</Label>
             <Input
               id="reference"
-              placeholder="MH-001"
-              {...register("reference")}
-              onChange={(e) =>
-                setValue("reference", e.target.value.toUpperCase(), {
-                  shouldValidate: true,
-                })
-              }
-              className={errors.reference ? "border-destructive" : ""}
+              value={article?.reference ?? ""}
+              placeholder="Générée automatiquement"
+              readOnly
+              disabled
+              className="bg-cream/50"
             />
-            <FieldError name="reference" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="name">
