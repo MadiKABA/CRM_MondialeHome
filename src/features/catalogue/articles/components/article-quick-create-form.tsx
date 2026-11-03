@@ -55,6 +55,11 @@ export function ArticleQuickCreateForm({ categories }: ArticleQuickCreateFormPro
   const watchedIsNew = watch("isNew");
   const watchedCategoryId = watch("categoryId");
 
+  const handleNewToggle = (checked: boolean) => {
+    setValue("isNew", checked, { shouldValidate: true });
+    if (!checked) setValue("arrivalDate", undefined, { shouldValidate: true });
+  };
+
   const onSubmit = (values: QuickCreateArticleInput) => {
     if (submittingRef.current) return;
     submittingRef.current = true;
@@ -138,7 +143,7 @@ export function ArticleQuickCreateForm({ categories }: ArticleQuickCreateFormPro
           >
             <SelectValue>
               {(value: string) =>
-                categories.find((cat) => cat.id === value)?.displayName ??
+                categories.find((cat) => cat.id === value)?.fullPath ??
                 "Sélectionner une catégorie…"
               }
             </SelectValue>
@@ -146,7 +151,7 @@ export function ArticleQuickCreateForm({ categories }: ArticleQuickCreateFormPro
           <SelectContent>
             {categories.map((cat) => (
               <SelectItem key={cat.id} value={cat.id} disabled={!cat.isActive}>
-                {cat.displayName}
+                {cat.fullPath}
               </SelectItem>
             ))}
           </SelectContent>
@@ -158,12 +163,12 @@ export function ArticleQuickCreateForm({ categories }: ArticleQuickCreateFormPro
 
       <div
         tabIndex={isPending ? -1 : 0}
-        onClick={() => !isPending && setValue("isNew", !watchedIsNew)}
+        onClick={() => !isPending && handleNewToggle(!watchedIsNew)}
         onKeyDown={(e) => {
           if (isPending) return;
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            setValue("isNew", !watchedIsNew);
+            handleNewToggle(!watchedIsNew);
           }
         }}
         className="data-[active=true]:border-primary data-[active=true]:bg-primary/5 flex w-full cursor-pointer items-center justify-between rounded-xl border-2 p-4 transition-colors"
@@ -189,11 +194,28 @@ export function ArticleQuickCreateForm({ categories }: ArticleQuickCreateFormPro
         <span onClick={(e) => e.stopPropagation()}>
           <Switch
             checked={watchedIsNew}
-            onCheckedChange={(v) => setValue("isNew", v)}
+            onCheckedChange={handleNewToggle}
             disabled={isPending}
           />
         </span>
       </div>
+
+      {watchedIsNew && (
+        <div className="space-y-1.5">
+          <Label htmlFor="arrivalDate">
+            Date d&apos;arrivée <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="arrivalDate"
+            type="date"
+            {...register("arrivalDate")}
+            className={errors.arrivalDate ? "border-destructive" : ""}
+          />
+          {errors.arrivalDate && (
+            <p className="text-destructive text-xs">{errors.arrivalDate.message}</p>
+          )}
+        </div>
+      )}
 
       <div className="flex justify-end gap-3 border-t pt-6">
         <Button

@@ -44,6 +44,10 @@ interface ArticleFormProps {
 
 type FormValues = ArticleInput;
 
+function toDateInput(date: Date | null | undefined): string | undefined {
+  return date ? new Date(date).toISOString().slice(0, 10) : undefined;
+}
+
 export function ArticleForm({
   article,
   categories,
@@ -66,7 +70,7 @@ export function ArticleForm({
     setValue,
     getValues,
     formState: { errors },
-  } = useForm<FormValues>({
+  } = useForm<ArticleInput, unknown, ArticleOutput>({
     resolver: zodResolver(articleSchema),
     defaultValues: article
       ? {
@@ -75,7 +79,7 @@ export function ArticleForm({
           barcode: article.barcode ?? "",
           shortDescription: article.shortDescription ?? "",
           description: article.description ?? "",
-          categoryId: article.categoryId ?? null,
+          categoryId: article.categoryId ?? "",
           brand: article.brand ?? "",
           supplier: article.supplier ?? "",
           color: article.color ?? "",
@@ -83,8 +87,11 @@ export function ArticleForm({
           dimensions: article.dimensions ?? "",
           weight: article.weight ?? undefined,
           attributes: article.attributes,
-          price: article.price,
+          price: article.price > 0 ? article.price : undefined,
           promoPrice: article.promoPrice ?? undefined,
+          promoStartDate: toDateInput(article.promoStartDate),
+          promoEndDate: toDateInput(article.promoEndDate),
+          arrivalDate: toDateInput(article.arrivalDate),
           currency: article.currency as "XOF" | "EUR" | "USD",
           stock: article.stock,
           stockAlert: article.stockAlert,
@@ -101,14 +108,13 @@ export function ArticleForm({
           barcode: "",
           shortDescription: "",
           description: "",
-          categoryId: null,
+          categoryId: "",
           brand: "",
           supplier: "",
           color: "",
           material: "",
           dimensions: "",
           attributes: {},
-          price: 0,
           currency: "XOF",
           stock: 0,
           stockAlert: 5,
@@ -128,6 +134,31 @@ export function ArticleForm({
   const watchedIsNew = watch("isNew");
   const watchedStatus = watch("status");
   const watchedMainImage = watch("mainImage");
+  const watchedCategoryId = watch("categoryId");
+  const watchedPromoStart = watch("promoStartDate");
+  const watchedPromoEnd = watch("promoEndDate");
+
+  const hasPromo = [watchedPromoStart, watchedPromoEnd, watchedPromoPrice].some(
+    (v) => v !== undefined && v !== null && v !== ""
+  );
+  const promoDatesIncomplete =
+    (!!watchedPromoStart && !watchedPromoEnd) ||
+    (!watchedPromoStart && !!watchedPromoEnd);
+
+  const clearPromo = () => {
+    const opts = { shouldDirty: true, shouldValidate: true };
+    setValue("promoPrice", undefined, opts);
+    setValue("promoStartDate", undefined, opts);
+    setValue("promoEndDate", undefined, opts);
+  };
+
+  const handleNewToggle = (checked: boolean) => {
+    setValue("isNew", checked, { shouldDirty: true, shouldValidate: true });
+    if (!checked)
+      setValue("arrivalDate", undefined, { shouldDirty: true, shouldValidate: true });
+  };
+
+  const selectedCategory = categories.find((c) => c.id === watchedCategoryId);
 
   const margin =
     canViewCost && watchedCostPrice && watchedPrice
@@ -153,7 +184,7 @@ export function ArticleForm({
     );
   };
 
-  const onSubmit = (values: FormValues) => {
+  const onSubmit = (values: ArticleOutput) => {
     if (submittingRef.current) return;
     submittingRef.current = true;
     startTransition(async () => {
@@ -246,22 +277,50 @@ export function ArticleForm({
             <Input id="barcode" placeholder="EAN-13" {...register("barcode")} />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="categoryId">Catégorie</Label>
+            <Label htmlFor="categoryId">
+              Catégorie <span className="text-destructive">*</span>
+            </Label>
             <Select
-              defaultValue={article?.categoryId ?? undefined}
-              onValueChange={(v) => setValue("categoryId", v || null)}
+              value={watchedCategoryId || ""}
+              onValueChange={(v) =>
+                setValue("categoryId", v ?? "", {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
             >
-              <SelectTrigger id="categoryId">
-                <SelectValue placeholder="Choisir une catégorie" />
+              <SelectTrigger
+                id="categoryId"
+                className={errors.categoryId ? "border-destructive" : ""}
+              >
+                <SelectValue>
+                  {(value: string) =>
+                    categories.find((cat) => cat.id === value)?.fullPath ??
+                    (value
+                      ? "Catégorie supprimée, choisissez-en une"
+                      : "Choisir une catégorie")
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id} disabled={!cat.isActive}>
-                    {cat.displayName}
+                  <SelectItem
+                    key={cat.id}
+                    value={cat.id}
+                    disabled={!cat.isActive && cat.id !== watchedCategoryId}
+                  >
+                    {cat.fullPath}
+                    {!cat.isActive ? " (désactivée)" : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {!selectedCategory && watchedCategoryId && (
+              <p className="text-xs text-amber-600">
+                Catégorie supprimée, choisissez-en une
+              </p>
+            )}
+            <FieldError name="categoryId" />
           </div>
         </div>
 
@@ -349,9 +408,7 @@ export function ArticleForm({
 
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-1.5">
-            <Label htmlFor="price">
-              Prix de vente <span className="text-destructive">*</span>
-            </Label>
+            <Label htmlFor="price">Prix de vente</Label>
             <div className="flex items-center gap-2">
               <Input
                 id="price"
@@ -366,9 +423,7 @@ export function ArticleForm({
             <FieldError name="price" />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="stock">
-              Stock actuel <span className="text-destructive">*</span>
-            </Label>
+            <Label htmlFor="stock">Stock actuel</Label>
             <Input
               id="stock"
               type="number"
@@ -403,30 +458,57 @@ export function ArticleForm({
                   />
                   <span className="text-muted-foreground text-sm">FCFA</span>
                 </div>
-                {errors.promoPrice && (
-                  <p className="text-destructive text-xs">{errors.promoPrice.message}</p>
-                )}
-                {watchedPromoPrice && watchedPrice && Number(watchedPromoPrice) > 0 && (
-                  <p className="text-muted-foreground text-xs">
-                    Remise :{" "}
-                    {Math.round(
-                      ((Number(watchedPrice) - Number(watchedPromoPrice)) /
-                        Number(watchedPrice)) *
-                        100
-                    )}
-                    %
-                  </p>
-                )}
+                <FieldError name="promoPrice" />
+                {Boolean(watchedPromoPrice) &&
+                  Boolean(watchedPrice) &&
+                  Number(watchedPromoPrice) > 0 && (
+                    <p className="text-muted-foreground text-xs">
+                      Remise :{" "}
+                      {Math.round(
+                        ((Number(watchedPrice) - Number(watchedPromoPrice)) /
+                          Number(watchedPrice)) *
+                          100
+                      )}
+                      %
+                    </p>
+                  )}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="promoStartDate">Début promo</Label>
-                <Input id="promoStartDate" type="date" {...register("promoStartDate")} />
+                <Label htmlFor="promoStartDate">
+                  Début promo
+                  {promoDatesIncomplete && !watchedPromoStart && (
+                    <span className="text-destructive"> * à compléter</span>
+                  )}
+                </Label>
+                <Input
+                  id="promoStartDate"
+                  type="date"
+                  {...register("promoStartDate")}
+                  className={errors.promoStartDate ? "border-destructive" : ""}
+                />
+                <FieldError name="promoStartDate" />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="promoEndDate">Fin promo</Label>
-                <Input id="promoEndDate" type="date" {...register("promoEndDate")} />
+                <Label htmlFor="promoEndDate">
+                  Fin promo
+                  {promoDatesIncomplete && !watchedPromoEnd && (
+                    <span className="text-destructive"> * à compléter</span>
+                  )}
+                </Label>
+                <Input
+                  id="promoEndDate"
+                  type="date"
+                  {...register("promoEndDate")}
+                  className={errors.promoEndDate ? "border-destructive" : ""}
+                />
+                <FieldError name="promoEndDate" />
               </div>
             </div>
+            {hasPromo && (
+              <Button type="button" variant="outline" size="sm" onClick={clearPromo}>
+                Effacer la promo
+              </Button>
+            )}
           </div>
         )}
 
@@ -484,22 +566,29 @@ export function ArticleForm({
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="arrivalDate">Date d&apos;arrivée</Label>
-            <Input id="arrivalDate" type="date" {...register("arrivalDate")} />
-          </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <Switch
-            id="isNew"
-            checked={watchedIsNew}
-            onCheckedChange={(checked) => setValue("isNew", checked)}
-          />
+          <Switch id="isNew" checked={watchedIsNew} onCheckedChange={handleNewToggle} />
           <Label htmlFor="isNew" className="cursor-pointer">
-            Marquer comme nouveauté
+            Nouvelle arrivée
           </Label>
         </div>
+
+        {watchedIsNew && (
+          <div className="max-w-xs space-y-1.5">
+            <Label htmlFor="arrivalDate">
+              Date d&apos;arrivée <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="arrivalDate"
+              type="date"
+              {...register("arrivalDate")}
+              className={errors.arrivalDate ? "border-destructive" : ""}
+            />
+            <FieldError name="arrivalDate" />
+          </div>
+        )}
       </section>
 
       <Separator />
