@@ -48,6 +48,7 @@
     "ioredis": "^5",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
+    "libphonenumber-js": "^1.13.15",
     "lucide-react": "^0.511.0",
     "nanoid": "^5",
     "next": "16.2.6",
