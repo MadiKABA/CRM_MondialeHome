@@ -1,5 +1,6 @@
 // Parsing CSV/Excel côté client — utilisé avant envoi au server action
 
+import { DEFAULT_COUNTRY, parsePhone, type CountryCode } from "@/lib/phone";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import type { ImportPreviewRow } from "../types";
@@ -67,14 +68,6 @@ export async function parseFile(
   throw new Error("Format non supporté. Utilisez CSV, XLS ou XLSX.");
 }
 
-export function normalizePhone(raw: string): string {
-  let phone = raw.replace(/[\s\-\.]/g, "");
-  if (!phone) return "";
-  if (phone.startsWith("00221")) phone = `+${phone.slice(2)}`;
-  if (!phone.startsWith("+") && phone.length === 9) phone = `+221${phone}`;
-  return phone;
-}
-
 export function autoMapColumns(headers: string[]): Record<string, string> {
   const mapping: Record<string, string> = {};
   for (const header of headers) {
@@ -89,18 +82,23 @@ export function autoMapColumns(headers: string[]): Record<string, string> {
 export function mapAndValidateRows(
   rows: Record<string, string>[],
   mapping: Record<string, string>,
-  existingPhones: Set<string> = new Set()
+  existingPhones: Set<string> = new Set(),
+  defaultCountry: CountryCode = DEFAULT_COUNTRY
 ): ImportPreviewRow[] {
   const seenPhones = new Set<string>(existingPhones);
 
   return rows.map((row, index) => {
     const mapped: Record<string, string> = {};
     const errors: string[] = [];
+    const invalidFields = new Set<string>();
 
     for (const [col, field] of Object.entries(mapping)) {
       const value = row[col]?.trim() ?? "";
       if (field === "phone" || field === "whatsapp") {
-        mapped[field] = value ? normalizePhone(value) : "";
+        const parsed = parsePhone(value, defaultCountry);
+        // Numéro invalide : on garde la saisie pour l'afficher dans l'aperçu
+        mapped[field] = parsed.ok ? parsed.e164 : value;
+        if (value && !parsed.ok) invalidFields.add(field);
       } else {
         mapped[field] = value;
       }
@@ -108,16 +106,16 @@ export function mapAndValidateRows(
 
     if (!mapped["firstName"]) errors.push("Prénom manquant");
 
-    if (mapped["phone"] && !/^\+221[0-9]{9}$/.test(mapped["phone"])) {
-      errors.push("Format téléphone invalide");
-    }
+    if (invalidFields.has("phone")) errors.push("Numéro de téléphone invalide");
+    if (invalidFields.has("whatsapp")) errors.push("Numéro WhatsApp invalide");
 
     if (mapped["email"] && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mapped["email"])) {
       errors.push("Format email invalide");
     }
 
     const isDuplicate = !!(mapped["phone"] && seenPhones.has(mapped["phone"]));
-    if (mapped["phone"] && !isDuplicate) seenPhones.add(mapped["phone"]);
+    if (mapped["phone"] && !isDuplicate && !invalidFields.has("phone"))
+      seenPhones.add(mapped["phone"]);
 
     return {
       rowIndex: index + 1,

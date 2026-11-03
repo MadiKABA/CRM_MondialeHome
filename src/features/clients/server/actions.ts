@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { checkPermission } from "@/lib/permissions/server";
+import { DEFAULT_COUNTRY, parsePhone, type CountryCode } from "@/lib/phone";
 import { PERMISSIONS } from "@/lib/permissions/constants";
 import {
   clientSchema,
@@ -638,7 +639,10 @@ export async function getClientsExportData(
 }
 
 // ── IMPORT CSV/EXCEL ──────────────────────────────────────────────────────────
-export async function importClients(rows: ImportRow[]): Promise<Result<ImportResult>> {
+export async function importClients(
+  rows: ImportRow[],
+  defaultCountry: CountryCode = DEFAULT_COUNTRY
+): Promise<Result<ImportResult>> {
   try {
     const user = await getUser();
     if (!user) return { success: false, error: "Non authentifié" };
@@ -660,7 +664,8 @@ export async function importClients(rows: ImportRow[]): Promise<Result<ImportRes
     const existingPhones = new Set(
       (
         await db.client.findMany({
-          where: { deletedAt: null, phone: { not: null } },
+          // Contrainte d'unicité globale : inclut les clients supprimés
+          where: { phone: { not: null } },
           select: { phone: true },
         })
       ).map((c) => c.phone!)
@@ -684,14 +689,23 @@ export async function importClients(rows: ImportRow[]): Promise<Result<ImportRes
 
       const data = parsed.data;
 
-      let phone = data.phone;
-      if (phone && !phone.startsWith("+221")) {
-        const cleaned = phone.replace(/[\s\-\.]/g, "").replace(/^0/, "");
-        phone = cleaned.length === 9 ? `+221${cleaned}` : undefined;
+      let phone: string | undefined;
+      if (data.phone?.trim()) {
+        const parsedPhone = parsePhone(data.phone, defaultCountry);
+        if (!parsedPhone.ok) {
+          result.errors++;
+          result.errorDetails.push({ row: i + 1, error: "Numéro de téléphone invalide" });
+          continue;
+        }
+        phone = parsedPhone.e164;
       }
 
       if (phone && existingPhones.has(phone)) {
         result.skipped++;
+        result.errorDetails.push({
+          row: i + 1,
+          error: "Doublon : numéro déjà enregistré",
+        });
         continue;
       }
 

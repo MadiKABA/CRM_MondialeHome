@@ -15,6 +15,14 @@ import {
   autoMapColumns,
   mapAndValidateRows,
 } from "@/features/clients/lib/import";
+import { DEFAULT_COUNTRY, getPhoneCountries, type CountryCode } from "@/lib/phone";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { importClients } from "@/features/clients/server/actions";
 import type { ImportPreviewRow, ImportResult } from "@/features/clients/types";
 import type { ImportRow } from "@/features/clients/schemas/client.schema";
@@ -36,6 +44,7 @@ export default function ImportPage() {
   const [previewRows, setPreviewRows] = useState<ImportPreviewRow[]>([]);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [defaultCountry, setDefaultCountry] = useState<CountryCode>(DEFAULT_COUNTRY);
 
   const handleFile = async (file: File) => {
     try {
@@ -66,7 +75,7 @@ export default function ImportPage() {
       toast.error("La colonne Prénom est obligatoire");
       return;
     }
-    const rows = mapAndValidateRows(rawRows, mapping);
+    const rows = mapAndValidateRows(rawRows, mapping, new Set(), defaultCountry);
     setPreviewRows(rows);
     setStep("preview");
   };
@@ -82,7 +91,7 @@ export default function ImportPage() {
     }
 
     setLoading(true);
-    const result = await importClients(validRows);
+    const result = await importClients(validRows, defaultCountry);
     setLoading(false);
 
     if (result.success) {
@@ -186,6 +195,33 @@ export default function ImportPage() {
               rowCount={rawRows.length}
               onMappingChange={setMapping}
             />
+            <div className="space-y-1.5">
+              <label htmlFor="default-country" className="text-sm font-medium">
+                Pays par défaut des numéros sans indicatif
+              </label>
+              <Select
+                value={defaultCountry}
+                onValueChange={(v) =>
+                  setDefaultCountry((v ?? DEFAULT_COUNTRY) as CountryCode)
+                }
+              >
+                <SelectTrigger id="default-country" className="h-11 w-full sm:w-72">
+                  <SelectValue>
+                    {(value: string) => {
+                      const c = getPhoneCountries().all.find((x) => x.code === value);
+                      return c ? `${c.flag} ${c.name} (${c.dialCode})` : value;
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {getPhoneCountries().all.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.flag} {c.name} ({c.dialCode})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep("upload")}>
                 ← Précédent
