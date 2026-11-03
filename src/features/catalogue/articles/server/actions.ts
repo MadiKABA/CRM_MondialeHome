@@ -18,7 +18,7 @@ import {
   type UpdateStockInput,
   type QuickCreateArticleInput,
 } from "../schemas/article.schema";
-import { isReferenceUnique, generateArticleReference } from "./queries";
+import { createArticleWithAutoReference, ArticleCreateError } from "./reference";
 import type { ActionResult, ArticleListItemDTO } from "../types";
 
 async function getUser() {
@@ -45,6 +45,14 @@ async function audit(
       status: "success",
     },
   });
+}
+
+// Message utilisateur : aucun détail technique (contrainte, trace) n'est exposé
+function createErrorMessage(err: unknown): string {
+  if (err instanceof ArticleCreateError && err.kind === "barcode") {
+    return "Ce code-barres existe déjà.";
+  }
+  return "Une erreur est survenue. Réessayez.";
 }
 
 // ── CRÉER ──────────────────────────────────────────────────────────────────
@@ -80,44 +88,36 @@ export async function createArticle(
       }
     }
 
-    const refUpper = data.reference.toUpperCase();
-    const unique = await isReferenceUnique(refUpper);
-    if (!unique) {
-      return { success: false, error: `La référence "${refUpper}" existe déjà` };
-    }
-
-    const article = await db.article.create({
-      data: {
-        reference: refUpper,
-        barcode: data.barcode || null,
-        name: data.name,
-        shortDescription: data.shortDescription || null,
-        description: data.description || null,
-        categoryId: data.categoryId || null,
-        brand: data.brand || null,
-        supplier: data.supplier || null,
-        color: data.color || null,
-        material: data.material || null,
-        dimensions: data.dimensions || null,
-        weight: data.weight ?? null,
-        attributes: (data.attributes ?? {}) as Prisma.InputJsonObject,
-        price: data.price,
-        promoPrice: data.promoPrice ?? null,
-        promoStartDate: data.promoStartDate ?? null,
-        promoEndDate: data.promoEndDate ?? null,
-        costPrice: data.costPrice ?? null,
-        currency: data.currency,
-        stock: data.stock,
-        stockAlert: data.stockAlert,
-        status: data.status,
-        isNew: data.isNew,
-        arrivalDate: data.arrivalDate ?? null,
-        mainImage: data.mainImage ?? null,
-        images: data.images ?? [],
-        videoUrl: data.videoUrl || null,
-        tags: data.tags ?? [],
-        metadata: (data.metadata ?? {}) as Prisma.InputJsonObject,
-      },
+    // La référence est toujours auto-générée (jamais saisie)
+    const article = await createArticleWithAutoReference({
+      barcode: data.barcode || null,
+      name: data.name,
+      shortDescription: data.shortDescription || null,
+      description: data.description || null,
+      categoryId: data.categoryId || null,
+      brand: data.brand || null,
+      supplier: data.supplier || null,
+      color: data.color || null,
+      material: data.material || null,
+      dimensions: data.dimensions || null,
+      weight: data.weight ?? null,
+      attributes: (data.attributes ?? {}) as Prisma.InputJsonObject,
+      price: data.price,
+      promoPrice: data.promoPrice ?? null,
+      promoStartDate: data.promoStartDate ?? null,
+      promoEndDate: data.promoEndDate ?? null,
+      costPrice: data.costPrice ?? null,
+      currency: data.currency,
+      stock: data.stock,
+      stockAlert: data.stockAlert,
+      status: data.status,
+      isNew: data.isNew,
+      arrivalDate: data.arrivalDate ?? null,
+      mainImage: data.mainImage ?? null,
+      images: data.images ?? [],
+      videoUrl: data.videoUrl || null,
+      tags: data.tags ?? [],
+      metadata: (data.metadata ?? {}) as Prisma.InputJsonObject,
     });
 
     await audit(user.id, "article.create", article.id, {
@@ -129,7 +129,7 @@ export async function createArticle(
     return { success: true, data: { id: article.id } };
   } catch (err) {
     logger.error({ err }, "Failed to create article");
-    return { success: false, error: "Une erreur est survenue lors de la création" };
+    return { success: false, error: createErrorMessage(err) };
   }
 }
 
@@ -152,25 +152,20 @@ export async function createArticleQuick(
       return { success: false, error: "L'image n'a pas été uploadée correctement" };
     }
 
-    const reference = await generateArticleReference();
-
-    const article = await db.article.create({
-      data: {
-        reference,
-        name: data.name,
-        categoryId: data.categoryId,
-        isNew: data.isNew,
-        price: 0,
-        currency: "XOF",
-        stock: 0,
-        stockAlert: 5,
-        status: "AVAILABLE",
-        mainImage: data.mainImage || null,
-        images: [],
-        tags: [],
-        attributes: {},
-        metadata: {},
-      },
+    const article = await createArticleWithAutoReference({
+      name: data.name,
+      categoryId: data.categoryId,
+      isNew: data.isNew,
+      price: 0,
+      currency: "XOF",
+      stock: 0,
+      stockAlert: 5,
+      status: "AVAILABLE",
+      mainImage: data.mainImage || null,
+      images: [],
+      tags: [],
+      attributes: {},
+      metadata: {},
     });
 
     await audit(user.id, "article.create", article.id, {
@@ -183,7 +178,7 @@ export async function createArticleQuick(
     return { success: true, data: { id: article.id } };
   } catch (err) {
     logger.error({ err }, "Failed to quick-create article");
-    return { success: false, error: "Une erreur est survenue lors de la création" };
+    return { success: false, error: createErrorMessage(err) };
   }
 }
 
@@ -221,12 +216,6 @@ export async function updateArticle(
       }
     }
 
-    const refUpper = data.reference.toUpperCase();
-    const unique = await isReferenceUnique(refUpper, articleId);
-    if (!unique) {
-      return { success: false, error: `La référence "${refUpper}" est déjà utilisée` };
-    }
-
     const old = await db.article.findUnique({
       where: { id: articleId },
       select: { name: true, price: true, status: true },
@@ -235,7 +224,6 @@ export async function updateArticle(
     await db.article.update({
       where: { id: articleId },
       data: {
-        reference: refUpper,
         barcode: data.barcode || null,
         name: data.name,
         shortDescription: data.shortDescription || null,

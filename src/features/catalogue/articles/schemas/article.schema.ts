@@ -12,11 +12,8 @@ const STATUSES = [
 export const articleSchema = z
   .object({
     name: z.string().min(1, "Le nom est requis").max(200, "Trop long"),
-    reference: z
-      .string()
-      .min(1, "La référence est requise")
-      .max(50)
-      .regex(/^[A-Z0-9\-_]+$/, "Uniquement lettres majuscules, chiffres, - et _"),
+    // Auto-générée côté serveur : jamais saisie, ignorée à la création et à la modification
+    reference: z.string().max(50).optional(),
     barcode: z.string().max(50).optional().or(z.literal("")),
     shortDescription: z.string().max(300).optional().or(z.literal("")),
     description: z.string().max(5000).optional().or(z.literal("")),
