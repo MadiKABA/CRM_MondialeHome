@@ -1,11 +1,8 @@
 import { z } from "zod";
 
-const phoneRegex = /^\+221[0-9]{9}$/;
-const phoneField = z
-  .string()
-  .regex(phoneRegex, "Format : +221XXXXXXXXX")
-  .optional()
-  .or(z.literal(""));
+import { phoneFieldSchema } from "@/lib/phone/zod";
+
+const phoneField = phoneFieldSchema;
 
 // ── Création / Modification ──────────────────────────────────────────────────
 export const clientSchema = z.object({

@@ -34,7 +34,37 @@ import type { ImportResult } from "../types";
 
 type Result<T = undefined> =
   | { success: true; data?: T }
-  | { success: false; error: string };
+  | { success: false; error: string; existingClientId?: string };
+
+const DUPLICATE_PHONE_ERROR = "Ce numéro est déjà associé à un client";
+
+// Unicité vérifiée sur le numéro normalisé (E.164). La contrainte DB est globale :
+// un client supprimé garde son numéro, on le signale sans lien vers sa fiche.
+async function findPhoneConflict(
+  phone: string,
+  excludeClientId?: string
+): Promise<Result | null> {
+  const existing = await db.client.findFirst({
+    where: { phone, ...(excludeClientId && { NOT: { id: excludeClientId } }) },
+    select: { id: true, deletedAt: true },
+  });
+  if (!existing) return null;
+  if (existing.deletedAt) {
+    return {
+      success: false,
+      error: "Ce numéro est associé à un client supprimé",
+    };
+  }
+  return { success: false, error: DUPLICATE_PHONE_ERROR, existingClientId: existing.id };
+}
+
+function isUniquePhoneViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: string }).code === "P2002"
+  );
+}
 
 async function getUser() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -75,14 +105,18 @@ export async function createClient(input: ClientInput): Promise<Result<{ id: str
 
     await checkPermission(PERMISSIONS.CLIENTS_CREATE_ALL);
 
-    const data = clientSchema.parse(input);
+    const parsed = clientSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message ?? "Données invalides",
+      };
+    }
+    const data = parsed.data;
 
     if (data.phone) {
-      const dup = await db.client.findFirst({
-        where: { phone: data.phone, deletedAt: null },
-        select: { id: true },
-      });
-      if (dup) return { success: false, error: "Un client avec ce numéro existe déjà" };
+      const conflict = await findPhoneConflict(data.phone);
+      if (conflict) return conflict;
     }
 
     const reference = await generateReference();
@@ -124,6 +158,8 @@ export async function createClient(input: ClientInput): Promise<Result<{ id: str
 
     return { success: true, data: { id: client.id } };
   } catch (error) {
+    if (isUniquePhoneViolation(error))
+      return { success: false, error: DUPLICATE_PHONE_ERROR };
     logger.error({ error }, "Failed to create client");
     return { success: false, error: "Une erreur est survenue" };
   }
@@ -140,19 +176,19 @@ export async function updateClient(
 
     await checkPermission(PERMISSIONS.CLIENTS_UPDATE_ALL);
 
-    const data = clientSchema.parse(input);
+    const parsed = clientSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message ?? "Données invalides",
+      };
+    }
+    const data = parsed.data;
     const fullName = [data.firstName, data.lastName].filter(Boolean).join(" ");
 
     if (data.phone) {
-      const dup = await db.client.findFirst({
-        where: { phone: data.phone, deletedAt: null, NOT: { id: clientId } },
-        select: { id: true },
-      });
-      if (dup)
-        return {
-          success: false,
-          error: "Ce numéro est déjà utilisé par un autre client",
-        };
+      const conflict = await findPhoneConflict(data.phone, clientId);
+      if (conflict) return conflict;
     }
 
     await db.client.update({
@@ -189,6 +225,8 @@ export async function updateClient(
 
     return { success: true };
   } catch (error) {
+    if (isUniquePhoneViolation(error))
+      return { success: false, error: DUPLICATE_PHONE_ERROR };
     logger.error({ error }, "Failed to update client");
     return { success: false, error: "Une erreur est survenue" };
   }

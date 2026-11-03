@@ -105,7 +105,16 @@ export function ClientForm({ client, tagSuggestions = [] }: ClientFormProps) {
       }
       router.refresh();
     } else {
-      toast.error(result.error);
+      const existingId =
+        "existingClientId" in result ? result.existingClientId : undefined;
+      toast.error(result.error, {
+        action: existingId
+          ? {
+              label: "Voir la fiche",
+              onClick: () => router.push(`/clients/${existingId}`),
+            }
+          : undefined,
+      });
     }
   };
 
