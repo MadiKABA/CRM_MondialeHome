@@ -2,6 +2,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppHeader } from "@/components/layout/app-header";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { PermissionsProvider } from "@/components/providers/permissions-provider";
 import { getServerSession } from "@/lib/permissions/server";
 
 export const dynamic = "force-dynamic";
@@ -13,28 +14,25 @@ export default async function DashboardLayout({
 }) {
   const session = await getServerSession();
 
-  const isSuperAdmin =
-    (session?.user as { isSuperAdmin?: boolean } | undefined)?.isSuperAdmin ?? false;
-
-  // Pré-calcul des permissions pour la sidebar — évite un appel DB côté client
+  // Source unique : getEffectivePermissions (super admin => "*")
   let userPermissions: string[] = [];
-  if (session && !isSuperAdmin) {
+  if (session) {
     const { getEffectivePermissions } = await import("@/features/admin/lib/permissions");
-    const perms = await getEffectivePermissions(session.user.id);
-    userPermissions = [...perms];
-  } else if (isSuperAdmin) {
-    userPermissions = ["*"];
+    userPermissions = [...(await getEffectivePermissions(session.user.id))];
   }
+  const isSuperAdmin = userPermissions.includes("*");
 
   return (
     <TooltipProvider>
-      <SidebarProvider>
-        <AppSidebar userPermissions={userPermissions} isSuperAdmin={isSuperAdmin} />
-        <SidebarInset>
-          <AppHeader />
-          <main className="flex flex-1 flex-col gap-4 p-4 md:p-6">{children}</main>
-        </SidebarInset>
-      </SidebarProvider>
+      <PermissionsProvider permissions={userPermissions}>
+        <SidebarProvider>
+          <AppSidebar userPermissions={userPermissions} isSuperAdmin={isSuperAdmin} />
+          <SidebarInset>
+            <AppHeader />
+            <main className="flex flex-1 flex-col gap-4 p-4 md:p-6">{children}</main>
+          </SidebarInset>
+        </SidebarProvider>
+      </PermissionsProvider>
     </TooltipProvider>
   );
 }
