@@ -6,7 +6,15 @@ import { toast } from "sonner";
 import { Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createCampaign, updateCampaign } from "../../server/actions";
-import { uploadCampaignImages } from "../../lib/cloudinary-upload";
+import {
+  uploadCampaignImages,
+  uploadBanner,
+  uploadFreeImage,
+  BANNER_KEY,
+  type UploadFailure,
+} from "../../lib/cloudinary-upload";
+import { uploadErrorMessage } from "@/lib/upload/client";
+import { UploadFailures } from "./upload-failures";
 import { StepInfo } from "./step-info";
 import { StepTemplate } from "./step-template";
 import { StepContent } from "./step-content";
@@ -70,6 +78,8 @@ export function CampaignForm({
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [failures, setFailures] = useState<UploadFailure[]>([]);
+  const [retryingKey, setRetryingKey] = useState<string | null>(null);
   const isEdit = mode === "edit" && !!campaignId;
 
   const [formState, setFormState] = useState<CampaignFormState>({
@@ -118,17 +128,49 @@ export function CampaignForm({
     }
   };
 
+  // Réessaie UNE image en échec, sans toucher aux autres
+  const handleRetry = async (key: string) => {
+    setRetryingKey(key);
+    try {
+      if (key === BANNER_KEY) {
+        update({ banner: await uploadBanner(formState.banner) });
+      } else {
+        const img = formState.freeImages.find((i) => i.id === key);
+        if (!img) return;
+        const uploaded = await uploadFreeImage(img);
+        setFormState((prev) => ({
+          ...prev,
+          freeImages: prev.freeImages.map((i) => (i.id === key ? uploaded : i)),
+        }));
+      }
+      setFailures((prev) => prev.filter((f) => f.key !== key));
+    } catch (err) {
+      const message = uploadErrorMessage(err);
+      setFailures((prev) => prev.map((f) => (f.key === key ? { ...f, message } : f)));
+    } finally {
+      setRetryingKey(null);
+    }
+  };
+
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
       setUploadStatus("Envoi des images vers Cloudinary...");
-      const { banner, freeImages, errors } = await uploadCampaignImages(
-        formState.banner,
-        formState.freeImages
-      );
+      const {
+        banner,
+        freeImages,
+        failures: uploadFailures,
+      } = await uploadCampaignImages(formState.banner, formState.freeImages);
 
-      if (errors.length > 0) {
-        toast.error(`Erreur lors de l'upload des images : ${errors.join(" · ")}`);
+      // Les images réussies sont conservées dans l'état : un nouvel essai
+      // n'enverra que celles qui restent.
+      update({ banner, freeImages });
+      setFailures(uploadFailures);
+
+      if (uploadFailures.length > 0) {
+        toast.error(
+          `${uploadFailures.length} image(s) non envoyée(s). Corrigez-les ou réessayez.`
+        );
         return;
       }
 
@@ -267,6 +309,18 @@ export function CampaignForm({
           <StepReview state={formState} templates={templates} segments={segments} />
         )}
       </div>
+
+      {step === STEPS.length - 1 && (
+        <UploadFailures
+          failures={failures.filter(
+            (f) =>
+              f.key === BANNER_KEY || formState.freeImages.some((i) => i.id === f.key)
+          )}
+          retryingKey={retryingKey}
+          disabled={isSubmitting}
+          onRetry={handleRetry}
+        />
+      )}
 
       {/* Navigation */}
       <div className="flex items-center justify-between">
