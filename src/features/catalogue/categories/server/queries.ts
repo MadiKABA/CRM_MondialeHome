@@ -86,7 +86,7 @@ export async function getCategoriesForSelect(): Promise<CategorySelectOption[]> 
   const tree = await getCategoryTree();
   const options: CategorySelectOption[] = [];
 
-  function flatten(nodes: CategoryTreeNode[]) {
+  function flatten(nodes: CategoryTreeNode[], parents: string[] = []) {
     for (const node of nodes) {
       const prefix = "— ".repeat(node.depth);
       options.push({
@@ -97,8 +97,9 @@ export async function getCategoriesForSelect(): Promise<CategorySelectOption[]> 
         parentId: node.parentId,
         isActive: node.isActive,
         displayName: `${prefix}${node.name}`,
+        fullPath: [...parents, node.name].join(" → "),
       });
-      if (node.children.length > 0) flatten(node.children);
+      if (node.children.length > 0) flatten(node.children, [...parents, node.name]);
     }
   }
 

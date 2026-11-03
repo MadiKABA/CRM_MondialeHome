@@ -29,4 +29,6 @@ export interface CategorySelectOption {
   parentId: string | null;
   isActive: boolean;
   displayName: string;
+  /** Libellé complet « Parent → Enfant » */
+  fullPath: string;
 }

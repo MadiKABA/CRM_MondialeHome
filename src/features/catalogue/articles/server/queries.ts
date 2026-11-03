@@ -48,7 +48,7 @@ function buildCategoryPath(category: CategoryNode): string | null {
     parts.unshift(current.name);
     current = current.parent ?? null;
   }
-  return parts.join(" > ");
+  return parts.join(" → ");
 }
 
 type ArticleRow = {
