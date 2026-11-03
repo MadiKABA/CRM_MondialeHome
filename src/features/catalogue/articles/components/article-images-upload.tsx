@@ -167,7 +167,9 @@ export function ArticleImagesUpload({
           toast.success(`${file.name} uploadé`);
         }
       } catch {
-        toast.error(`Erreur lors de l'upload de ${file.name}`);
+        toast.error(
+          `${file.name} : l'image n'a pas pu être envoyée. Vérifiez le format et la taille (5 Mo maximum).`
+        );
       } finally {
         URL.revokeObjectURL(previewUrl);
         setUploadingSecondary((prev) => prev.filter((i) => i.localId !== localId));

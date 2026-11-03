@@ -101,7 +101,11 @@ export async function uploadArticleMainImage(
     return { success: true, data: { url: uploaded.url } };
   } catch (error) {
     logger.error({ error }, "Failed to upload article main image");
-    return { success: false, error: "Erreur lors de l'upload" };
+    return {
+      success: false,
+      error:
+        "L'image n'a pas pu être envoyée. Vérifiez le format et la taille (5 Mo maximum).",
+    };
   }
 }
 
@@ -201,7 +205,11 @@ export async function uploadArticleSecondaryImage(
     return { success: true, data: { url: uploaded.url } };
   } catch (error) {
     logger.error({ error }, "Failed to upload secondary image");
-    return { success: false, error: "Erreur lors de l'upload" };
+    return {
+      success: false,
+      error:
+        "L'image n'a pas pu être envoyée. Vérifiez le format et la taille (5 Mo maximum).",
+    };
   }
 }
 
